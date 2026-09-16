@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/playwright:v1.55.0-noble
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install
 COPY worker ./worker
 COPY tsconfig.json ./
 ENV APPLICATION_MODE=PREPARE_ONLY
