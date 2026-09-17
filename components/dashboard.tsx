@@ -253,6 +253,7 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
               rows={documents}
               busy={busy}
               approve={(id) => action(id, `/api/documents/${id}/approve`)}
+              upload={(id) => action(id, `/api/documents/${id}/drive`)}
             />
           ) : tab === "questions" ? (
             <Questions rows={questions} />
@@ -439,10 +440,12 @@ function Documents({
   rows,
   busy,
   approve,
+  upload,
 }: {
   rows: DocumentRecord[];
   busy: string;
   approve: (id: string) => Promise<void>;
+  upload: (id: string) => Promise<void>;
 }) {
   return rows.length ? (
     <table>
@@ -492,6 +495,15 @@ function Documents({
                     onClick={() => approve(d.id)}
                   >
                     Approuver
+                  </button>
+                )}
+                {d.approved && !d.storage_path && (
+                  <button
+                    className="btn small"
+                    disabled={Boolean(busy)}
+                    onClick={() => upload(d.id)}
+                  >
+                    Envoyer vers Drive
                   </button>
                 )}
               </div>
