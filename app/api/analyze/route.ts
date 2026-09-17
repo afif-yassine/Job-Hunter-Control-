@@ -1,7 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
 const input=z.object({jobDescription:z.string().min(50).max(30000),verifiedProfile:z.string().min(20).max(30000)});
 export async function POST(req:Request){
+ const supabase=await createClient();
+ if(!supabase)return Response.json({error:"Supabase is not configured"},{status:503});
+ const {data}=await supabase.auth.getClaims();
+ if(!data?.claims?.sub)return Response.json({error:"Unauthorized"},{status:401});
  if(!process.env.GEMINI_API_KEY)return Response.json({error:"GEMINI_API_KEY is not configured"},{status:503});
  const parsed=input.safeParse(await req.json());if(!parsed.success)return Response.json({error:"Invalid input"},{status:400});
  const ai=new GoogleGenAI({apiKey:process.env.GEMINI_API_KEY});
