@@ -1,0 +1,2 @@
+import { authenticatedClient } from "@/lib/api";
+export async function POST(_:Request,{params}:{params:Promise<{id:string}>}){const auth=await authenticatedClient();if("error" in auth)return auth.error;const {id}=await params;const {data,error}=await auth.supabase.from("documents").update({approved:true}).eq("id",id).eq("user_id",auth.userId).select().single();if(error)return Response.json({error:error.message},{status:400});return Response.json(data)}
