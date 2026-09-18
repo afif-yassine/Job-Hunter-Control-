@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BriefcaseBusiness,
+  Bell,
   FileText,
   HelpCircle,
   LayoutDashboard,
@@ -16,6 +17,7 @@ import type {
   DocumentRecord,
   Job,
   Question,
+  NotificationRecord,
 } from "@/lib/types";
 import { logout } from "@/app/login/actions";
 export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
@@ -24,6 +26,7 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
     [apps, setApps] = useState<Application[]>([]),
     [questions, setQuestions] = useState<Question[]>([]),
     [documents, setDocuments] = useState<DocumentRecord[]>([]),
+    [notifications, setNotifications] = useState<NotificationRecord[]>([]),
     [runs, setRuns] = useState<AgentRun[]>([]),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(""),
@@ -37,7 +40,7 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
       setLoading(false);
       return;
     }
-    const [j, a, q, d, r] = await Promise.all([
+    const [j, a, q, d, r, n] = await Promise.all([
       supabase
         .from("jobs")
         .select("*")
@@ -58,20 +61,69 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
         .from("agent_runs")
         .select("*")
         .order("created_at", { ascending: false }),
+      supabase
+        .from("notifications")
+        .select("*")
+        .order("created_at", { ascending: false }),
     ]);
     setJobs(j.data || []);
     setApps((a.data || []) as Application[]);
     setQuestions(q.data || []);
     setDocuments((d.data || []) as DocumentRecord[]);
     setRuns((r.data || []) as AgentRun[]);
+    setNotifications((n.data || []) as NotificationRecord[]);
     setLoading(false);
   }
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
+    if (!supabase) return () => window.clearTimeout(timer);
+    const channel = supabase
+      .channel("job-hunter-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "applications" }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => void load())
+      .subscribe();
+    return () => {
+      window.clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
     // The Supabase client is stable for the lifetime of this dashboard.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  async function runSmartPipeline() {
+    const pending = jobs.filter((job) => job.status === "DISCOVERED" && job.description);
+    if (!pending.length) {
+      setMessage("Aucune nouvelle offre complète à traiter.");
+      return;
+    }
+    setBusy("pipeline");
+    let analyzed = 0, prepared = 0, failed = 0;
+    for (const job of pending) {
+      try {
+        setMessage(`Analyse Gemini ${analyzed + 1}/${pending.length} · ${job.company}`);
+        const analysisResponse = await fetch(`/api/jobs/${job.id}/analyze`, { method: "POST" });
+        const analysis = await analysisResponse.json();
+        if (!analysisResponse.ok) throw new Error(analysis.error || "Analyse impossible");
+        analyzed += 1;
+        if (analysis.total >= 80) {
+          const generationResponse = await fetch(`/api/jobs/${job.id}/generate`, { method: "POST" });
+          const generation = await generationResponse.json();
+          if (!generationResponse.ok) throw new Error(generation.error || "Génération impossible");
+          prepared += 1;
+        }
+      } catch {
+        failed += 1;
+      }
+    }
+    setBusy("");
+    setMessage(`Pipeline terminé : ${analyzed} analysée(s), ${prepared} préparée(s), ${failed} échec(s).`);
+    await load();
+  }
+  async function markNotificationRead(id: string) {
+    if (!supabase) return;
+    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
+    await load();
+  }
   async function addJob(form: FormData) {
     if (!supabase) return;
     const {
@@ -144,6 +196,7 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
     }
   }
   const high = jobs.filter((j) => (j.match_score || 0) >= 80).length;
+  const unread = notifications.filter((n) => !n.read_at).length;
   return (
     <main className="shell">
       <header className="top">
@@ -170,6 +223,7 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
       <section className="grid">
         <Metric label="Offres" value={jobs.length} />
         <Metric label="Score ≥ 80" value={high} />
+        <Metric label="À traiter" value={jobs.filter((j) => j.status === "DISCOVERED").length} />
         <Metric label="Documents" value={documents.length} />
         <Metric
           label="Blocages"
@@ -182,6 +236,7 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
             ["jobs", LayoutDashboard, "Offres"],
             ["applications", BriefcaseBusiness, "Candidatures"],
             ["documents", FileText, "Documents"],
+            ["notifications", Bell, `Notifications${unread ? ` (${unread})` : ""}`],
             ["questions", HelpCircle, "Questions"],
             ["runs", Play, "Exécutions"],
             ["settings", Settings, "Réglages"],
@@ -216,6 +271,7 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
                       jobs: "Pipeline des offres",
                       applications: "Candidatures",
                       documents: "Documents générés",
+                      notifications: "Centre de notifications",
                       questions: "Questions à valider",
                       runs: "Journal d’exécution",
                       settings: "Configuration",
@@ -230,6 +286,9 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
             </div>
             {tab === "jobs" && (
               <div className="toolbar">
+                <button className="btn smart" disabled={Boolean(busy)} onClick={() => void runSmartPipeline()}>
+                  {busy === "pipeline" ? "Pipeline en cours…" : "Lancer le pipeline intelligent"}
+                </button>
                 <button className="btn secondary" onClick={() => void load()}>
                   Actualiser
                 </button>
@@ -255,6 +314,8 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
               approve={(id) => action(id, `/api/documents/${id}/approve`)}
               upload={(id) => action(id, `/api/documents/${id}/drive`)}
             />
+          ) : tab === "notifications" ? (
+            <Notifications rows={notifications} markRead={markNotificationRead} />
           ) : tab === "questions" ? (
             <Questions rows={questions} />
           ) : tab === "runs" ? (
@@ -339,6 +400,7 @@ function Jobs({
           <tr>
             <th>Entreprise / poste</th>
             <th>Score</th>
+            <th>Source</th>
             <th>Statut</th>
             <th>Commandes</th>
           </tr>
@@ -354,6 +416,7 @@ function Jobs({
                 </span>
               </td>
               <td className="score">{j.match_score ?? "—"}</td>
+              <td>{j.source_url ? <a href={j.source_url} target="_blank">Ouvrir</a> : "Manuelle"}</td>
               <td>
                 <span className={`status ${j.status.toLowerCase()}`}>
                   {j.status}
@@ -389,6 +452,26 @@ function Jobs({
   ) : (
     <Empty text="Aucune offre. Ajoutez une offre et sa description." />
   );
+}
+function Notifications({ rows, markRead }: { rows: NotificationRecord[]; markRead: (id: string) => Promise<void> }) {
+  return rows.length ? (
+    <div className="feed">
+      {rows.map((n) => (
+        <article className={`notice ${n.read_at ? "read" : "unread"}`} key={n.id}>
+          <div>
+            <span className="eyebrow">{n.notification_type}</span>
+            <h3>{n.title}</h3>
+            <p>{n.message}</p>
+            <span className="muted">{new Date(n.created_at).toLocaleString("fr-FR")}</span>
+          </div>
+          <div className="toolbar">
+            {n.action_url && <a className="btn secondary small" href={n.action_url} target="_blank">Ouvrir</a>}
+            {!n.read_at && <button className="btn small" onClick={() => void markRead(n.id)}>Marquer lu</button>}
+          </div>
+        </article>
+      ))}
+    </div>
+  ) : <Empty text="Aucune notification." />;
 }
 function Applications({
   rows,
@@ -588,10 +671,7 @@ function SettingsPanel({ configured }: { configured: boolean }) {
         Gemini : <strong>serveur uniquement</strong>
       </p>
       <p>
-        Drive :{" "}
-        <strong>
-          destination configurée, synchronisation serveur à finaliser par OAuth
-        </strong>
+        Drive : <strong>compte de service et dossiers configurés</strong>
       </p>
       <p>
         Playwright Railway : <strong>inspection contrôlée</strong>
