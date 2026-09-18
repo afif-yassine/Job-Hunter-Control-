@@ -91,6 +91,9 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   async function runSmartPipeline() {
+    if (!supabase) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
     const pending = jobs.filter((job) => job.status === "DISCOVERED" && job.description);
     if (!pending.length) {
       setMessage("Aucune nouvelle offre complète à traiter.");
@@ -110,6 +113,14 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
           const generation = await generationResponse.json();
           if (!generationResponse.ok) throw new Error(generation.error || "Génération impossible");
           prepared += 1;
+          if (supabase) await supabase.from("notifications").insert({
+            user_id: user.id,
+            notification_type: "DOCUMENTS_READY",
+            title: `${job.company} · documents prêts`,
+            message: `${generation.documents?.length || 0} document(s) généré(s), ${generation.questions?.length || 0} question(s) à vérifier.`,
+            action_url: job.official_url || job.source_url,
+            delivery_channels: ["dashboard"],
+          });
         }
       } catch {
         failed += 1;
