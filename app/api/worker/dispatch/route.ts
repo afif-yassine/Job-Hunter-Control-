@@ -91,5 +91,16 @@ export async function POST(req: Request) {
           approved: false,
         })),
       );
+  await supabase.from("notifications").insert({
+    user_id: userId,
+    application_id: application.id,
+    notification_type: body.questions?.length ? "ACTION_REQUIRED" : "FORM_PREPARED",
+    title: body.questions?.length ? "Préparation Playwright interrompue" : "Formulaire inspecté",
+    message: body.questions?.length
+      ? `${body.questions.length} blocage(s) nécessitent votre intervention. Aucun envoi n’a été effectué.`
+      : `${body.fields?.length || 0} champ(s) détecté(s). La soumission finale reste désactivée.`,
+    action_url: url,
+    delivery_channels: ["dashboard"],
+  });
   return Response.json(body, { status: response.status });
 }
