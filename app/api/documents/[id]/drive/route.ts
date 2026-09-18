@@ -82,6 +82,14 @@ export async function POST(
       action: "UPLOADED_TO_DRIVE",
       details: { driveFileId: created.data.id },
     });
+  await auth.supabase.from("notifications").insert({
+    user_id: auth.userId,
+    notification_type: "DRIVE_UPLOAD",
+    title: `${doc.filename} ajouté à Drive`,
+    message: "Le PDF approuvé est disponible dans le dossier Drive prévu.",
+    action_url: link,
+    delivery_channels: ["dashboard"],
+  });
   return Response.json({
     id: created.data.id,
     name: created.data.name,
