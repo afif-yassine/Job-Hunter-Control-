@@ -51,7 +51,7 @@ export async function POST(
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const prompt = `Analyse cette offre uniquement avec le profil et le registre de vérité. N'invente jamais une compétence, une expérience, une date, un statut légal ou un diplôme. Réponds en JSON: score_breakdown avec contract/20, mission/20, technical/25, education/15, experience/10, location/10; total sur 100; verified_strengths; gaps; questions; cv_summary.\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify(job)}`;
     const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.6-flash",
       contents: prompt,
       config: { responseMimeType: "application/json" },
     });
