@@ -11,6 +11,6 @@ export async function POST(req:Request){
  const parsed=input.safeParse(await req.json());if(!parsed.success)return Response.json({error:"Invalid input"},{status:400});
  const ai=new GoogleGenAI({apiKey:process.env.GEMINI_API_KEY});
  const prompt=`You are a strict job matching assistant. Use only facts explicitly present in VERIFIED PROFILE. Never invent experience, dates, tools, authorization or salary. Return JSON with score_breakdown (contract/20, mission/20, technical/25, education/15, experience/10, location/10), total, verified_strengths, gaps, questions, and cv_summary.\nVERIFIED PROFILE:\n${parsed.data.verifiedProfile}\nJOB:\n${parsed.data.jobDescription}`;
- const result=await ai.models.generateContent({model:"gemini-2.5-flash",contents:prompt,config:{responseMimeType:"application/json"}});
+ const result=await ai.models.generateContent({model:"gemini-3.6-flash",contents:prompt,config:{responseMimeType:"application/json"}});
  return Response.json(JSON.parse(result.text||"{}"));
 }
