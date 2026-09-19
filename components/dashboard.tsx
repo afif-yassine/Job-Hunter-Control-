@@ -678,3 +678,36 @@ function Runs({ rows }: { rows: AgentRun[] }) {
             </td>
             <td>{new Date(r.created_at).toLocaleString("fr-FR")}</td>
             <td>{r.error_message || JSON.stringify(r.counters)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  ) : (
+    <Empty text="Aucune exécution enregistrée." />
+  );
+}
+function SettingsPanel({ configured }: { configured: boolean }) {
+  return (
+    <div>
+      <p className="alert">
+        PREPARE_ONLY : jamais de clic final. CAPTCHA, MFA, consentement légal ou
+        donnée inconnue provoquent une pause.
+      </p>
+      <p>
+        Supabase : <strong>{configured ? "configuré" : "absent"}</strong>
+      </p>
+      <p>
+        Gemini : <strong>serveur uniquement</strong>
+      </p>
+      <p>
+        Drive : <strong>compte de service et dossiers configurés</strong>
+      </p>
+      <p>
+        Playwright Railway : <strong>inspection contrôlée</strong>
+      </p>
+    </div>
+  );
+}
+function Empty({ text }: { text: string }) {
+  return <div className="empty">{text}</div>;
+}
