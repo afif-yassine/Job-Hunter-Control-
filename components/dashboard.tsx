@@ -105,7 +105,7 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
       try {
         setMessage(`Analyse Gemini ${analyzed + 1}/${pending.length} · ${job.company}`);
         const analysisResponse = await fetch(`/api/jobs/${job.id}/analyze`, { method: "POST" });
-        const analysis = await analysisResponse.json();
+        const analysis = await analysisResponse.json().catch(() => ({ error: `Réponse vide du serveur (${analysisResponse.status})` }));
         if (!analysisResponse.ok) throw new Error(analysis.error || "Analyse impossible");
         analyzed += 1;
         if (analysis.total >= 80) {
@@ -129,6 +129,21 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
     setBusy("");
     setMessage(`Pipeline terminé : ${analyzed} analysée(s), ${prepared} préparée(s), ${failed} échec(s).`);
     await load();
+  }
+  async function scanOffers() {
+    setBusy("scan");
+    setMessage("");
+    try {
+      const response = await fetch("/api/scan", { method: "POST" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Scan impossible");
+      setMessage(body.message || "Scan lancé. Les nouvelles offres apparaîtront automatiquement.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Scan impossible.");
+    } finally {
+      setBusy("");
+    }
   }
   async function markNotificationRead(id: string) {
     if (!supabase) return;
@@ -299,6 +314,9 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
               <div className="toolbar">
                 <button className="btn smart" disabled={Boolean(busy)} onClick={() => void runSmartPipeline()}>
                   {busy === "pipeline" ? "Pipeline en cours…" : "Lancer le pipeline intelligent"}
+                </button>
+                <button className="btn" disabled={Boolean(busy)} onClick={() => void scanOffers()}>
+                  {busy === "scan" ? "Scan en cours…" : "Scanner les offres maintenant"}
                 </button>
                 <button className="btn secondary" onClick={() => void load()}>
                   Actualiser
@@ -660,36 +678,3 @@ function Runs({ rows }: { rows: AgentRun[] }) {
             </td>
             <td>{new Date(r.created_at).toLocaleString("fr-FR")}</td>
             <td>{r.error_message || JSON.stringify(r.counters)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <Empty text="Aucune exécution enregistrée." />
-  );
-}
-function SettingsPanel({ configured }: { configured: boolean }) {
-  return (
-    <div>
-      <p className="alert">
-        PREPARE_ONLY : jamais de clic final. CAPTCHA, MFA, consentement légal ou
-        donnée inconnue provoquent une pause.
-      </p>
-      <p>
-        Supabase : <strong>{configured ? "configuré" : "absent"}</strong>
-      </p>
-      <p>
-        Gemini : <strong>serveur uniquement</strong>
-      </p>
-      <p>
-        Drive : <strong>compte de service et dossiers configurés</strong>
-      </p>
-      <p>
-        Playwright Railway : <strong>inspection contrôlée</strong>
-      </p>
-    </div>
-  );
-}
-function Empty({ text }: { text: string }) {
-  return <div className="empty">{text}</div>;
-}
