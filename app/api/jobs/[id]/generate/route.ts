@@ -59,7 +59,7 @@ export async function POST(
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const prompt = `Génère le contenu d'un CV ATS français d'une page et, si utile, une lettre courte. Utilise exclusivement les faits du PROFIL et du REGISTRE. Sélectionne et reformule, sans inventer. Toute donnée légale, immigration, salaire numérique, handicap, casier, certification incertaine ou information absente devient unresolved_questions. JSON strict: cv {title,summary,experience[{heading,bullets}],projects[{heading,bullets}],skills[],education[],languages}, cover_letter string|null, unresolved_questions[{question,category}].\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify(job)}`;
   const result = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-3.6-flash",
     contents: prompt,
     config: { responseMimeType: "application/json" },
   });
