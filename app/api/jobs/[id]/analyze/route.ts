@@ -47,34 +47,39 @@ export async function POST(
       { error: "Le profil vérifié n’est pas encore synchronisé." },
       { status: 409 },
     );
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const prompt = `Analyse cette offre uniquement avec le profil et le registre de vérité. N'invente jamais une compétence, une expérience, une date, un statut légal ou un diplôme. Réponds en JSON: score_breakdown avec contract/20, mission/20, technical/25, education/15, experience/10, location/10; total sur 100; verified_strengths; gaps; questions; cv_summary.\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify(job)}`;
-  const result = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: { responseMimeType: "application/json" },
-  });
-  const parsed = output.safeParse(JSON.parse(result.text || "{}"));
-  if (!parsed.success)
-    return Response.json({ error: "Réponse Gemini invalide" }, { status: 502 });
-  await auth.supabase
-    .from("jobs")
-    .update({
-      match_score: Math.round(parsed.data.total),
-      score_breakdown: parsed.data,
-      status: "ANALYZED",
-      last_checked_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .eq("user_id", auth.userId);
-  await auth.supabase
-    .from("audit_events")
-    .insert({
-      user_id: auth.userId,
-      entity_type: "job",
-      entity_id: id,
-      action: "ANALYZED",
-      details: { score: parsed.data.total },
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const prompt = `Analyse cette offre uniquement avec le profil et le registre de vérité. N'invente jamais une compétence, une expérience, une date, un statut légal ou un diplôme. Réponds en JSON: score_breakdown avec contract/20, mission/20, technical/25, education/15, experience/10, location/10; total sur 100; verified_strengths; gaps; questions; cv_summary.\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify(job)}`;
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: { responseMimeType: "application/json" },
     });
-  return Response.json(parsed.data);
+    const parsed = output.safeParse(JSON.parse(result.text || "{}"));
+    if (!parsed.success)
+      return Response.json({ error: "Réponse Gemini invalide ou vide" }, { status: 502 });
+    await auth.supabase
+      .from("jobs")
+      .update({
+        match_score: Math.round(parsed.data.total),
+        score_breakdown: parsed.data,
+        status: "ANALYZED",
+        last_checked_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("user_id", auth.userId);
+    await auth.supabase
+      .from("audit_events")
+      .insert({
+        user_id: auth.userId,
+        entity_type: "job",
+        entity_id: id,
+        action: "ANALYZED",
+        details: { score: parsed.data.total },
+      });
+    return Response.json(parsed.data);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Erreur inconnue Gemini";
+    return Response.json({ error: `Analyse Gemini impossible : ${detail}` }, { status: 502 });
+  }
 }
