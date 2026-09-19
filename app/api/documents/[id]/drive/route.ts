@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
 import { google } from "googleapis";
 import { authenticatedClient } from "@/lib/api";
+import { renderContextFor } from "@/lib/documents";
 import { renderDocumentPdf } from "@/lib/pdf";
 function credentials() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -53,7 +54,10 @@ export async function POST(
     scopes: ["https://www.googleapis.com/auth/drive.file"],
   });
   const drive = google.drive({ version: "v3", auth: client });
-  const pdf = await renderDocumentPdf(doc);
+  const pdf = await renderDocumentPdf(
+    doc,
+    await renderContextFor(auth.supabase, auth.userId, doc),
+  );
   const created = await drive.files.create({
     requestBody: {
       name: doc.filename,

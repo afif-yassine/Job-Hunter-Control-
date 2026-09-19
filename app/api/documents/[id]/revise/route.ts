@@ -1,6 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { authenticatedClient } from "@/lib/api";
+import {
+  ACCENTS,
+  DENSITIES,
+  TEMPLATES,
+  designFromInstruction,
+  normalizeDesign,
+  sameDesign,
+} from "@/lib/design";
 import { parseContent, versionedFilename } from "@/lib/documents";
 import { normaliseGenerated, parseJson, asRecord, asText } from "@/lib/generated";
 import { queueQuestions } from "@/lib/question-store";
@@ -48,18 +56,26 @@ export async function POST(
   const isLetter = doc.kind === "COVER_LETTER";
   const current = parseContent(doc.content_text);
   const shape = isLetter
-    ? `{"cover_letter": string, "unresolved_questions": [{"question": string, "category": string}], "change_summary": string}`
-    : `{"cv": {"title","summary","experience":[{"heading","bullets":[]}],"projects":[{"heading","bullets":[]}],"skills":[],"education":[],"languages"}, "unresolved_questions": [{"question": string, "category": string}], "change_summary": string}`;
+    ? `{"cover_letter": string, "design": {"template","accent","density"}, "unresolved_questions": [{"question": string, "category": string}], "change_summary": string}`
+    : `{"cv": {"title","summary","experience":[{"heading","bullets":[]}],"projects":[{"heading","bullets":[]}],"skills":[],"education":[],"languages"}, "design": {"template","accent","density"}, "unresolved_questions": [{"question": string, "category": string}], "change_summary": string}`;
+  const currentRecord = asRecord(current);
+  const currentDesign = normalizeDesign(currentRecord.design);
+  const { design: _ignored, ...currentContent } = currentRecord;
+  void _ignored;
   const prompt = `Tu révises un ${isLetter ? "lettre de motivation" : "CV ATS d'une page"} déjà généré, selon la demande de Yassine.
 RÈGLES STRICTES :
 - Applique uniquement la demande. Tout le reste doit rester identique.
+- Une demande de style (« professionnalise », « plus percutant », « plus direct ») change réellement le texte : formulations plus concises, verbes d'action, phrases plus nettes, sans ajouter aucun fait.
+- L'APPARENCE (design, mise en page, couleurs, sobriété, densité) est gérée par le champ "design" : template ∈ ${TEMPLATES.join("|")} ; accent ∈ ${ACCENTS.join("|")} ; density ∈ ${DENSITIES.join("|")}. Si la demande concerne l'apparence, modifie "design" et laisse le texte inchangé. Sinon renvoie le design actuel tel quel.
+${isLetter ? "- La lettre garde ses paragraphes séparés par UNE LIGNE VIDE : « Objet : … », « Madame, Monsieur, », trois paragraphes courts, formule de politesse. Ni coordonnées, ni date, ni signature." : ""}
 - Utilise exclusivement les faits du PROFIL, du REGISTRE et du contenu actuel. N'invente aucune compétence, expérience, date, diplôme, statut légal ou chiffre.
 - Si la demande exige une information absente du profil, ne l'ajoute pas : pose la question dans unresolved_questions et explique-le dans change_summary.
 - Garde la langue et le ton du document actuel, sauf demande contraire.
 - change_summary : 1 à 3 phrases en français qui disent ce qui a changé.
 Retourne uniquement du JSON de la forme ${shape}.
 DEMANDE=${JSON.stringify(parsedInput.data.instruction)}
-CONTENU_ACTUEL=${JSON.stringify(current)}
+CONTENU_ACTUEL=${JSON.stringify(currentContent)}
+DESIGN_ACTUEL=${JSON.stringify(currentDesign)}
 PROFIL=${JSON.stringify(profile.profile)}
 REGISTRE=${JSON.stringify(profile.truth_ledger)}
 OFFRE=${JSON.stringify(job)}`;
@@ -92,6 +108,14 @@ OFFRE=${JSON.stringify(job)}`;
       return Response.json({ error: "Révision invalide : CV inexploitable." }, { status: 502 });
     content = normalised.cv;
   }
+
+  // Model's design choice first, then explicit keywords of the request on top.
+  const nextDesign = designFromInstruction(
+    parsedInput.data.instruction,
+    normalizeDesign(root.design, currentDesign),
+  );
+  content = { ...(content as Record<string, unknown>), design: nextDesign };
+  const designChanged = !sameDesign(currentDesign, nextDesign);
 
   const version = (Number(doc.version) || 1) + 1;
   const { data: created, error } = await supabase
@@ -146,7 +170,11 @@ OFFRE=${JSON.stringify(job)}`;
 
   return Response.json({
     document: created,
-    summary: asText(root.change_summary) || "Document révisé.",
+    summary: `${asText(root.change_summary) || "Document révisé."}${
+      designChanged
+        ? ` Design : ${nextDesign.template}, couleur ${nextDesign.accent}, densité ${nextDesign.density}.`
+        : ""
+    }`,
     questions: asked,
   });
 }

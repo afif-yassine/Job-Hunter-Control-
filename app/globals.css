@@ -25,4 +25,11 @@
 tr.replaced td{opacity:.5}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
 .docdialog{max-width:760px}
+.pdfpreview{width:100%;height:560px;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:10px;background:#fff}
+.designpick{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:12px;padding:10px 14px}
+.designpick legend{padding:0 6px;color:var(--muted)}
+.designpick label{display:grid;gap:4px;flex:1 1 220px}
+.swatches{display:flex;gap:8px;align-items:center}
+.swatch{width:26px;height:26px;border-radius:50%;border:2px solid transparent;padding:0;cursor:pointer}
+.swatch.on{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.35)}
 .ok{color:var(--cyan)}

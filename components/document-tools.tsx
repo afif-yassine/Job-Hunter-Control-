@@ -1,6 +1,17 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { DocumentRecord } from "@/lib/types";
+import {
+  ACCENTS,
+  ACCENT_LABELS,
+  ACCENT_RGB,
+  DENSITIES,
+  DENSITY_LABELS,
+  TEMPLATES,
+  TEMPLATE_LABELS,
+  normalizeDesign,
+  type Design,
+} from "@/lib/design";
 
 type Block = { heading: string; bullets: string[] };
 type CvContent = {
@@ -65,6 +76,9 @@ export function DocumentDialog({
   const [error, setError] = useState("");
   const [instruction, setInstruction] = useState("");
   const [letter, setLetter] = useState("");
+  const [design, setDesign] = useState<Design>(normalizeDesign(null));
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [cv, setCv] = useState({
     title: "",
     summary: "",
@@ -91,6 +105,10 @@ export function DocumentDialog({
     const t = window.setTimeout(() => {
       setError("");
       setInstruction("");
+      setPreviewUrl(null);
+      setDesign(
+        normalizeDesign(readJson<{ design?: unknown }>(doc.content_text, {}).design),
+      );
       if (doc.kind === "COVER_LETTER") {
         setLetter(readJson<{ letter: string }>(doc.content_text, { letter: "" }).letter);
       } else {
@@ -117,6 +135,50 @@ export function DocumentDialog({
     return () => window.clearTimeout(t);
   }, [doc]);
 
+  function buildContent() {
+    return isLetter
+      ? { letter: letter.trim(), design }
+      : {
+          title: cv.title.trim() || "CV ciblé",
+          summary: cv.summary.trim(),
+          experience: textToBlocks(cv.experience),
+          projects: textToBlocks(cv.projects),
+          skills: cv.skills.split(",").map((s) => s.trim()).filter(Boolean),
+          education: lines(cv.education),
+          languages: cv.languages.trim(),
+          design,
+        };
+  }
+
+  // Object URLs are released when replaced / when the dialog closes.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  async function preview() {
+    if (!doc) return;
+    setPreviewing(true);
+    setError("");
+    try {
+      const r = await fetch(`/api/documents/${doc.id}/pdf`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ content: buildContent() }),
+      });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body.error || "Aperçu impossible");
+      }
+      setPreviewUrl(URL.createObjectURL(await r.blob()));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur");
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
   async function submit() {
     if (!doc) return;
     setBusy(true);
@@ -134,17 +196,7 @@ export function DocumentDialog({
           `Nouvelle version créée (v${body.document?.version}). ${body.summary}${body.questions ? ` ${body.questions} question(s) à valider.` : ""}`,
         );
       } else {
-        const content = isLetter
-          ? { letter: letter.trim() }
-          : {
-              title: cv.title.trim() || "CV ciblé",
-              summary: cv.summary.trim(),
-              experience: textToBlocks(cv.experience),
-              projects: textToBlocks(cv.projects),
-              skills: cv.skills.split(",").map((s) => s.trim()).filter(Boolean),
-              education: lines(cv.education),
-              languages: cv.languages.trim(),
-            };
+        const content = buildContent();
         const r = await fetch(`/api/documents/${doc.id}/edit`, {
           method: "PATCH",
           headers: { "content-type": "application/json" },
@@ -204,17 +256,21 @@ export function DocumentDialog({
                   rows={5}
                   value={instruction}
                   onChange={(e) => setInstruction(e.target.value)}
-                  placeholder="Ex. : mets Python et les projets IA en premier, enlève le projet X, raccourcis la lettre…"
+                  placeholder="Ex. : mets Python et les projets IA en premier, enlève le projet X, raccourcis la lettre… Pour le design : « version sobre », « en bleu marine », « plus aéré »."
                 />
               </label>
             </>
           ) : isLetter ? (
+            <>
+            <DesignPicker design={design} onChange={setDesign} />
             <label className="wide">
-              Lettre
+              Lettre <span className="muted">(une ligne vide entre deux paragraphes)</span>
               <textarea rows={16} value={letter} onChange={(e) => setLetter(e.target.value)} />
             </label>
+            </>
           ) : (
             <>
+              <DesignPicker design={design} onChange={setDesign} />
               <label className="wide">
                 Titre du CV
                 <input value={cv.title} onChange={(e) => setCv({ ...cv, title: e.target.value })} />
@@ -246,8 +302,25 @@ export function DocumentDialog({
             </>
           )}
 
+          {mode === "edit" && previewUrl && (
+            <iframe
+              className="wide pdfpreview"
+              title="Aperçu du PDF"
+              src={previewUrl}
+            />
+          )}
           {error && <p className="wide error">{error}</p>}
           <div className="wide toolbar">
+            {mode === "edit" && (
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => void preview()}
+                disabled={busy || previewing}
+              >
+                {previewing ? "Aperçu…" : "Prévisualiser"}
+              </button>
+            )}
             <button type="button" className="btn secondary" onClick={onClose} disabled={busy}>
               Annuler
             </button>
@@ -269,5 +342,64 @@ export function DocumentDialog({
         </div>
       )}
     </dialog>
+  );
+}
+
+function DesignPicker({
+  design,
+  onChange,
+}: {
+  design: Design;
+  onChange: (next: Design) => void;
+}) {
+  return (
+    <fieldset className="wide designpick">
+      <legend>Design du PDF</legend>
+      <label>
+        Modèle
+        <select
+          value={design.template}
+          onChange={(e) => onChange({ ...design, template: e.target.value as Design["template"] })}
+        >
+          {TEMPLATES.map((t) => (
+            <option key={t} value={t}>
+              {TEMPLATE_LABELS[t]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Densité
+        <select
+          value={design.density}
+          onChange={(e) => onChange({ ...design, density: e.target.value as Design["density"] })}
+        >
+          {DENSITIES.map((d) => (
+            <option key={d} value={d}>
+              {DENSITY_LABELS[d]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="swatches" role="radiogroup" aria-label="Couleur">
+        <span className="muted">Couleur</span>
+        {ACCENTS.map((a) => {
+          const [r, g, b] = ACCENT_RGB[a];
+          return (
+            <button
+              type="button"
+              key={a}
+              role="radio"
+              aria-checked={design.accent === a}
+              aria-label={ACCENT_LABELS[a]}
+              title={ACCENT_LABELS[a]}
+              className={design.accent === a ? "swatch on" : "swatch"}
+              style={{ background: `rgb(${r},${g},${b})` }}
+              onClick={() => onChange({ ...design, accent: a })}
+            />
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
