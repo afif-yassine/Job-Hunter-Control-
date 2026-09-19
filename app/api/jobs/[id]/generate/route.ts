@@ -21,6 +21,128 @@ const generated = z.object({
     z.object({ question: z.string(), category: z.string() }),
   ),
 });
+
+type Generated = z.infer<typeof generated>;
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function asText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
+  return "";
+}
+
+function asTextList(value: unknown): string[] {
+  if (Array.isArray(value))
+    return value
+      .map((item) => {
+        if (typeof item === "string") return item.trim();
+        const record = asRecord(item);
+        return asText(
+          record.name ??
+            record.title ??
+            record.label ??
+            record.text ??
+            record.description,
+        );
+      })
+      .filter(Boolean);
+  const text = asText(value);
+  return text ? [text] : [];
+}
+
+function asSections(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (typeof item === "string") {
+      const heading = item.trim();
+      return heading ? [{ heading, bullets: [] as string[] }] : [];
+    }
+    const record = asRecord(item);
+    const heading = asText(
+      record.heading ?? record.title ?? record.role ?? record.name,
+    );
+    const bullets = asTextList(
+      record.bullets ?? record.items ?? record.highlights ?? record.description,
+    );
+    return heading || bullets.length ? [{ heading, bullets }] : [];
+  });
+}
+
+function parseJson(text: string): unknown {
+  const withoutFence = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  try {
+    return JSON.parse(withoutFence);
+  } catch {
+    const start = withoutFence.indexOf("{");
+    const end = withoutFence.lastIndexOf("}");
+    if (start < 0 || end <= start) return null;
+    try {
+      return JSON.parse(withoutFence.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  }
+}
+
+function normaliseGenerated(value: unknown): Generated | null {
+  const root = asRecord(value);
+  const source = asRecord(root.cv ?? root.CV ?? root.resume ?? root);
+  const cv = {
+    title: asText(source.title ?? source.name) || "CV ciblé",
+    summary: asText(source.summary ?? source.profile ?? source.about),
+    experience: asSections(
+      source.experience ?? source.experiences ?? source.work_experience,
+    ),
+    projects: asSections(source.projects ?? source.project),
+    skills: asTextList(source.skills ?? source.competencies),
+    education: asTextList(source.education ?? source.education_history),
+    languages: Array.isArray(source.languages)
+      ? asTextList(source.languages).join(" | ")
+      : asText(source.languages ?? source.language),
+  };
+  const coverValue =
+    root.cover_letter ?? root.coverLetter ?? root.letter ?? root.coverLetterText;
+  const coverRecord = asRecord(coverValue);
+  const cover_letter =
+    coverValue == null
+      ? null
+      : asText(coverRecord.text ?? coverRecord.content ?? coverValue) || null;
+  const unresolved = root.unresolved_questions ?? root.unresolvedQuestions ?? [];
+  const unresolved_questions = Array.isArray(unresolved)
+    ? unresolved.flatMap((item) => {
+        if (typeof item === "string") {
+          const question = item.trim();
+          return question
+            ? [{ question, category: "UNSPECIFIED" }]
+            : [];
+        }
+        const record = asRecord(item);
+        const question = asText(record.question ?? record.text ?? record.prompt);
+        const category = asText(record.category ?? record.type) || "UNSPECIFIED";
+        return question ? [{ question, category }] : [];
+      })
+    : [];
+  const result = generated.safeParse({ cv, cover_letter, unresolved_questions });
+  if (!result.success) return null;
+  const hasCvContent = Boolean(
+    result.data.cv.summary ||
+      result.data.cv.experience.length ||
+      result.data.cv.projects.length ||
+      result.data.cv.skills.length ||
+      result.data.cv.education.length,
+  );
+  return hasCvContent ? result.data : null;
+}
 export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -56,17 +178,27 @@ export async function POST(
       { error: "Analysez l’offre avant de générer les documents." },
       { status: 409 },
     );
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const prompt = `Génère le contenu d'un CV ATS français d'une page et, si utile, une lettre courte. Utilise exclusivement les faits du PROFIL et du REGISTRE. Sélectionne et reformule, sans inventer. Toute donnée légale, immigration, salaire numérique, handicap, casier, certification incertaine ou information absente devient unresolved_questions. JSON strict: cv {title,summary,experience[{heading,bullets}],projects[{heading,bullets}],skills[],education[],languages}, cover_letter string|null, unresolved_questions[{question,category}].\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify(job)}`;
-  const result = await ai.models.generateContent({
-    model: "gemini-3.6-flash",
-    contents: prompt,
-    config: { responseMimeType: "application/json" },
-  });
-  const parsed = generated.safeParse(JSON.parse(result.text || "{}"));
-  if (!parsed.success)
+  let parsed: Generated | null = null;
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const prompt = `Génère le contenu d'un CV ATS français d'une page et, si utile, une lettre courte. Utilise exclusivement les faits du PROFIL et du REGISTRE. Sélectionne et reformule, sans inventer. Toute donnée légale, immigration, salaire numérique, handicap, casier, certification incertaine ou information absente devient unresolved_questions. Retourne uniquement un objet JSON avec cv {title,summary,experience[{heading,bullets}],projects[{heading,bullets}],skills[],education[],languages}, cover_letter string|null, unresolved_questions[{question,category}]. Les tableaux peuvent être vides si aucune information vérifiée n'existe.\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify(job)}`;
+    const result = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: prompt,
+      config: { responseMimeType: "application/json" },
+    });
+    parsed = normaliseGenerated(parseJson(result.text || ""));
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Erreur inconnue Gemini";
+    console.error("Document generation failed", detail);
     return Response.json(
-      { error: "Documents Gemini invalides" },
+      { error: `Génération Gemini impossible : ${detail}` },
+      { status: 502 },
+    );
+  }
+  if (!parsed)
+    return Response.json(
+      { error: "Documents Gemini invalides : le modèle n’a pas retourné un CV exploitable." },
       { status: 502 },
     );
   const base = safeFilename(`Yassine_AFIF_${job.company}_${job.title}`);
@@ -77,19 +209,19 @@ export async function POST(
       kind: "TAILORED_CV",
       filename: `CV_${base}.pdf`,
       mime_type: "application/pdf",
-      content_text: JSON.stringify(parsed.data.cv),
+      content_text: JSON.stringify(parsed.cv),
       generation_prompt: "verified-profile-v1",
       approved: false,
     },
   ];
-  if (parsed.data.cover_letter)
+  if (parsed.cover_letter)
     docs.push({
       user_id: auth.userId,
       job_id: id,
       kind: "COVER_LETTER",
       filename: `Lettre_${base}.pdf`,
       mime_type: "application/pdf",
-      content_text: JSON.stringify({ letter: parsed.data.cover_letter }),
+      content_text: JSON.stringify({ letter: parsed.cover_letter }),
       generation_prompt: "verified-profile-v1",
       approved: false,
     });
@@ -117,11 +249,11 @@ export async function POST(
       .single();
     application = made.data;
   }
-  if (application && parsed.data.unresolved_questions.length)
+  if (application && parsed.unresolved_questions.length)
     await auth.supabase
       .from("application_questions")
       .insert(
-        parsed.data.unresolved_questions.map((q) => ({
+        parsed.unresolved_questions.map((q) => ({
           user_id: auth.userId,
           application_id: application!.id,
           question: q.question,
@@ -138,6 +270,6 @@ export async function POST(
   return Response.json({
     documents: created,
     applicationId: application?.id,
-    questions: parsed.data.unresolved_questions,
+    questions: parsed.unresolved_questions,
   });
 }
