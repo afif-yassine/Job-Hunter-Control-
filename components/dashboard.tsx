@@ -20,6 +20,21 @@ import type {
   NotificationRecord,
 } from "@/lib/types";
 import { logout } from "@/app/login/actions";
+import { QuestionsPanel, openQuestionCount } from "@/components/questions-panel";
+import { DocumentDialog, type DocumentDialogState } from "@/components/document-tools";
+type SystemStatus = {
+  applicationMode: string;
+  safeMode: boolean;
+  explicitModeVariable: boolean;
+  gemini: boolean;
+  drive: boolean;
+  worker: boolean;
+  scanSources: { franceTravail: boolean; gmailAlerts: boolean; webhook: boolean };
+  scheduledScan: boolean;
+};
+const ERROR_MESSAGE =
+  /Erreur|impossible|absent|introuvable|Ajoutez|refus|injoignable|non configur|pas encore|invalide|Aucune source/i;
+
 export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
   const [tab, setTab] = useState("jobs"),
     [jobs, setJobs] = useState<Job[]>([]),
@@ -30,8 +45,13 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
     [runs, setRuns] = useState<AgentRun[]>([]),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(""),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useState(""),
+    [docDialog, setDocDialog] = useState<DocumentDialogState>(null),
+    [descJob, setDescJob] = useState<Job | null>(null),
+    [descText, setDescText] = useState(""),
+    [status, setStatus] = useState<SystemStatus | null>(null);
   const modal = useRef<HTMLDialogElement>(null),
+    descModal = useRef<HTMLDialogElement>(null),
     supabase = useMemo(() => createClient(), []);
   async function load() {
     setLoading(true);
@@ -51,7 +71,7 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
         .order("created_at", { ascending: false }),
       supabase
         .from("application_questions")
-        .select("*")
+        .select("*,applications(jobs(company,title))")
         .order("created_at", { ascending: false }),
       supabase
         .from("documents")
@@ -66,9 +86,18 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
         .select("*")
         .order("created_at", { ascending: false }),
     ]);
+    let questionRows = q.data as Question[] | null;
+    if (q.error) {
+      // The join is only a nicety: fall back to the plain table if it fails.
+      const plain = await supabase
+        .from("application_questions")
+        .select("*")
+        .order("created_at", { ascending: false });
+      questionRows = plain.data as Question[] | null;
+    }
     setJobs(j.data || []);
     setApps((a.data || []) as Application[]);
-    setQuestions(q.data || []);
+    setQuestions(questionRows || []);
     setDocuments((d.data || []) as DocumentRecord[]);
     setRuns((r.data || []) as AgentRun[]);
     setNotifications((n.data || []) as NotificationRecord[]);
@@ -90,22 +119,31 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
     // The Supabase client is stable for the lifetime of this dashboard.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  async function runSmartPipeline() {
-    if (!supabase) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const pending = jobs.filter((job) => job.status === "DISCOVERED" && job.description);
-    if (!pending.length) {
-      setMessage("Aucune nouvelle offre complète à traiter.");
-      return;
-    }
-    setBusy("pipeline");
-    let analyzed = 0, prepared = 0, failed = 0;
+  /** Scores every complete DISCOVERED offer, then prepares documents for >= 80. */
+  async function processPending(): Promise<string> {
+    if (!supabase) return "";
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return "";
+    const { data: pendingRows } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("status", "DISCOVERED")
+      .not("description", "is", null);
+    const pending = ((pendingRows || []) as Job[]).filter((job) => job.description);
+    if (!pending.length) return "Aucune nouvelle offre complète à traiter.";
+    let analyzed = 0,
+      prepared = 0,
+      failed = 0;
+    const errors: string[] = [];
     for (const job of pending) {
       try {
         setMessage(`Analyse Gemini ${analyzed + 1}/${pending.length} · ${job.company}`);
         const analysisResponse = await fetch(`/api/jobs/${job.id}/analyze`, { method: "POST" });
-        const analysis = await analysisResponse.json().catch(() => ({ error: `Réponse vide du serveur (${analysisResponse.status})` }));
+        const analysis = await analysisResponse
+          .json()
+          .catch(() => ({ error: `Réponse vide du serveur (${analysisResponse.status})` }));
         if (!analysisResponse.ok) throw new Error(analysis.error || "Analyse impossible");
         analyzed += 1;
         if (analysis.total >= 80) {
@@ -113,21 +151,30 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
           const generation = await generationResponse.json();
           if (!generationResponse.ok) throw new Error(generation.error || "Génération impossible");
           prepared += 1;
-          if (supabase) await supabase.from("notifications").insert({
+          const stats = generation.questionStats || {};
+          await supabase.from("notifications").insert({
             user_id: user.id,
             notification_type: "DOCUMENTS_READY",
             title: `${job.company} · documents prêts`,
-            message: `${generation.documents?.length || 0} document(s) généré(s), ${generation.questions?.length || 0} question(s) à vérifier.`,
+            message: `${generation.documents?.length || 0} document(s) généré(s), ${stats.asked ?? generation.questions?.length ?? 0} question(s) à valider${stats.autoAnswered ? `, ${stats.autoAnswered} reprise(s) de ta mémoire` : ""}.`,
             action_url: job.official_url || job.source_url,
             delivery_channels: ["dashboard"],
           });
         }
-      } catch {
+      } catch (e) {
         failed += 1;
+        if (e instanceof Error && errors.length < 2) errors.push(`${job.company} : ${e.message}`);
       }
     }
-    setBusy("");
-    setMessage(`Pipeline terminé : ${analyzed} analysée(s), ${prepared} préparée(s), ${failed} échec(s).`);
+    return `Pipeline terminé : ${analyzed} analysée(s), ${prepared} préparée(s), ${failed} échec(s).${errors.length ? ` Erreur : ${errors.join(" ; ")}` : ""}`;
+  }
+  async function runSmartPipeline() {
+    setBusy("pipeline");
+    try {
+      setMessage(await processPending());
+    } finally {
+      setBusy("");
+    }
     await load();
   }
   async function scanOffers() {
@@ -135,15 +182,34 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
     setMessage("");
     try {
       const response = await fetch("/api/scan", { method: "POST" });
-      const body = await response.json();
+      const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Scan impossible");
-      setMessage(body.message || "Scan lancé. Les nouvelles offres apparaîtront automatiquement.");
+      let text: string = body.message || "Scan terminé.";
       await load();
+      if (body.inserted > body.needsDescription) {
+        // New offers with a full description: score them right away.
+        setMessage(`${text} Analyse des nouvelles offres…`);
+        text += ` ${await processPending()}`;
+      }
+      setMessage(text);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Scan impossible.");
     } finally {
       setBusy("");
+      await load();
     }
+  }
+  async function saveDescription() {
+    if (!supabase || !descJob || descText.trim().length < 50) return;
+    const { error } = await supabase
+      .from("jobs")
+      .update({ description: descText.trim() })
+      .eq("id", descJob.id);
+    setMessage(error ? `Erreur : ${error.message}` : "Description enregistrée : tu peux analyser l’offre.");
+    descModal.current?.close();
+    setDescJob(null);
+    setDescText("");
+    await load();
   }
   async function markNotificationRead(id: string) {
     if (!supabase) return;
@@ -221,6 +287,13 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
       setBusy("");
     }
   }
+  useEffect(() => {
+    if (tab !== "settings") return;
+    void fetch("/api/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => setStatus(body))
+      .catch(() => setStatus(null));
+  }, [tab]);
   const high = jobs.filter((j) => (j.match_score || 0) >= 80).length;
   const unread = notifications.filter((n) => !n.read_at).length;
   return (
@@ -251,10 +324,7 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
         <Metric label="Score ≥ 80" value={high} />
         <Metric label="À traiter" value={jobs.filter((j) => j.status === "DISCOVERED").length} />
         <Metric label="Documents" value={documents.length} />
-        <Metric
-          label="Blocages"
-          value={questions.filter((q) => q.blocking && !q.approved).length}
-        />
+        <Metric label="Blocages" value={openQuestionCount(questions)} />
       </section>
       <section className="layout">
         <nav className="card nav">
@@ -270,7 +340,10 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
             <button
               key={String(id)}
               className={tab === id ? "active" : ""}
-              onClick={() => setTab(String(id))}
+              onClick={() => {
+                setTab(String(id));
+                setMessage("");
+              }}
             >
               <Icon size={16} /> {String(label)}
             </button>
@@ -279,11 +352,7 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
         <div className="card">
           {message && (
             <p
-              className={
-                /Erreur|impossible|absent|introuvable|Ajoutez/.test(message)
-                  ? "error"
-                  : "alert"
-              }
+              className={ERROR_MESSAGE.test(message) ? "error" : "alert"}
             >
               {message}
             </p>
@@ -333,7 +402,16 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
           {loading ? (
             <div className="empty">Chargement…</div>
           ) : tab === "jobs" ? (
-            <Jobs jobs={jobs} busy={busy} action={action} />
+            <Jobs
+              jobs={jobs}
+              busy={busy}
+              action={action}
+              addDescription={(job) => {
+                setDescJob(job);
+                setDescText("");
+                descModal.current?.showModal();
+              }}
+            />
           ) : tab === "applications" ? (
             <Applications rows={apps} busy={busy} prepare={prepare} />
           ) : tab === "documents" ? (
@@ -342,18 +420,61 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
               busy={busy}
               approve={(id) => action(id, `/api/documents/${id}/approve`)}
               upload={(id) => action(id, `/api/documents/${id}/drive`)}
+              revise={(doc) => setDocDialog({ doc, mode: "revise" })}
+              edit={(doc) => setDocDialog({ doc, mode: "edit" })}
             />
           ) : tab === "notifications" ? (
             <Notifications rows={notifications} markRead={markNotificationRead} />
           ) : tab === "questions" ? (
-            <Questions rows={questions} />
+            <QuestionsPanel
+              rows={questions}
+              supabase={supabase}
+              reload={load}
+              notify={setMessage}
+            />
           ) : tab === "runs" ? (
             <Runs rows={runs} />
           ) : (
-            <SettingsPanel configured={Boolean(supabase)} />
+            <SettingsPanel configured={Boolean(supabase)} status={status} />
           )}
         </div>
       </section>
+      <DocumentDialog
+        state={docDialog}
+        onClose={() => setDocDialog(null)}
+        onDone={async (text) => {
+          setMessage(text);
+          await load();
+        }}
+      />
+      <dialog ref={descModal} onClose={() => setDescJob(null)}>
+        <div className="form">
+          <div className="wide">
+            <h2>Description de l’offre</h2>
+            <p className="muted">
+              {descJob ? `${descJob.company} · ${descJob.title}` : ""} — colle le texte complet de
+              l’annonce (missions, profil, contrat) pour activer l’analyse Gemini.
+            </p>
+          </div>
+          <label className="wide">
+            Description complète
+            <textarea rows={12} value={descText} onChange={(e) => setDescText(e.target.value)} />
+          </label>
+          <div className="wide toolbar">
+            <button type="button" className="btn secondary" onClick={() => descModal.current?.close()}>
+              Annuler
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={descText.trim().length < 50}
+              onClick={() => void saveDescription()}
+            >
+              Enregistrer
+            </button>
+          </div>
+        </div>
+      </dialog>
       <dialog ref={modal}>
         <form action={addJob} className="form">
           <div className="wide">
@@ -417,10 +538,12 @@ function Jobs({
   jobs,
   busy,
   action,
+  addDescription,
 }: {
   jobs: Job[];
   busy: string;
   action: (l: string, u: string) => Promise<void>;
+  addDescription: (job: Job) => void;
 }) {
   return jobs.length ? (
     <div className="table-wrap">
@@ -453,6 +576,15 @@ function Jobs({
               </td>
               <td>
                 <div className="toolbar">
+                  {!j.description && (
+                    <button
+                      className="btn secondary small"
+                      disabled={Boolean(busy)}
+                      onClick={() => addDescription(j)}
+                    >
+                      Coller la description
+                    </button>
+                  )}
                   <button
                     className="btn small"
                     disabled={Boolean(busy) || !j.description}
@@ -553,12 +685,20 @@ function Documents({
   busy,
   approve,
   upload,
+  revise,
+  edit,
 }: {
   rows: DocumentRecord[];
   busy: string;
   approve: (id: string) => Promise<void>;
   upload: (id: string) => Promise<void>;
+  revise: (doc: DocumentRecord) => void;
+  edit: (doc: DocumentRecord) => void;
 }) {
+  // A document is "replaced" once a newer version was created from it.
+  const replacedBy = new Map<string, DocumentRecord>();
+  for (const d of rows)
+    if (d.based_on_document_id) replacedBy.set(d.based_on_document_id, d);
   return rows.length ? (
     <table>
       <thead>
@@ -570,92 +710,85 @@ function Documents({
         </tr>
       </thead>
       <tbody>
-        {rows.map((d) => (
-          <tr key={d.id}>
-            <td>
-              <strong>{d.filename}</strong>
-              <br />
-              <span className="muted">
-                {d.jobs?.company} · {d.kind}
-              </span>
-            </td>
-            <td>v{d.version}</td>
-            <td>
-              {d.storage_path ? (
-                <a href={d.storage_path} target="_blank">
-                  Drive
-                </a>
-              ) : d.approved ? (
-                "Approuvé"
-              ) : (
-                "Brouillon"
-              )}
-            </td>
-            <td>
-              <div className="toolbar">
-                <a
-                  className="btn secondary small"
-                  href={`/api/documents/${d.id}/pdf`}
-                  target="_blank"
-                >
-                  Aperçu PDF
-                </a>
-                {!d.approved && (
-                  <button
-                    className="btn small"
-                    disabled={Boolean(busy)}
-                    onClick={() => approve(d.id)}
-                  >
-                    Approuver
-                  </button>
+        {rows.map((d) => {
+          const newer = replacedBy.get(d.id);
+          return (
+            <tr key={d.id} className={newer ? "replaced" : ""}>
+              <td>
+                <strong>{d.filename}</strong>
+                <br />
+                <span className="muted">
+                  {d.jobs?.company} · {d.kind}
+                </span>
+              </td>
+              <td>v{d.version}</td>
+              <td>
+                {newer ? (
+                  `Remplacé par v${newer.version}`
+                ) : d.storage_path ? (
+                  <a href={d.storage_path} target="_blank">
+                    Drive
+                  </a>
+                ) : d.approved ? (
+                  "Approuvé"
+                ) : (
+                  "Brouillon"
                 )}
-                {d.approved && !d.storage_path && (
-                  <button
-                    className="btn small"
-                    disabled={Boolean(busy)}
-                    onClick={() => upload(d.id)}
+              </td>
+              <td>
+                <div className="toolbar">
+                  <a
+                    className="btn secondary small"
+                    href={`/api/documents/${d.id}/pdf`}
+                    target="_blank"
                   >
-                    Envoyer vers Drive
-                  </button>
-                )}
-              </div>
-            </td>
-          </tr>
-        ))}
+                    Aperçu PDF
+                  </a>
+                  {!newer && (
+                    <>
+                      <button
+                        className="btn secondary small"
+                        disabled={Boolean(busy)}
+                        onClick={() => revise(d)}
+                      >
+                        Demander une modification
+                      </button>
+                      <button
+                        className="btn secondary small"
+                        disabled={Boolean(busy)}
+                        onClick={() => edit(d)}
+                      >
+                        Modifier moi-même
+                      </button>
+                    </>
+                  )}
+                  {!newer && !d.approved && (
+                    <button
+                      className="btn small"
+                      disabled={Boolean(busy)}
+                      onClick={() => approve(d.id)}
+                    >
+                      Approuver
+                    </button>
+                  )}
+                  {!newer && d.approved && !d.storage_path && (
+                    <button
+                      className="btn small"
+                      disabled={Boolean(busy)}
+                      onClick={() => upload(d.id)}
+                    >
+                      Envoyer vers Drive
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   ) : (
     <Empty text="Aucun document généré." />
-  );
-}
-function Questions({ rows }: { rows: Question[] }) {
-  return rows.length ? (
-    <table>
-      <thead>
-        <tr>
-          <th>Question</th>
-          <th>Catégorie</th>
-          <th>Réponse</th>
-          <th>État</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((q) => (
-          <tr key={q.id}>
-            <td>{q.question}</td>
-            <td>{q.category}</td>
-            <td>{q.answer || "À confirmer"}</td>
-            <td>
-              <span className="status">
-                {q.approved ? "APPROUVÉE" : "BLOQUANTE"}
-              </span>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <Empty text="Aucune question en attente." />
   );
 }
 function Runs({ rows }: { rows: AgentRun[] }) {
@@ -686,7 +819,21 @@ function Runs({ rows }: { rows: AgentRun[] }) {
     <Empty text="Aucune exécution enregistrée." />
   );
 }
-function SettingsPanel({ configured }: { configured: boolean }) {
+function Flag({ ok, label, hint }: { ok: boolean; label: string; hint?: string }) {
+  return (
+    <p>
+      {label} : <strong className={ok ? "ok" : "error"}>{ok ? "connecté" : "non configuré"}</strong>
+      {!ok && hint && <span className="muted"> — {hint}</span>}
+    </p>
+  );
+}
+function SettingsPanel({
+  configured,
+  status,
+}: {
+  configured: boolean;
+  status: SystemStatus | null;
+}) {
   return (
     <div>
       <p className="alert">
@@ -696,15 +843,25 @@ function SettingsPanel({ configured }: { configured: boolean }) {
       <p>
         Supabase : <strong>{configured ? "configuré" : "absent"}</strong>
       </p>
-      <p>
-        Gemini : <strong>serveur uniquement</strong>
-      </p>
-      <p>
-        Drive : <strong>compte de service et dossiers configurés</strong>
-      </p>
-      <p>
-        Playwright Railway : <strong>inspection contrôlée</strong>
-      </p>
+      {!status ? (
+        <p className="muted">Chargement de l’état des connexions…</p>
+      ) : (
+        <>
+          <p>
+            Mode : <strong>{status.applicationMode}</strong>
+            {!status.explicitModeVariable && (
+              <span className="muted"> (par défaut ; APPLICATION_MODE n’est pas défini dans Vercel)</span>
+            )}
+          </p>
+          <Flag ok={status.gemini} label="Gemini (analyse + CV)" hint="GEMINI_API_KEY" />
+          <Flag ok={status.drive} label="Google Drive" hint="GOOGLE_SERVICE_ACCOUNT_JSON + IDs de dossiers" />
+          <Flag ok={status.worker} label="Playwright (Railway)" hint="WORKER_BASE_URL + WORKER_SHARED_SECRET" />
+          <Flag ok={status.scanSources.franceTravail} label="Scan · France Travail" hint="FRANCE_TRAVAIL_CLIENT_ID / _SECRET" />
+          <Flag ok={status.scanSources.gmailAlerts} label="Scan · alertes e-mail (LinkedIn, Indeed, Hellowork…)" hint="GMAIL_CLIENT_ID / _SECRET / GMAIL_REFRESH_TOKEN" />
+          <Flag ok={status.scanSources.webhook} label="Scan · scanner externe" hint="SCAN_WEBHOOK_URL (optionnel)" />
+          <Flag ok={status.scheduledScan} label="Scan automatique quotidien" hint="CRON_SECRET + SCAN_USER_ID + SUPABASE_SERVICE_ROLE_KEY (optionnel)" />
+        </>
+      )}
     </div>
   );
 }

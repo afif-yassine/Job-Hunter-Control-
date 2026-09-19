@@ -9,3 +9,20 @@
 .notice{display:flex;justify-content:space-between;gap:16px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#0a1726}
 .notice.unread{border-color:#37d6c477;box-shadow:inset 3px 0 var(--cyan)}
 .notice h3{margin:5px 0}.notice p{margin:7px 0 10px;color:var(--muted)}
+
+/* Questions, saved answers, document editor */
+.qcard{padding:16px;border:1px solid var(--line);border-radius:14px;background:#0a1726;display:grid;gap:12px}
+.qhead{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+.qcard h3{margin:6px 0 4px;font-size:16px}.qcard p{margin:4px 0}
+.qform{display:grid;gap:10px}
+.qform input,.qform select,.qform textarea,.saved input{background:#071522;border:1px solid var(--line);border-radius:9px;color:var(--text);padding:10px;width:100%}
+.qform .inline{display:grid;gap:6px;font-size:13px}
+.qfoot{justify-content:space-between;align-items:center}
+.check,.radio{display:inline-flex;gap:8px;align-items:center;color:var(--muted);font-size:13px}
+.check input,.radio input{width:auto}
+.saved{margin-top:28px}.saved h3{margin:0 0 4px}.saved summary{cursor:pointer;color:var(--muted)}
+.saved td .status{margin-left:8px}
+tr.replaced td{opacity:.5}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.docdialog{max-width:760px}
+.ok{color:var(--cyan)}

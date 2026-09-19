@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { createServer } from "node:http";
 import { isIP } from "node:net";
+import { inspectPage } from "./inspect";
 const port = Number(process.env.PORT || 3001),
   secret = process.env.WORKER_SHARED_SECRET;
 function allowed(raw: string) {
@@ -61,49 +62,7 @@ const server = createServer(async (req, res) => {
         waitUntil: "domcontentloaded",
         timeout: 45_000,
       });
-      const fields = await page
-        .locator("input, textarea, select")
-        .evaluateAll((els) =>
-          els.slice(0, 150).map((el) => {
-            const field = el as HTMLInputElement;
-            return {
-              tag: field.tagName.toLowerCase(),
-              type: field.type || null,
-              name: field.name || null,
-              label:
-                field.labels?.[0]?.innerText?.trim() ||
-                field.getAttribute("aria-label") ||
-                field.placeholder ||
-                null,
-              required: Boolean(field.required),
-            };
-          }),
-        );
-      const text = (await page.locator("body").innerText())
-        .slice(0, 30_000)
-        .toLowerCase();
-      const blockers = [
-        "captcha",
-        "recaptcha",
-        "hcaptcha",
-        "multi-factor",
-        "two-factor",
-        "legal declaration",
-        "certify that",
-        "j'atteste",
-        "je certifie",
-      ].filter((x) => text.includes(x));
-      const questions = fields
-        .filter((f) => f.required && !f.name && !f.label)
-        .map(() => ({
-          question: "Champ obligatoire non identifié",
-          category: "UNKNOWN_FIELD",
-        }));
-      for (const blocker of blockers)
-        questions.push({
-          question: `Intervention humaine requise: ${blocker}`,
-          category: "HUMAN_VERIFICATION",
-        });
+      const { fields, questions } = await inspectPage(page);
       res.end(
         JSON.stringify({
           ok: true,

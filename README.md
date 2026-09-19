@@ -29,9 +29,31 @@ Use the project URL and **publishable key** from Supabase. Never use a service-r
 ## Deploy
 
 1. Create/import this repository in Vercel and set the dashboard variables from `.env.example`.
-2. Create a Railway service using `Dockerfile.worker` and set `WORKER_SHARED_SECRET`.
-3. Put the Railway public URL and the same secret into Vercel.
-4. Keep `APPLICATION_MODE=PREPARE_ONLY` in both services.
+2. Apply the SQL in `supabase/migrations/20260920120000_profile_answers.sql` (Supabase → SQL editor). It creates the reusable answer bank.
+3. Create a Railway service using `Dockerfile.worker` and set `WORKER_SHARED_SECRET`.
+4. Put the Railway public URL (`WORKER_BASE_URL`) and the same secret (`WORKER_SHARED_SECRET`) into Vercel.
+5. Set `APPLICATION_MODE=PREPARE_ONLY` in both services (a missing value behaves the same; any other value is refused).
+6. Connect the offer scanner: see [docs/SCANNER.md](docs/SCANNER.md).
+
+The **Réglages** tab shows which integrations are connected.
+
+## Questions and reusable answers
+
+Questions found on offers or forms are mapped to a canonical key (nationality, address, residence permit...).
+You answer once in the **Questions** tab; the answer is remembered and reused automatically, including for
+identical open questions in other applications and for select fields (mapped onto the form's own options).
+Sensitive answers are never guessed onto a different option, answers with a validity date are asked again
+when they expire, and offer-specific questions (motivation, salary) are not remembered by default.
+
+## Changing a CV or cover letter
+
+In **Documents**: *Demander une modification* (Gemini writes a new version from your instruction and the
+verified profile only; the old version is kept) or *Modifier moi-même* (edit the text directly; an approved
+document is never overwritten, the edit becomes a new draft version).
+
+## Tests
+
+`npm test` runs the logic tests (question matching, answer memory, scan parsing and de-duplication).
 
 ## Existing Android prototype
 

@@ -1,6 +1,7 @@
 export type Job={id:string;company:string;title:string;contract_type:string|null;location:string|null;source_url:string|null;official_url?:string|null;description?:string|null;match_score:number|null;score_breakdown?:Record<string,unknown>;status:string;publication_date:string|null};
 export type Application={id:string;status:string;platform:string|null;created_at:string;jobs?:{company:string;title:string}|null};
-export type Question={id:string;question:string;category:string;answer:string|null;blocking:boolean;approved:boolean};
-export type DocumentRecord={id:string;job_id:string|null;kind:string;filename:string;version:number;approved:boolean;storage_path:string|null;created_at:string;jobs?:{company:string;title:string}|null};
+export type Question={id:string;application_id?:string|null;question:string;category:string;answer:string|null;blocking:boolean;approved:boolean;question_key?:string|null;answer_type?:string|null;options?:string[]|null;auto_answered?:boolean|null;answered_at?:string|null;created_at?:string;applications?:{jobs?:{company:string;title:string}|null}|null};
+export type ProfileAnswer={id:string;question_key:string;label:string;answer:string;answer_type:string;sensitive:boolean;expires_at:string|null;source_question:string|null;updated_at:string};
+export type DocumentRecord={id:string;job_id:string|null;kind:string;filename:string;version:number;approved:boolean;storage_path:string|null;created_at:string;based_on_document_id?:string|null;content_text?:string|null;jobs?:{company:string;title:string}|null};
 export type AgentRun={id:string;run_type:string;status:string;created_at:string;error_message:string|null;counters:Record<string,unknown>};
 export type NotificationRecord={id:string;notification_type:string;title:string;message:string;action_url:string|null;read_at:string|null;created_at:string};
