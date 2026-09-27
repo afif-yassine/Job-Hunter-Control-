@@ -12,6 +12,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Gauge,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -32,6 +33,8 @@ import { ApplicationsView } from "@/components/views/applications-view";
 import { ActivityView } from "@/components/views/activity-view";
 import { SettingsView } from "@/components/views/settings-view";
 import { MoreView } from "@/components/views/more-view";
+import { AdminView } from "@/components/views/admin-view";
+import type { AdminOverview } from "@/lib/admin/overview";
 import { PageHead } from "@/components/ui";
 import type { Ctx, JobFilter, Tone, View } from "@/components/views/types";
 
@@ -48,8 +51,9 @@ const TABS: { id: View; label: string; icon: LucideIcon }[] = [
   ...NAV.slice(0, 4),
   { id: "more", label: "Plus", icon: Ellipsis },
 ];
-const VIEWS = new Set<string>([...NAV.map((n) => n.id), "more"]);
-const MORE_VIEWS = new Set<View>(["more", "applications", "activity", "settings"]);
+const ADMIN_NAV = { id: "admin" as View, label: "Admin", icon: Gauge };
+const VIEWS = new Set<string>([...NAV.map((n) => n.id), "more", "admin"]);
+const MORE_VIEWS = new Set<View>(["more", "applications", "activity", "settings", "admin"]);
 
 /** Server error → one readable sentence. */
 function readable(raw: unknown): string {
@@ -77,7 +81,7 @@ async function post(url: string, body: unknown = {}) {
   }
 }
 
-export type DemoState = { data: Data; status: SystemStatus };
+export type DemoState = { data: Data; status: SystemStatus; admin?: AdminOverview };
 
 export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?: DemoState }) {
   const { supabase, data, loading, error: loadError, reload } = useDashboardData(demo?.data);
@@ -274,14 +278,25 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
     jobFilter,
     setJobFilter,
     act,
+    adminDemo: demo?.admin,
   };
+  const nav = status?.isAdmin ? [...NAV, ADMIN_NAV] : NAV;
 
   const replaced = new Set(data.documents.map((d) => d.based_on_document_id).filter(Boolean));
   const toApprove = data.documents.filter((d: DocumentRecord) => !d.approved && !replaced.has(d.id)).length;
   const unread = data.notifications.filter((n) => !n.read_at).length;
   const openQuestions = openQuestionCount(data.questions);
+  const sourceAlerts = data.notifications.filter((n) => !n.read_at && n.notification_type === "SOURCE_ALERT").length;
   const badge = (id: View) =>
-    id === "questions" ? openQuestions : id === "documents" ? toApprove : id === "activity" ? unread : id === "more" ? unread : 0;
+    id === "questions"
+      ? openQuestions
+      : id === "documents"
+        ? toApprove
+        : id === "activity" || id === "more"
+          ? unread
+          : id === "admin"
+            ? sourceAlerts
+            : 0;
   const activeTab: View = MORE_VIEWS.has(view) ? "more" : view;
 
   const p = pipeline.progress;
@@ -301,7 +316,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
           </div>
         </div>
         <nav aria-label="Navigation principale">
-          {NAV.map(({ id, label, icon: Icon }) => (
+          {nav.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               className={view === id ? "navlink active" : "navlink"}
@@ -386,6 +401,8 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
             <ActivityView ctx={ctx} />
           ) : view === "settings" ? (
             <SettingsView ctx={ctx} />
+          ) : view === "admin" && status?.isAdmin ? (
+            <AdminView ctx={ctx} />
           ) : (
             <MoreView ctx={ctx} badge={badge} />
           )}

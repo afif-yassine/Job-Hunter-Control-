@@ -362,7 +362,7 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
           />
           <small className="muted">
             Colle le lien de la page carrière d’une entreprise (une par ligne, {MAX_TARGETS} maximum). Pris en charge :
-            Greenhouse, Lever, Ashby, SmartRecruiters, Workable. Leurs offres sont lues à la source, sans clé, souvent avant
+            Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee. Leurs offres sont lues à la source, sans clé, souvent avant
             LinkedIn ou Indeed.
           </small>
           {unknown.length > 0 && (

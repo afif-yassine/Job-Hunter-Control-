@@ -1,5 +1,7 @@
 import type { Data } from "@/components/use-dashboard-data";
 import type { SystemStatus } from "@/components/use-status";
+import { AI_ADVICE, EMBEDDINGS_PLAN, NOT_CONNECTED, SOURCES } from "@/lib/admin/catalog";
+import type { AdminOverview, AdminSource } from "@/lib/admin/overview";
 
 /** Fake data for screenshots (`/demo`, enabled only with DEMO_MODE=1). */
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
@@ -73,9 +75,66 @@ export const demoStatus: SystemStatus = {
   autoScan: true,
   lastScanAt: ago(88),
   scheduledScan: true,
+  isAdmin: true,
   usage: {
     scan: { used: 1, limit: 3 },
     analysis: { used: 12, limit: 20 },
     generation: { used: 2, limit: 10 },
   },
+};
+
+const demoStates: Record<string, Partial<AdminSource>> = {
+  francetravail: { state: "active", stateLabel: "Activé", keyOrigin: "platform", lastRun: { status: "ok", at: ago(40), found: 34, message: null, cached: false }, runs7d: { ok: 14, problems: 0, cached: 20 }, quality: { offers: 120, links: 160, analyzed: 60, avgScore: 71, strong: 12, suspected: 1, toReview: 4, unreadable: 0 } },
+  jsearch: { state: "budget", stateLabel: "Budget gratuit atteint", keyOrigin: "platform", budget: { used: 180, limit: 180, period: "2026-09" }, lastRun: { status: "budget", at: ago(120), found: 0, message: "Budget gratuit atteint pour jsearch (180 appels ce mois-ci).", cached: false }, runs7d: { ok: 9, problems: 1, cached: 31 }, quality: { offers: 210, links: 330, analyzed: 90, avgScore: 76, strong: 22, suspected: 0, toReview: 9, unreadable: 6 } },
+  adzuna: { state: "missing_key", stateLabel: "Clé manquante", keyOrigin: "none", missingKeys: ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"] },
+  jooble: { state: "auth", stateLabel: "Clé refusée", keyOrigin: "platform", lastRun: { status: "auth", at: ago(300), found: 0, message: "Clé Jooble refusée : vérifie la clé reçue par e-mail.", cached: false }, runs7d: { ok: 0, problems: 3, cached: 0 } },
+  "ats:greenhouse": { state: "active", stateLabel: "Activé", keyOrigin: "not_needed", companies: 6, lastRun: { status: "ok", at: ago(40), found: 11, message: null, cached: false }, quality: { offers: 18, links: 18, analyzed: 18, avgScore: 81, strong: 7, suspected: 0, toReview: 0, unreadable: 0 } },
+  "ats:lever": { state: "active", stateLabel: "Activé", keyOrigin: "not_needed", companies: 3, lastRun: { status: "ok", at: ago(40), found: 4, message: null, cached: true } },
+  "ats:ashby": { state: "idle", stateLabel: "Activé — aucune entreprise ajoutée", keyOrigin: "not_needed", companies: 0 },
+  "ats:smartrecruiters": { state: "idle", stateLabel: "Activé — aucune entreprise ajoutée", keyOrigin: "not_needed", companies: 0 },
+  "ats:workable": { state: "idle", stateLabel: "Activé — aucune entreprise ajoutée", keyOrigin: "not_needed", companies: 0 },
+  "ats:recruitee": { state: "idle", stateLabel: "Activé — aucune entreprise ajoutée", keyOrigin: "not_needed", companies: 0 },
+  gmail: { state: "optional", stateLabel: "Facultatif — non configuré", keyOrigin: "none", missingKeys: ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"] },
+  webhook: { state: "optional", stateLabel: "Facultatif — non configuré", keyOrigin: "none", missingKeys: ["SCAN_WEBHOOK_URL"] },
+};
+
+export const demoAdmin: AdminOverview = {
+  ai: {
+    provider: "Google Gemini",
+    configured: true,
+    analysisModel: "gemini-3.6-flash",
+    writingModel: "gemini-3.6-flash",
+    usageToday: { scan: 4, analysis: 37, generation: 6 },
+    advice: AI_ADVICE,
+  },
+  embeddings: EMBEDDINGS_PLAN,
+  sources: SOURCES.map((s, i) => ({
+    ...s,
+    n: i + 1,
+    state: "active",
+    stateLabel: "Activé",
+    keyOrigin: "platform",
+    missingKeys: [],
+    lastRun: null,
+    runs7d: { ok: 0, problems: 0, cached: 0 },
+    budget: null,
+    quality: null,
+    companies: s.id.startsWith("ats:") ? 0 : null,
+    ...demoStates[s.id],
+  })),
+  notConnected: NOT_CONNECTED,
+  automation: { cronConfigured: true, sharedCache: true, lastServerRun: ago(25) },
+  worker: { configured: true, online: true, browserReady: true },
+  drive: true,
+  alerts: [
+    { title: "Budget gratuit atteint : jsearch", message: "Budget gratuit atteint pour jsearch (180 appels ce mois-ci).", at: ago(120), read: false },
+    { title: "Clé refusée : jooble", message: "Clé Jooble refusée : vérifie la clé reçue par e-mail.", at: ago(300), read: true },
+  ],
+  actions: [
+    { level: "required", text: "Jooble : clé refusée. Remplace-la dans Vercel (ou Réglages)." },
+    { level: "recommended", text: "JSearch (Google Jobs) : budget gratuit atteint pour la période. Rien à faire si c’est voulu ; sinon augmente la limite ou passe au plan payant." },
+    { level: "recommended", text: "Ajoute des pages carrière d’entreprises dans Réglages > Recherche (gratuit, sans clé)." },
+    { level: "before_launch", text: "Active la protection des mots de passe compromis dans Supabase (Authentication > Security)." },
+    { level: "before_launch", text: "France Travail : Licence ouverte : usage commercial autorisé en citant France Travail." },
+  ],
 };

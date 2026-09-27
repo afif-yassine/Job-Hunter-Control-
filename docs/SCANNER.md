@@ -70,7 +70,7 @@ Valeurs par défaut : alternance / stage développeur, IA, data, en Île-de-Fran
 ## 4. Pages carrière des entreprises (sans clé)
 
 Dans Réglages > Recherche, « Entreprises à surveiller » : colle le lien de la page carrière (une par ligne,
-30 maximum). Pris en charge : Greenhouse, Lever, Ashby, SmartRecruiters, Workable — ces plateformes publient
+30 maximum). Pris en charge : Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee — ces plateformes publient
 les offres de leurs clients en JSON public, prévu pour être lu (`lib/scan/sources/ats.ts`). Les offres hors de
 France (sauf télétravail) et celles de plus de 30 jours sont ignorées.
 
@@ -112,7 +112,20 @@ candidature déjà faite (y compris « Déjà postulé ailleurs ») est rangée 
 Les offres suspectes (paiement demandé, colis, WhatsApp + e-mail personnel…) vont aussi dans « À vérifier » :
 rien n'est dépensé dessus (ni IA, ni quota) tant que tu n'as pas décidé.
 
-## 7. Scanner externe (compatibilité)
+## 7. Santé des sources, budgets et alertes (page Admin)
+
+Chaque passage de chaque source est enregistré (`source_runs`). Quand une source n'a plus de quota, que sa clé
+est refusée ou qu'elle plante, les administrateurs reçoivent une alerte dans l'appli (une par source et par
+problème toutes les 6 h, puis une quand elle se rétablit). Les plans gratuits sont protégés par un budget commun
+à toute la plateforme (`JSEARCH_MONTHLY_BUDGET` = 180, `ADZUNA_DAILY_BUDGET` = 240, `JOOBLE_TOTAL_BUDGET` = 450) :
+une fois atteint, la source est sautée, les autres continuent. Avec `SUPABASE_SERVICE_ROLE_KEY`, une même recherche
+faite par deux comptes dans les 12 h (`SOURCE_CACHE_HOURS`) n'appelle la source qu'une fois.
+
+La page **Admin** (visible des seuls administrateurs ; le premier compte l'est automatiquement, table
+`app_admins`) montre l'IA utilisée, chaque point de recherche numéroté avec son état, son budget, sa qualité sur
+30 jours, l'automatisation, et la liste de ce qu'il faut faire à la main.
+
+## 8. Scanner externe (compatibilité)
 
 Si `SCAN_WEBHOOK_URL` est défini, il est appelé en plus (`POST`, `Authorization: Bearer $SCAN_WEBHOOK_SECRET`).
 Il peut répondre `{"offers":[{"source","company","title","location","contract_type","description","url","publishedAt"}]}`.

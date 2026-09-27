@@ -4,6 +4,7 @@ import type { Data } from "@/components/use-dashboard-data";
 import type { SystemStatus } from "@/components/use-status";
 import type { usePipeline } from "@/components/use-pipeline";
 import type { DocumentDialogState } from "@/components/document-tools";
+import type { AdminOverview } from "@/lib/admin/overview";
 
 export type View =
   | "home"
@@ -13,7 +14,8 @@ export type View =
   | "more"
   | "applications"
   | "activity"
-  | "settings";
+  | "settings"
+  | "admin";
 
 export type JobFilter = "all" | "best" | "todo" | "missing" | "ready" | "review" | "applied";
 
@@ -34,6 +36,8 @@ export type Ctx = {
   go: (view: View, filter?: JobFilter) => void;
   notify: (text: string, tone?: Tone) => void;
   reload: () => Promise<void>;
+  /** Fixed admin data for the /demo page. */
+  adminDemo?: AdminOverview;
   jobFilter: JobFilter;
   setJobFilter: (filter: JobFilter) => void;
   act: {

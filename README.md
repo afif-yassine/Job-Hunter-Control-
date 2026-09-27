@@ -12,7 +12,7 @@ Secure control plane for discovering, scoring and preparing alternance and inter
 - Next.js 16 dashboard with offers, applications, documents, questions, runs and settings.
 - Supabase Auth + the existing 10 RLS-protected tables in `IA AGENT HUNTER`.
 - One AI layer (`lib/ai.ts`): the model is configuration (`AI_MODEL…`), and every score/document records its model.
-- Search on many sources + company careers pages (Greenhouse, Lever, Ashby, SmartRecruiters, Workable), with
+- Search on many sources + company careers pages (Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee), with
   cross-platform de-duplication, "already applied elsewhere" memory and suspected-offer review.
 - Scheduled server run for every account (`/api/cron/tick`): search → score → documents, no browser needed.
 - Daily limits per account (`lib/quota.ts`): searches, analyses, CV + letters.

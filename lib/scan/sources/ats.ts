@@ -8,7 +8,7 @@ import type { ScannedOffer } from "../types";
  * no key, and often shows offers before they reach LinkedIn or Indeed.
  */
 
-export type AtsId = "greenhouse" | "lever" | "ashby" | "smartrecruiters" | "workable";
+export type AtsId = "greenhouse" | "lever" | "ashby" | "smartrecruiters" | "workable" | "recruitee";
 export type AtsTarget = { ats: AtsId; slug: string };
 
 export const ATS_LABEL: Record<AtsId, string> = {
@@ -17,7 +17,10 @@ export const ATS_LABEL: Record<AtsId, string> = {
   ashby: "Ashby",
   smartrecruiters: "SmartRecruiters",
   workable: "Workable",
+  recruitee: "Recruitee",
 };
+
+export const ATS_IDS = Object.keys(ATS_LABEL) as AtsId[];
 
 const SLUG = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 
@@ -27,7 +30,7 @@ const SLUG = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
  */
 export function parseAtsTarget(raw: string): AtsTarget | null {
   const text = raw.trim();
-  const short = text.match(/^(greenhouse|lever|ashby|smartrecruiters|workable):([^/\s]+)$/i);
+  const short = text.match(/^(greenhouse|lever|ashby|smartrecruiters|workable|recruitee):([^/\s]+)$/i);
   if (short) return SLUG.test(short[2]) ? { ats: short[1].toLowerCase() as AtsId, slug: short[2].toLowerCase() } : null;
   let url: URL;
   try {
@@ -45,6 +48,8 @@ export function parseAtsTarget(raw: string): AtsTarget | null {
   if (host === "apply.workable.com") return pick("workable", first);
   const sub = host.match(/^([a-z0-9-]+)\.workable\.com$/);
   if (sub && sub[1] !== "apply" && sub[1] !== "www") return pick("workable", sub[1]);
+  const rc = host.match(/^([a-z0-9-]+)\.recruitee\.com$/);
+  if (rc && rc[1] !== "www" && rc[1] !== "app") return pick("recruitee", rc[1]);
   return null;
 }
 
@@ -181,6 +186,21 @@ export function mapAtsJobs(target: AtsTarget, body: unknown): ScannedOffer[] {
       });
     }
 
+  if (target.ats === "recruitee")
+    for (const raw of (root.offers as unknown[]) ?? []) {
+      const j = obj(raw);
+      push({
+        company: str(j.company_name) ?? fallback,
+        title: str(j.title) ?? "",
+        location: str(j.location) ?? ([str(j.city), str(j.country)].filter(Boolean).join(", ") || (j.remote ? "Remote" : null)),
+        contract_type: str(j.employment_type_code),
+        description: clip(`${str(j.description) ?? ""}\n${str(j.requirements) ?? ""}`),
+        url: str(j.careers_url) ?? "",
+        applyUrl: str(j.careers_apply_url),
+        publishedAt: date(j.published_at),
+      });
+    }
+
   return out;
 }
 
@@ -197,10 +217,17 @@ export function atsEndpoint(t: AtsTarget): string {
       return `https://api.smartrecruiters.com/v1/companies/${s}/postings?limit=100`;
     case "workable":
       return `https://apply.workable.com/api/v1/widget/accounts/${s}?details=true`;
+    case "recruitee":
+      return `https://${s}.recruitee.com/api/offers/`;
   }
 }
 
-export type AtsScan = { offers: ScannedOffer[]; errors: string[] };
+export type AtsScan = {
+  offers: ScannedOffer[];
+  errors: string[];
+  /** Per platform, for the health page. */
+  stats: Partial<Record<AtsId, { found: number; errors: string[] }>>;
+};
 
 /** Reads every target (5 at a time); one broken page never stops the others. */
 export async function scanAts(
@@ -210,6 +237,8 @@ export async function scanAts(
 ): Promise<AtsScan> {
   const offers: ScannedOffer[] = [];
   const errors: string[] = [];
+  const stats: AtsScan["stats"] = {};
+  const stat = (ats: AtsId) => (stats[ats] ??= { found: 0, errors: [] });
   const cutoff = Date.now() - Math.max(config.maxAgeDays, 30) * 86_400_000;
   let next = 0;
   const lane = async () => {
@@ -222,23 +251,33 @@ export async function scanAts(
           signal: AbortSignal.timeout(10_000),
         });
         if (response.status === 404) {
-          errors.push(`${name} : page carrière introuvable (vérifie le lien)`);
+          const e = `${name} : page carrière introuvable (vérifie le lien)`;
+          errors.push(e);
+          stat(t.ats).errors.push(e);
           continue;
         }
         if (!response.ok) {
-          errors.push(`${name} : HTTP ${response.status}`);
+          const e = `${name} : HTTP ${response.status}`;
+          errors.push(e);
+          stat(t.ats).errors.push(e);
           continue;
         }
         for (const offer of mapAtsJobs(t, await response.json())) {
           // Company boards keep old offers online: drop the stale ones.
           if (offer.publishedAt && Date.parse(offer.publishedAt) < cutoff) continue;
-          if (inFrance(offer.location, config)) offers.push(offer);
+          if (inFrance(offer.location, config)) {
+            offers.push(offer);
+            stat(t.ats).found += 1;
+          }
         }
+        stat(t.ats);
       } catch (error) {
-        errors.push(`${name} : ${error instanceof Error ? error.message : "erreur"}`);
+        const e = `${name} : ${error instanceof Error ? error.message : "erreur"}`;
+        errors.push(e);
+        stat(t.ats).errors.push(e);
       }
     }
   };
   await Promise.all(Array.from({ length: Math.min(5, targets.length) }, lane));
-  return { offers, errors };
+  return { offers, errors, stats };
 }

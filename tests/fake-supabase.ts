@@ -62,6 +62,11 @@ export function fakeSupabase(tables: Record<string, Row[]>, options: Options = {
       lt: (k: string, v: string | number) =>
         (filters.push((r) => (typeof v === "number" ? Number(r[k] ?? Infinity) < v : String(r[k] ?? "") < v)), q),
       delete: () => ((op = "delete"), q),
+      filter: (k: string, _op: string, v: unknown) => {
+        const [col, key] = k.split("->>");
+        filters.push((r) => (key ? (r[col] as Record<string, unknown> | undefined)?.[key] : r[col]) === v);
+        return q;
+      },
       order: () => q,
       limit: () => q,
       single: () => ((single = true), q),

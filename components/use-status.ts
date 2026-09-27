@@ -20,6 +20,8 @@ export type SystemStatus = {
   scheduledScan: boolean;
   /** Today's use of the daily limits (null before the migration). */
   usage?: Usage | null;
+  /** The account administers the platform (sees the Admin page). */
+  isAdmin?: boolean;
 };
 
 /** State of the connections (sources, Gemini, Drive, Playwright worker). */
