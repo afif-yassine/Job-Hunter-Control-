@@ -1,11 +1,47 @@
 "use client";
-import { CloudUpload, ExternalLink, FileText, Pencil, Sparkles } from "lucide-react";
+import { CloudUpload, Code2, ExternalLink, FileText, Pencil, Sparkles } from "lucide-react";
 import { Chip, Empty, PageHead } from "@/components/ui";
 import { DOCUMENT_KIND } from "@/lib/labels";
 import type { DocumentRecord } from "@/lib/types";
 import type { Ctx } from "./types";
 
 type Group = { key: string; company: string; title: string; docs: DocumentRecord[] };
+
+/**
+ * Opens the LaTeX source in Overleaf (free online LaTeX editor) so it can be
+ * edited and compiled there. Only on the user's click; nothing is sent otherwise.
+ */
+async function openInOverleaf(doc: DocumentRecord, notify: Ctx["notify"]) {
+  // Opened now (during the click) so the browser does not block it as a pop-up.
+  const tab = window.open("", "overleaf");
+  try {
+    const response = await fetch(`/api/documents/${doc.id}/latex?inline=1`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const source = await response.text();
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "https://www.overleaf.com/docs";
+    form.target = "overleaf";
+    const fields: Record<string, string> = {
+      encoded_snip: encodeURIComponent(source),
+      snip_name: doc.filename.replace(/\.pdf$/i, ".tex"),
+      engine: "pdflatex",
+    };
+    for (const [name, value] of Object.entries(fields)) {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    }
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+  } catch (error) {
+    tab?.close();
+    notify(`Impossible de préparer le fichier LaTeX (${error instanceof Error ? error.message : "erreur"}).`, "bad");
+  }
+}
 
 export function DocumentsView({ ctx }: { ctx: Ctx }) {
   const { data, busy } = ctx;
@@ -79,8 +115,9 @@ export function DocumentsView({ ctx }: { ctx: Ctx }) {
         })}
       </div>
       <p className="muted small-text" style={{ marginTop: 12 }}>
-        <FileText size={13} aria-hidden /> Astuce : « Demander à l’IA » applique une consigne (ex. « plus court », « change le
-        design ») ; « Modifier » te laisse tout retoucher toi-même.
+        <FileText size={13} aria-hidden /> Astuce : « Demander à l’IA » applique une consigne (ex. « plus court », « reformule
+        le résumé ») ; « Modifier » te laisse tout retoucher toi-même ; « LaTeX » donne le code source à éditer (Overleaf ou
+        ton éditeur).
       </p>
     </>
   );
@@ -111,6 +148,19 @@ function DocRow({ doc, ctx, working }: { doc: DocumentRecord; ctx: Ctx; working:
         <button className="btn secondary small" disabled={disabled} onClick={() => act.openDocument({ doc, mode: "edit" })}>
           <Pencil size={14} aria-hidden /> Modifier
         </button>
+        <details className="more">
+          <summary className="btn ghost small">
+            <Code2 size={14} aria-hidden /> LaTeX
+          </summary>
+          <div className="menu">
+            <button className="btn secondary small" onClick={() => void openInOverleaf(doc, ctx.notify)}>
+              Éditer dans Overleaf
+            </button>
+            <a className="btn secondary small" href={`/api/documents/${doc.id}/latex`}>
+              Télécharger le .tex
+            </a>
+          </div>
+        </details>
         {!doc.approved && (
           <button className="btn small" disabled={disabled} onClick={() => void act.approve(doc)}>
             {working ? "…" : "Approuver"}

@@ -1,109 +1,12 @@
-import { GoogleGenAI } from "@google/genai";
-import { z } from "zod";
 import { authenticatedClient } from "@/lib/api";
-import { fetchJobText } from "@/lib/scan/enrich";
+import { analyzeJob } from "@/lib/pipeline/analyze";
 
-const output = z.object({
-  score_breakdown: z.record(z.string(), z.number()),
-  total: z.number().min(0).max(100),
-  verified_strengths: z.array(z.string()),
-  gaps: z.array(z.string()),
-  questions: z.array(z.string()),
-  cv_summary: z.string(),
-});
-export async function POST(
-  _: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export const maxDuration = 60;
+
+export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await authenticatedClient();
   if ("error" in auth) return auth.error;
-  if (!process.env.GEMINI_API_KEY)
-    return Response.json(
-      { error: "GEMINI_API_KEY is not configured" },
-      { status: 503 },
-    );
   const { id } = await params;
-  const [{ data: job, error }, { data: profile }] = await Promise.all([
-    auth.supabase
-      .from("jobs")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", auth.userId)
-      .single(),
-    auth.supabase
-      .from("candidate_profiles")
-      .select("profile,truth_ledger")
-      .eq("user_id", auth.userId)
-      .maybeSingle(),
-  ]);
-  if (error || !job)
-    return Response.json({ error: "Offer not found" }, { status: 404 });
-  // Offers from aggregators only carry a short extract: read the ad page to
-  // score the full text (best effort; never bypasses a protection).
-  if ((job.description?.length ?? 0) < 600) {
-    const page = await fetchJobText(job.official_url || job.source_url || "");
-    if (page && page.length > (job.description?.length ?? 0)) {
-      job.description = page;
-      await auth.supabase
-        .from("jobs")
-        .update({ description: page })
-        .eq("id", id)
-        .eq("user_id", auth.userId);
-    }
-  }
-  if (!job.description || job.description.length < 80) {
-    // Remember the attempt so the pipeline does not retry this offer every run.
-    await auth.supabase
-      .from("jobs")
-      .update({ last_checked_at: new Date().toISOString() })
-      .eq("id", id)
-      .eq("user_id", auth.userId);
-    return Response.json(
-      {
-        error:
-          "Impossible de lire l’annonce automatiquement : ouvre l’offre et colle sa description (bouton « Coller la description »).",
-      },
-      { status: 400 },
-    );
-  }
-  if (!profile)
-    return Response.json(
-      { error: "Le profil vérifié n’est pas encore synchronisé." },
-      { status: 409 },
-    );
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const prompt = `Analyse cette offre uniquement avec le profil et le registre de vérité. N'invente jamais une compétence, une expérience, une date, un statut légal ou un diplôme. Réponds en JSON: score_breakdown avec contract/20, mission/20, technical/25, education/15, experience/10, location/10; total sur 100; verified_strengths; gaps; questions; cv_summary.\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify(job)}`;
-    const result = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: prompt,
-      config: { responseMimeType: "application/json" },
-    });
-    const parsed = output.safeParse(JSON.parse(result.text || "{}"));
-    if (!parsed.success)
-      return Response.json({ error: "Réponse Gemini invalide ou vide" }, { status: 502 });
-    await auth.supabase
-      .from("jobs")
-      .update({
-        match_score: Math.round(parsed.data.total),
-        score_breakdown: parsed.data,
-        status: "ANALYZED",
-        last_checked_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("user_id", auth.userId);
-    await auth.supabase
-      .from("audit_events")
-      .insert({
-        user_id: auth.userId,
-        entity_type: "job",
-        entity_id: id,
-        action: "ANALYZED",
-        details: { score: parsed.data.total },
-      });
-    return Response.json(parsed.data);
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : "Erreur inconnue Gemini";
-    return Response.json({ error: `Analyse Gemini impossible : ${detail}` }, { status: 502 });
-  }
+  const result = await analyzeJob({ supabase: auth.supabase, userId: auth.userId, jobId: id });
+  return Response.json(result.body, { status: result.status });
 }

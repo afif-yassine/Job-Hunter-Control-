@@ -1,0 +1,138 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
+import { AI_NOT_CONFIGURED, aiConfigured, defaultAi, type AiCall } from "@/lib/ai";
+import { consumeQuota, quotaRefusal } from "@/lib/quota";
+import { fetchJobText } from "@/lib/scan/enrich";
+import { detectSuspicion } from "@/lib/scan/suspicion";
+
+const output = z.object({
+  score_breakdown: z.record(z.string(), z.number()),
+  total: z.number().min(0).max(100),
+  verified_strengths: z.array(z.string()),
+  gaps: z.array(z.string()),
+  questions: z.array(z.string()),
+  cv_summary: z.string(),
+  suspicion: z
+    .object({
+      level: z.enum(["none", "low", "high"]).catch("none"),
+      reasons: z.array(z.string()).catch([]),
+    })
+    .optional()
+    .catch(undefined),
+});
+
+export type StepResult = { status: number; body: Record<string, unknown> };
+
+/** Aggregators give a short extract: below this, the ad page is read first. */
+export const FULL_TEXT = 1500;
+
+type Ctx = {
+  supabase: SupabaseClient;
+  userId: string;
+  jobId: string;
+  env?: Record<string, string | undefined>;
+  ai?: AiCall;
+  fetchPage?: (url: string) => Promise<string | null>;
+};
+
+async function updateJob(ctx: Ctx, patch: Record<string, unknown>) {
+  const run = (p: Record<string, unknown>) =>
+    ctx.supabase.from("jobs").update(p).eq("id", ctx.jobId).eq("user_id", ctx.userId);
+  const { error } = await run(patch);
+  if (error && /column|schema cache|42703|PGRST204/i.test(`${error.code} ${error.message}`)) {
+    // Database not migrated yet: save what the old schema knows.
+    const rest = { ...patch };
+    for (const c of ["score_model", "review_flag", "review_reason", "duplicate_of"]) delete rest[c];
+    await run(rest);
+  }
+}
+
+/**
+ * Scores one offer against the verified profile. Used by the dashboard button,
+ * the browser pipeline and the scheduled server run.
+ */
+export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
+  const env = ctx.env ?? process.env;
+  if (!ctx.ai && !aiConfigured(env)) return { status: 503, body: { error: AI_NOT_CONFIGURED } };
+  const [{ data: job, error }, { data: profile }] = await Promise.all([
+    ctx.supabase.from("jobs").select("*").eq("id", ctx.jobId).eq("user_id", ctx.userId).single(),
+    ctx.supabase.from("candidate_profiles").select("profile,truth_ledger").eq("user_id", ctx.userId).maybeSingle(),
+  ]);
+  if (error || !job) return { status: 404, body: { error: "Offer not found" } };
+  if (job.review_flag)
+    return {
+      status: 409,
+      body: { error: "Cette offre est dans « À vérifier » : confirme-la d’abord.", code: "TO_REVIEW" },
+    };
+
+  // Always score the full ad: read the page when we only have an extract
+  // (best effort; never gets around a protection).
+  if ((job.description?.length ?? 0) < FULL_TEXT) {
+    const page = await (ctx.fetchPage ?? fetchJobText)(job.official_url || job.source_url || "");
+    if (page && page.length > (job.description?.length ?? 0)) {
+      job.description = page;
+      await updateJob(ctx, { description: page });
+    }
+  }
+  if (!job.description || job.description.length < 80) {
+    // Remember the attempt so the pipeline does not retry this offer every run.
+    await updateJob(ctx, { last_checked_at: new Date().toISOString() });
+    return {
+      status: 400,
+      body: {
+        error:
+          "Impossible de lire l’annonce automatiquement : ouvre l’offre et colle sa description (bouton « Coller la description »).",
+      },
+    };
+  }
+
+  // Obvious scams never reach the AI.
+  const signals = detectSuspicion(job);
+  if (signals.level === "high") {
+    const reason = signals.reasons.join(" · ");
+    await updateJob(ctx, { review_flag: "SUSPECTED", review_reason: reason, last_checked_at: new Date().toISOString() });
+    return { status: 200, body: { suspected: true, reasons: signals.reasons } };
+  }
+
+  if (!profile) return { status: 409, body: { error: "Le profil vérifié n’est pas encore synchronisé." } };
+
+  const quota = await consumeQuota(ctx.supabase, ctx.userId, "analysis", env);
+  if (!quota.ok) return quotaRefusal("analysis", quota.limit);
+
+  const hints = signals.reasons.length ? `\nSIGNAUX_A_VERIFIER=${JSON.stringify(signals.reasons)}` : "";
+  const prompt = `Analyse cette offre uniquement avec le profil et le registre de vérité. N'invente jamais une compétence, une expérience, une date, un statut légal ou un diplôme. Réponds en JSON: score_breakdown avec contract/20, mission/20, technical/25, education/15, experience/10, location/10; total sur 100; verified_strengths; gaps; questions; cv_summary; suspicion {level: "none"|"low"|"high", reasons: string[]} — "high" seulement pour une offre qui ressemble à une arnaque (paiement demandé au candidat, entreprise invérifiable, contact uniquement par messagerie ou e-mail personnel, promesse de gains, mission sans rapport avec l'intitulé), jamais pour une simple offre peu adaptée au profil.\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify({
+    company: job.company,
+    title: job.title,
+    contract_type: job.contract_type,
+    location: job.location,
+    description: job.description,
+  })}${hints}`;
+  try {
+    const result = await (ctx.ai ?? defaultAi)(prompt, "analysis");
+    const parsed = output.safeParse(JSON.parse(result.text || "{}"));
+    if (!parsed.success) return { status: 502, body: { error: "Réponse Gemini invalide ou vide" } };
+    const { suspicion, ...analysis } = parsed.data;
+    const suspected = suspicion?.level === "high";
+    await updateJob(ctx, {
+      match_score: Math.round(analysis.total),
+      score_breakdown: analysis,
+      status: "ANALYZED",
+      score_model: result.model,
+      last_checked_at: new Date().toISOString(),
+      ...(suspected
+        ? { review_flag: "SUSPECTED", review_reason: suspicion.reasons.join(" · ") || "Signalée par l’analyse IA" }
+        : {}),
+    });
+    await ctx.supabase.from("audit_events").insert({
+      user_id: ctx.userId,
+      entity_type: "job",
+      entity_id: ctx.jobId,
+      action: "ANALYZED",
+      details: { score: analysis.total, model: result.model, suspected },
+    });
+    return { status: 200, body: { ...analysis, suspected, reasons: suspected ? suspicion.reasons : [] } };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Erreur inconnue Gemini";
+    return { status: 502, body: { error: `Analyse Gemini impossible : ${detail}` } };
+  }
+}

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { parseAlertHtml } from "../lib/scan/alerts";
 import { isRelevant } from "../lib/scan/config";
 import { canonicalUrl, fingerprintOf, ingestOffers } from "../lib/scan/ingest";
+import { fakeSupabase } from "./fake-supabase";
 import { scanFranceTravail } from "../lib/scan/sources/francetravail";
 
 // NOTE: synthetic alert layouts. Validate against a real alert e-mail before relying on them.
@@ -53,7 +54,7 @@ test("France Travail: OAuth client credentials + search mapping", async () => {
     return new Response(JSON.stringify({ resultats: [{ id: "1", intitule: "Alternance Développeur Web", description: "…", entreprise: { nom: "Acme" }, lieuTravail: { libelle: "75 - PARIS 08" } }, { id: "no-title" }] }), { status: 206 });
   };
   const offers = await scanFranceTravail(
-    { queries: [{ keywords: "alternance développeur" }, { keywords: "alternance intelligence artificielle" }], departments: ["75", "92"], city: "Paris", maxAgeDays: 14 },
+    { queries: [{ keywords: "alternance développeur" }, { keywords: "alternance intelligence artificielle" }], departments: ["75", "92"], city: "Paris", maxAgeDays: 14, targets: [] },
     { FRANCE_TRAVAIL_CLIENT_ID: "i", FRANCE_TRAVAIL_CLIENT_SECRET: "s" },
     fakeFetch,
     new Date("2026-09-20T00:00:00Z"),
@@ -64,21 +65,20 @@ test("France Travail: OAuth client credentials + search mapping", async () => {
 });
 
 test("ingest de-duplicates against existing jobs, across sources and inside the batch", async () => {
-  const existing = [{ company: "Alan", title: "Software Engineer Internship", location: "Paris, Île-de-France, France (hybrid)", source_url: "https://jobs.example/alan/1", official_url: null }];
-  const inserted: unknown[] = [];
-  const fake = {
-    from: () => ({
-      select: () => ({ eq: () => ({ limit: async () => ({ data: existing, error: null }) }) }),
-      insert: async (rows: unknown[]) => { inserted.push(...rows); return { error: null }; },
-    }),
-  } as never;
+  const { db, tables } = fakeSupabase({
+    jobs: [{ id: "j1", user_id: "u1", company: "Alan", title: "Software Engineer Internship", location: "Paris, Île-de-France, France (hybrid)", status: "ANALYZED", source_url: "https://jobs.example/alan/1", official_url: null }],
+    job_sources: [],
+    applications: [],
+  });
   const base = { contract_type: null, description: null, publishedAt: null };
-  const result = await ingestOffers(fake, "u1", [
+  const result = await ingestOffers(db, "u1", [
     { ...base, source: "alert:linkedin", company: "Alan", title: "Software Engineer Internship", location: "Paris", url: "https://www.linkedin.com/jobs/view/1/" },
     { ...base, source: "alert:linkedin", company: "À compléter", title: "Stage IA", location: null, url: "https://www.linkedin.com/jobs/view/2/" },
     { ...base, source: "alert:indeed", company: "À compléter", title: "Stage IA", location: null, url: "https://www.linkedin.com/jobs/view/2/?utm_source=z" },
     { ...base, source: "francetravail", company: "Acme", title: "Alternance Développeur Web", location: "PARIS 08", url: "https://ft.example/1", description: "texte" },
   ]);
   assert.deepEqual([result.inserted, result.duplicates, result.needsDescription], [2, 2, 1]);
-  assert.equal(inserted.length, 2);
+  assert.equal(tables.jobs.length, 3);
+  // The LinkedIn link of Alan's offer is now remembered on the existing offer.
+  assert.ok(tables.job_sources.some((s) => s.job_id === "j1" && String(s.url).includes("linkedin.com/jobs/view/1")));
 });

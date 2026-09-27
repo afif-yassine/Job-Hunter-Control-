@@ -1,3 +1,5 @@
+import { parseAtsTarget, targetKey, type AtsTarget } from "./sources/ats";
+
 export type SearchQuery = {
   keywords: string;
 };
@@ -9,6 +11,8 @@ export type ScanConfig = {
   /** Town used by the aggregator APIs (Adzuna, Jooble, JSearch). */
   city: string;
   maxAgeDays: number;
+  /** Company careers pages read directly (Greenhouse, Lever, Ashby…). */
+  targets: AtsTarget[];
 };
 
 /** What the user edits in Réglages > Recherche. */
@@ -18,6 +22,8 @@ export type ScanPrefs = {
   city: string;
   departments: string[];
   maxAgeDays: number;
+  /** "greenhouse:doctolib", "lever:mistral"… (see parseAtsTarget). */
+  targets: string[];
 };
 
 export const DEFAULT_PREFS: ScanPrefs = {
@@ -26,7 +32,10 @@ export const DEFAULT_PREFS: ScanPrefs = {
   city: "Paris",
   departments: ["75", "92", "93", "94", "91"],
   maxAgeDays: 14,
+  targets: [],
 };
+
+export const MAX_TARGETS = 30;
 
 const list = (value: unknown, max: number) =>
   Array.isArray(value)
@@ -48,6 +57,14 @@ export function normalizePrefs(value: unknown): ScanPrefs {
     city: typeof v.city === "string" && v.city.trim() ? v.city.trim().slice(0, 60) : DEFAULT_PREFS.city,
     departments: departments.length ? departments : DEFAULT_PREFS.departments,
     maxAgeDays: Number.isFinite(days) && days >= 1 && days <= 60 ? Math.round(days) : DEFAULT_PREFS.maxAgeDays,
+    targets: [
+      ...new Set(
+        list(v.targets, 100)
+          .map(parseAtsTarget)
+          .filter((t): t is AtsTarget => Boolean(t))
+          .map(targetKey),
+      ),
+    ].slice(0, MAX_TARGETS),
   };
 }
 
@@ -57,7 +74,13 @@ export function configFromPrefs(prefs: ScanPrefs, maxQueries = 8): ScanConfig {
   for (const keyword of prefs.keywords)
     for (const contract of prefs.contracts)
       if (queries.length < maxQueries) queries.push({ keywords: `${contract} ${keyword}` });
-  return { queries, departments: prefs.departments.slice(0, 5), city: prefs.city, maxAgeDays: prefs.maxAgeDays };
+  return {
+    queries,
+    departments: prefs.departments.slice(0, 5),
+    city: prefs.city,
+    maxAgeDays: prefs.maxAgeDays,
+    targets: prefs.targets.map(parseAtsTarget).filter((t): t is AtsTarget => Boolean(t)),
+  };
 }
 
 /**
@@ -77,6 +100,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
   departments: ["75", "92", "93", "94", "91"],
   city: "Paris",
   maxAgeDays: 14,
+  targets: [],
 };
 
 export function loadScanConfig(env: Record<string, string | undefined> = process.env): ScanConfig {
@@ -92,6 +116,7 @@ export function loadScanConfig(env: Record<string, string | undefined> = process
       ).slice(0, 5),
       city: parsed.city || DEFAULT_CONFIG.city,
       maxAgeDays: parsed.maxAgeDays || DEFAULT_CONFIG.maxAgeDays,
+      targets: [],
     };
   } catch {
     return DEFAULT_CONFIG;

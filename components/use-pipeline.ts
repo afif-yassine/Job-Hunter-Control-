@@ -65,7 +65,9 @@ export function usePipeline({
 
   // Automatic search when the dashboard opens and the last one is old.
   useEffect(() => {
-    if (!status || !status.autoScan || !status.scanConfigured) return;
+    // When the server searches on its own schedule, opening the dashboard
+    // does not spend one of the day's manual searches.
+    if (!status || !status.autoScan || !status.scanConfigured || status.scheduledScan) return;
     const last = status.lastScanAt ? Date.parse(status.lastScanAt) : 0;
     if (Date.now() - last < INTERVAL) return;
     try {

@@ -156,6 +156,11 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
             "good",
           );
         }),
+      review: (job, action, platform) =>
+        run(job.id, async () => {
+          const r = await post(`/api/jobs/${job.id}/review`, { action, platform });
+          notify(r.ok ? String(r.body.message || "C’est noté.") : readable(r.body.error), r.ok ? "good" : "bad");
+        }),
       approve: (doc) =>
         run(doc.id, async () => {
           const r = await post(`/api/documents/${doc.id}/approve`);

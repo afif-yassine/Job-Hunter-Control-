@@ -4,7 +4,8 @@ import { CircleCheck, ExternalLink, LoaderCircle, ShieldCheck } from "lucide-rea
 import { Callout, Chip, PageHead } from "@/components/ui";
 import { PROVIDERS, type ProviderDef } from "@/lib/providers";
 import type { ProviderStatus } from "@/lib/integrations";
-import { DEFAULT_PREFS, type ScanPrefs } from "@/lib/scan/config";
+import { DEFAULT_PREFS, MAX_TARGETS, type ScanPrefs } from "@/lib/scan/config";
+import { parseAtsTarget } from "@/lib/scan/sources/ats";
 import { timeAgo } from "@/lib/labels";
 import type { SystemStatus } from "@/components/use-status";
 import type { Ctx } from "./types";
@@ -238,6 +239,7 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
   const [prefs, setPrefs] = useState<ScanPrefs>(DEFAULT_PREFS);
   const [keywords, setKeywords] = useState(DEFAULT_PREFS.keywords.join(", "));
   const [departments, setDepartments] = useState(DEFAULT_PREFS.departments.join(", "));
+  const [targets, setTargets] = useState("");
   const [auto, setAuto] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -251,6 +253,7 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
         setPrefs(body.prefs);
         setKeywords(body.prefs.keywords.join(", "));
         setDepartments(body.prefs.departments.join(", "));
+        setTargets((body.prefs.targets ?? []).join("\n"));
         setAuto(body.autoScan !== false);
         setLoaded(true);
       })
@@ -267,7 +270,12 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          prefs: { ...prefs, keywords: split(keywords), departments: split(departments) },
+          prefs: {
+            ...prefs,
+            keywords: split(keywords),
+            departments: split(departments),
+            targets: targets.split(/\n+/).map((t) => t.trim()).filter(Boolean),
+          },
           autoScan: auto,
         }),
       });
@@ -276,6 +284,7 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
       setPrefs(body.prefs);
       setKeywords(body.prefs.keywords.join(", "));
       setDepartments(body.prefs.departments.join(", "));
+      setTargets((body.prefs.targets ?? []).join("\n"));
       await refreshStatus();
       notify("Recherche enregistrée. Elle sera utilisée au prochain lancement.", "good");
     } catch (error) {
@@ -284,6 +293,9 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
       setSaving(false);
     }
   }
+
+  const lines = targets.split(/\n+/).map((t) => t.trim()).filter(Boolean);
+  const unknown = lines.filter((line) => !parseAtsTarget(line));
 
   const toggle = (value: string) =>
     setPrefs({
@@ -340,9 +352,31 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
             ))}
           </select>
         </label>
+        <label className="wide">
+          Entreprises à surveiller directement (facultatif)
+          <textarea
+            className="targets"
+            value={targets}
+            onChange={(e) => setTargets(e.target.value)}
+            placeholder={"https://jobs.lever.co/mistral\nhttps://boards.greenhouse.io/doctolib\nhttps://jobs.ashbyhq.com/qonto"}
+          />
+          <small className="muted">
+            Colle le lien de la page carrière d’une entreprise (une par ligne, {MAX_TARGETS} maximum). Pris en charge :
+            Greenhouse, Lever, Ashby, SmartRecruiters, Workable. Leurs offres sont lues à la source, sans clé, souvent avant
+            LinkedIn ou Indeed.
+          </small>
+          {unknown.length > 0 && (
+            <small className="warn-text">
+              Non reconnu{unknown.length > 1 ? "s" : ""} (ignoré{unknown.length > 1 ? "s" : ""} à l’enregistrement) :{" "}
+              {unknown.slice(0, 3).join(", ")}
+            </small>
+          )}
+        </label>
         <label className="check switch wide">
           <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
-          Chercher automatiquement à l’ouverture de l’appli (au plus toutes les 12 h)
+          {status?.scheduledScan
+            ? "Recherche automatique sur le serveur, même appli fermée (au plus toutes les 12 h)"
+            : "Chercher automatiquement à l’ouverture de l’appli (au plus toutes les 12 h)"}
         </label>
         <div className="wide toolbar">
           <button className="btn" disabled={saving || !loaded}>

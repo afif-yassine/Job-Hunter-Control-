@@ -10,6 +10,7 @@ import {
   Settings,
   TriangleAlert,
   Check,
+  ShieldAlert,
 } from "lucide-react";
 import { openQuestionCount } from "@/components/questions-panel";
 import { Callout, Chip, PageHead, Progress, ScoreBadge } from "@/components/ui";
@@ -30,10 +31,13 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
   const replaced = new Set(documents.map((d) => d.based_on_document_id).filter(Boolean));
   const toApprove = documents.filter((d) => !d.approved && !replaced.has(d.id)).length;
   const openQuestions = openQuestionCount(questions);
-  const missing = jobs.filter((j) => j.status === "DISCOVERED" && !j.description).length;
-  const best = jobs.filter((j) => (j.match_score ?? 0) >= 80).length;
-  const ready = jobs.filter((j) => j.status === "WAITING_APPROVAL" || j.status === "PREPARED").length;
-  const top = [...jobs]
+  // Offers waiting for a decision, dismissed or already applied are not "to do".
+  const open = jobs.filter((j) => !j.review_flag && !["SKIPPED", "SUBMITTED", "CONFIRMED", "INTERVIEW", "REJECTED"].includes(j.status));
+  const toReview = jobs.filter((j) => j.review_flag && j.status !== "SKIPPED").length;
+  const missing = open.filter((j) => j.status === "DISCOVERED" && !j.description).length;
+  const best = open.filter((j) => (j.match_score ?? 0) >= 80).length;
+  const ready = open.filter((j) => j.status === "WAITING_APPROVAL" || j.status === "PREPARED").length;
+  const top = [...open]
     .filter((j) => (j.match_score ?? 0) >= 60)
     .sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0))
     .slice(0, 5);
@@ -95,6 +99,14 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
       text: "Relis ton CV et ta lettre, puis approuve-les.",
       onClick: () => go("documents"),
     });
+  if (toReview)
+    todo.push({
+      icon: ShieldAlert,
+      count: toReview,
+      title: `${toReview} offre${toReview > 1 ? "s" : ""} à vérifier`,
+      text: "Suspecte, en double, ou déjà postulée ailleurs : c’est toi qui décides.",
+      onClick: () => go("jobs", "review"),
+    });
   if (missing)
     todo.push({
       icon: Search,
@@ -153,7 +165,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
                   {noSource
                     ? "Une clé gratuite suffit pour chercher sur tout internet."
                     : last
-                      ? `Dernière recherche : ${timeAgo(last)}${status?.autoScan ? " · automatique à l’ouverture" : ""}`
+                      ? `Dernière recherche : ${timeAgo(last)}${status?.scheduledScan ? " · automatique sur le serveur" : status?.autoScan ? " · automatique à l’ouverture" : ""}`
                       : "Aucune recherche pour l’instant."}
                 </p>
               </div>
@@ -179,6 +191,29 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
                 </button>
               )}
             </div>
+            {status?.usage && (
+              <p className="usage" aria-label="Utilisation aujourd’hui">
+                Aujourd’hui :
+                {(
+                  [
+                    ["scan", "recherches"],
+                    ["analysis", "analyses"],
+                    ["generation", "CV + lettres"],
+                  ] as const
+                ).map(([kind, label]) => {
+                  const u = status.usage![kind];
+                  if (!u.limit) return null;
+                  return (
+                    <span key={kind} className={u.used >= u.limit ? "full" : ""}>
+                      <b>
+                        {u.used}/{u.limit}
+                      </b>{" "}
+                      {label}
+                    </span>
+                  );
+                })}
+              </p>
+            )}
             <p className="muted small-text">
               Ce que fait « Lancer la recherche » : cherche les nouvelles offres, calcule ton score, écrit CV + lettre
               pour celles ≥ 80, puis lit le formulaire. <strong>Rien n’est jamais envoyé sans toi.</strong>

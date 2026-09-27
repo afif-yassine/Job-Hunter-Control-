@@ -6,7 +6,18 @@ const JOB: Record<string, { label: string; tone: Tone }> = {
   ANALYZED: { label: "Analysée", tone: "neutral" },
   WAITING_APPROVAL: { label: "Documents prêts", tone: "good" },
   PREPARED: { label: "Préparée", tone: "good" },
-  REJECTED: { label: "Écartée", tone: "bad" },
+  SUBMITTED: { label: "Déjà postulée", tone: "good" },
+  CONFIRMED: { label: "Candidature confirmée", tone: "good" },
+  INTERVIEW: { label: "Entretien", tone: "good" },
+  SKIPPED: { label: "Écartée", tone: "neutral" },
+  REJECTED: { label: "Refusée", tone: "bad" },
+};
+
+/** Why an offer waits in "À vérifier". */
+export const REVIEW: Record<string, { label: string; tone: Tone }> = {
+  SUSPECTED: { label: "Offre suspecte", tone: "bad" },
+  PROBABLE_DUPLICATE: { label: "Doublon probable", tone: "warn" },
+  ALREADY_APPLIED: { label: "Déjà postulé ?", tone: "warn" },
 };
 
 const APPLICATION: Record<string, { label: string; tone: Tone }> = {
@@ -75,6 +86,11 @@ export function sourceLabel(platform: string | null | undefined, url: string | n
     [/adzuna/, "Adzuna"],
     [/jooble/, "Jooble"],
     [/glassdoor/, "Glassdoor"],
+    [/greenhouse/, "Greenhouse"],
+    [/lever/, "Lever"],
+    [/ashby/, "Ashby"],
+    [/smartrecruiters/, "SmartRecruiters"],
+    [/workable/, "Workable"],
   ];
   for (const [re, name] of known) if (re.test(raw)) return name;
   try {
@@ -82,5 +98,16 @@ export function sourceLabel(platform: string | null | undefined, url: string | n
   } catch {
     // not a URL
   }
-  return raw ? raw.replace(/^jsearch:|^alert:/, "") : "Manuelle";
+  return raw ? raw.replace(/^jsearch:|^alert:|^ats:/, "") : "Manuelle";
+}
+
+/** Distinct platform names where the same offer was seen. */
+export function platformsOf(job: {
+  source_platform?: string | null;
+  source_url?: string | null;
+  job_sources?: { platform: string | null; url: string }[] | null;
+}): string[] {
+  const names = new Set<string>([sourceLabel(job.source_platform, job.source_url)]);
+  for (const s of job.job_sources ?? []) names.add(sourceLabel(s.platform, s.url));
+  return [...names];
 }

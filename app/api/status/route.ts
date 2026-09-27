@@ -1,6 +1,7 @@
 import { authenticatedClient } from "@/lib/api";
 import { applicationMode, isSafeMode } from "@/lib/config";
 import { integrationStatus } from "@/lib/integrations";
+import { usageToday } from "@/lib/quota";
 import { loadUserSettings } from "@/lib/settings";
 
 /** Asks the Railway worker whether it is up and its browser is installed. */
@@ -25,10 +26,11 @@ export async function GET() {
   const auth = await authenticatedClient();
   if ("error" in auth) return auth.error;
   const has = (name: string) => Boolean(process.env[name]?.trim());
-  const [providers, settings, worker] = await Promise.all([
+  const [providers, settings, worker, usage] = await Promise.all([
     integrationStatus(auth.supabase, auth.userId),
     loadUserSettings(auth.supabase, auth.userId),
     workerState(),
+    usageToday(auth.supabase, auth.userId),
   ]);
   return Response.json({
     applicationMode: applicationMode(),
@@ -44,10 +46,12 @@ export async function GET() {
     workerBrowserReady: worker.browserReady,
     providers,
     integrationsSecret: has("INTEGRATIONS_SECRET"),
-    scanConfigured: providers.some((p) => p.configured) || has("SCAN_WEBHOOK_URL"),
+    scanConfigured:
+      providers.some((p) => p.configured) || has("SCAN_WEBHOOK_URL") || settings.prefs.targets.length > 0,
     autoScan: settings.autoScan,
     lastScanAt: settings.lastScanAt,
-    scheduledScan:
-      has("CRON_SECRET") && has("SCAN_USER_ID") && has("SUPABASE_SERVICE_ROLE_KEY"),
+    // The server runs search → score → documents by itself (see /api/cron/tick).
+    scheduledScan: has("CRON_SECRET") && has("SUPABASE_SERVICE_ROLE_KEY"),
+    usage,
   });
 }

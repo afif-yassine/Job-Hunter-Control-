@@ -190,6 +190,24 @@ pre { white-space: pre-wrap; word-break: break-word; margin: 8px 0 0; font-size:
 .why ul { margin: 0; padding-left: 20px; font-size: 14.5px; }
 .why ul.plus li::marker { color: var(--good); } .why ul.minus li::marker { color: var(--warn); }
 
+/* Offers waiting for a decision (suspected, probable duplicate, already applied) */
+.reviewbox { border: 1px solid #75592a; background: #2a2212; border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; }
+.reviewbox.bad { border-color: #7c3543; background: #2b1720; }
+.reviewbox > p:first-child { margin: 0; display: flex; gap: 8px; align-items: flex-start; font-size: 14.5px; }
+.reviewbox > p:first-child svg { flex: none; margin-top: 3px; color: var(--warn); }
+.reviewbox.bad > p:first-child svg { color: var(--bad); }
+.reviewbox .jobactions { margin-top: 4px; }
+.linkbtn { background: none; border: 0; padding: 4px 0; color: var(--muted); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; justify-self: start; min-height: 32px; }
+.linkbtn:hover:not(:disabled) { color: var(--text); text-decoration: underline; }
+.inlineform { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inlineform select { background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; min-height: 36px; }
+.why ul.links { list-style: none; padding-left: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }
+.why ul.links a { color: var(--info); font-size: 14px; }
+.usage { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 13px; }
+.usage b { color: var(--text); font-weight: 600; }
+.usage .full b { color: var(--warn); }
+.targets { width: 100%; min-height: 110px; resize: vertical; font-family: inherit; background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 14.5px; }
+
 .list { padding: 4px 0; }
 .row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; text-align: left; }
 .row:last-child { border-bottom: 0; }
@@ -370,3 +388,11 @@ tr.replaced td { opacity: .5; }
 @media (min-width: 1200px) {
   .hero-top { gap: 24px; }
 }
+
+/* Small disclosure menu (LaTeX actions) */
+details.more { position: relative; }
+details.more > summary { list-style: none; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); right: 0; display: grid; gap: 6px; padding: 8px; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; min-width: 220px; white-space: nowrap; box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+@media (max-width: 639px) { details.more .menu { right: auto; left: 0; } }
+.warn-text { color: var(--warn); font-size: 13px; }

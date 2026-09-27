@@ -30,6 +30,7 @@ export async function POST(req: Request) {
     queries: [{ keywords: "alternance développeur" }],
     departments: ["75"],
     city: "Paris",
+    targets: [],
     maxAgeDays: 30,
   };
   try {

@@ -16,10 +16,16 @@ const breakdown = {
 
 export const demoData: Data = {
   jobs: [
-    { id: "j1", company: "Doctolib", title: "Alternant développeur IA", contract_type: "Alternance", location: "Paris (75)", source_url: "https://www.linkedin.com/jobs/view/1", official_url: "https://www.linkedin.com/jobs/view/1", description: "…", match_score: 88, score_breakdown: breakdown, status: "WAITING_APPROVAL", publication_date: null, source_platform: "jsearch:LinkedIn", created_at: ago(90) },
+    { id: "j1", company: "Doctolib", title: "Alternant développeur IA", contract_type: "Alternance", location: "Paris (75)", source_url: "https://www.linkedin.com/jobs/view/1", official_url: "https://www.linkedin.com/jobs/view/1", description: "…", match_score: 88, score_breakdown: breakdown, status: "WAITING_APPROVAL", publication_date: null, source_platform: "jsearch:LinkedIn", created_at: ago(90), job_sources: [
+      { platform: "jsearch:LinkedIn", url: "https://www.linkedin.com/jobs/view/1" },
+      { platform: "jsearch:Indeed", url: "https://fr.indeed.com/viewjob?jk=9" },
+      { platform: "ats:greenhouse", url: "https://boards.greenhouse.io/doctolib/jobs/1" },
+    ] },
     { id: "j2", company: "Airbus", title: "Stagiaire data engineer", contract_type: "Stage", location: "Toulouse", source_url: "https://www.indeed.com/viewjob?jk=2", description: "…", match_score: 84, score_breakdown: { ...breakdown, total: 84 }, status: "ANALYZED", publication_date: null, source_platform: "jsearch:Indeed", created_at: ago(95) },
     { id: "j3", company: "Alan", title: "Développeur full-stack en alternance", contract_type: "Alternance", location: "Paris (75)", source_url: "https://www.welcometothejungle.com/fr/jobs/3", description: "…", match_score: 67, status: "ANALYZED", publication_date: null, source_platform: "jsearch:Welcome to the Jungle", created_at: ago(300) },
     { id: "j4", company: "Entreprise non communiquée", title: "Alternance développeur web", contract_type: "Alternance", location: "Nanterre (92)", source_url: "https://candidat.francetravail.fr/offres/recherche/detail/4", description: null, match_score: null, status: "DISCOVERED", publication_date: "2026-09-18", source_platform: "francetravail", created_at: ago(20) },
+    { id: "j6", company: "Logistix Services", title: "Stage assistant administratif", contract_type: "Stage", location: "Paris", source_url: "https://jooble.org/desc/6", description: "…", match_score: null, status: "DISCOVERED", publication_date: null, source_platform: "jooble", created_at: ago(15), review_flag: "SUSPECTED", review_reason: "Mission typique des arnaques (colis, chèques, cartes prépayées) · Contact demandé par messagerie (WhatsApp/Telegram)" },
+    { id: "j7", company: "Doctolib", title: "Software Engineer Backend Java — Alternance", contract_type: "Alternance", location: "Paris", source_url: "https://www.welcometothejungle.com/fr/jobs/7", description: "…", match_score: null, status: "DISCOVERED", publication_date: null, source_platform: "jsearch:Welcome to the Jungle", created_at: ago(12), review_flag: "PROBABLE_DUPLICATE", review_reason: "Peut-être la même offre qu’une autre déjà trouvée (même entreprise, intitulé très proche).", duplicate_of: "j1" },
     { id: "j5", company: "Capgemini", title: "Alternant ingénieur data & IA", contract_type: "Alternance", location: "Paris La Défense", source_url: "https://www.hellowork.com/fr-fr/emplois/5.html", description: "Missions : …", match_score: null, status: "DISCOVERED", publication_date: null, source_platform: "adzuna", created_at: ago(20) },
   ],
   apps: [
@@ -66,5 +72,10 @@ export const demoStatus: SystemStatus = {
   scanConfigured: true,
   autoScan: true,
   lastScanAt: ago(88),
-  scheduledScan: false,
+  scheduledScan: true,
+  usage: {
+    scan: { used: 1, limit: 3 },
+    analysis: { used: 12, limit: 20 },
+    generation: { used: 2, limit: 10 },
+  },
 };

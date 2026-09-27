@@ -15,7 +15,9 @@ export type View =
   | "activity"
   | "settings";
 
-export type JobFilter = "all" | "best" | "todo" | "missing" | "ready";
+export type JobFilter = "all" | "best" | "todo" | "missing" | "ready" | "review" | "applied";
+
+export type ReviewAction = "keep" | "merge" | "dismiss" | "applied_elsewhere";
 
 export type Tone = "good" | "bad" | "info";
 
@@ -37,6 +39,7 @@ export type Ctx = {
   act: {
     analyze: (job: Job) => Promise<void>;
     generate: (job: Job) => Promise<void>;
+    review: (job: Job, action: ReviewAction, platform?: string) => Promise<void>;
     approve: (doc: DocumentRecord) => Promise<void>;
     upload: (doc: DocumentRecord) => Promise<void>;
     prepare: (applicationId: string) => Promise<void>;

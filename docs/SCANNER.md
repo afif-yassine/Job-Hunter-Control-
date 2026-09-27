@@ -67,14 +67,52 @@ Variable `SCAN_CONFIG` (JSON) :
 
 Valeurs par défaut : alternance / stage développeur, IA, data, en Île-de-France, offres de moins de 14 jours.
 
-## 4. Scan automatique quotidien (optionnel)
+## 4. Pages carrière des entreprises (sans clé)
 
-`vercel.json` déclare un cron quotidien sur `/api/scan/cron` (06:00 UTC). Il ne fait rien tant que ces variables
-**serveur** n'existent pas : `CRON_SECRET` (chaîne aléatoire), `SCAN_USER_ID` (ton `auth.users.id` Supabase),
-`SUPABASE_SERVICE_ROLE_KEY`. Le cron ne fait qu'ajouter des offres `DISCOVERED` ; il ne postule jamais.
-Ne mets jamais la clé service-role dans une variable `NEXT_PUBLIC_`.
+Dans Réglages > Recherche, « Entreprises à surveiller » : colle le lien de la page carrière (une par ligne,
+30 maximum). Pris en charge : Greenhouse, Lever, Ashby, SmartRecruiters, Workable — ces plateformes publient
+les offres de leurs clients en JSON public, prévu pour être lu (`lib/scan/sources/ats.ts`). Les offres hors de
+France (sauf télétravail) et celles de plus de 30 jours sont ignorées.
 
-## 5. Scanner externe (compatibilité)
+## 5. Recherche automatique sur le serveur (toutes les heures ou demi-heures)
+
+`/api/cron/tick` fait, pour **chaque compte**, sans navigateur ouvert : recherche (au plus toutes les 12 h par
+compte), analyse des offres en attente, rédaction CV + lettre pour les scores ≥ 80. Il s'arrête proprement avant
+la limite de 60 s de Vercel ; l'appel suivant reprend où il en était (la file d'attente, c'est le statut des
+offres). Il ne postule jamais et n'ouvre jamais de navigateur.
+
+Variables **serveur** nécessaires dans Vercel : `CRON_SECRET` (longue chaîne aléatoire) et
+`SUPABASE_SERVICE_ROLE_KEY`. Ne mets jamais la clé service-role dans une variable `NEXT_PUBLIC_`.
+
+Fréquence :
+- `vercel.json` l'appelle une fois par jour (06:00 UTC) — c'est le maximum sur le plan Vercel Hobby ;
+- pour une vraie automatisation, fais-le appeler toutes les 30 min par Supabase (gratuit) :
+
+```sql
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+select vault.create_secret('<le même CRON_SECRET que dans Vercel>', 'cron_secret');
+select cron.schedule('job-hunter-tick', '*/30 * * * *', $$
+  select net.http_post(
+    url := 'https://job-hunter-control.vercel.app/api/cron/tick',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret'),
+      'Content-Type', 'application/json'),
+    timeout_milliseconds := 60000);
+$$);
+```
+
+## 6. Dédoublonnage et offres « À vérifier »
+
+Une même offre vue sur plusieurs plateformes devient **une seule** offre (table `job_sources` = tous ses liens),
+notée une seule fois. Trois niveaux (`lib/scan/dedupe.ts`) : même lien ; même empreinte (entreprise + intitulé
+nettoyé + ville + type de contrat) ; texte très proche (similarité par trigrammes, comme `pg_trgm`). Dans la
+zone grise, l'offre est gardée mais rangée dans « À vérifier » (doublon probable). Une offre proche d'une
+candidature déjà faite (y compris « Déjà postulé ailleurs ») est rangée avec l'étiquette « Déjà postulé ? ».
+Les offres suspectes (paiement demandé, colis, WhatsApp + e-mail personnel…) vont aussi dans « À vérifier » :
+rien n'est dépensé dessus (ni IA, ni quota) tant que tu n'as pas décidé.
+
+## 7. Scanner externe (compatibilité)
 
 Si `SCAN_WEBHOOK_URL` est défini, il est appelé en plus (`POST`, `Authorization: Bearer $SCAN_WEBHOOK_SECRET`).
 Il peut répondre `{"offers":[{"source","company","title","location","contract_type","description","url","publishedAt"}]}`.

@@ -14,6 +14,7 @@ function stub(jobs: Row[]) {
       const q: Record<string, unknown> = {
         select: () => q,
         eq: () => q,
+        is: () => q,
         order: () => q,
         limit: () => q,
         insert: (row: Row) => (inserted.push({ table, row }), Promise.resolve({ error: null })),

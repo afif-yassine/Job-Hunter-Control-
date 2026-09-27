@@ -28,6 +28,12 @@ export type ScanSummary = {
   relevant: number;
   inserted: number;
   duplicates: number;
+  /** Seen again on another platform, and you had already applied to it. */
+  alreadyApplied: number;
+  /** New offers waiting in "À vérifier" (probable duplicate, already applied). */
+  toReview: number;
+  /** New offers waiting in "À vérifier" as possible scams. */
+  suspected: number;
   needsDescription: number;
   configured: boolean;
 };

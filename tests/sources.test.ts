@@ -15,6 +15,7 @@ const config: ScanConfig = {
   departments: ["75"],
   city: "Paris",
   maxAgeDays: 14,
+  targets: [],
 };
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });

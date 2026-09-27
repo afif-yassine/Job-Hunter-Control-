@@ -1,4 +1,5 @@
 import { authenticatedClient } from "@/lib/api";
+import { consumeQuota, quotaRefusal } from "@/lib/quota";
 import { runScan, scanMessage, SETUP_HINT } from "@/lib/scan";
 
 // France Travail + Gmail take a few seconds; allow up to a minute.
@@ -13,6 +14,12 @@ export async function POST(req: Request) {
   const auth = await authenticatedClient();
   if ("error" in auth) return auth.error;
   const body = (await req.json().catch(() => ({}))) as { log?: boolean };
+  // Scheduled server scans are free; scans started from the dashboard are counted.
+  const quota = await consumeQuota(auth.supabase, auth.userId, "scan");
+  if (!quota.ok) {
+    const refusal = quotaRefusal("scan", quota.limit);
+    return Response.json(refusal.body, { status: refusal.status });
+  }
   const summary = await runScan({
     supabase: auth.supabase,
     userId: auth.userId,

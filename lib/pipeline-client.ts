@@ -38,6 +38,10 @@ export type PipelineReport = {
   found: number;
   inserted: number;
   duplicates: number;
+  /** Seen again elsewhere, already applied: never proposed again. */
+  alreadyApplied: number;
+  /** Offers put in "À vérifier" (possible scam, probable duplicate…). */
+  toReview: number;
   needsDescription: number;
   analyzed: number;
   strong: number;
@@ -88,7 +92,7 @@ async function call(url: string, signal?: AbortSignal, body: unknown = {}): Prom
 }
 
 /** Errors after which trying the next offer would be pointless. */
-const FATAL_ANALYSIS = /quota|429|RESOURCE_EXHAUSTED|GEMINI_API_KEY|API key|Unauthorized|Connexion impossible/i;
+const FATAL_ANALYSIS = /quota|429|RESOURCE_EXHAUSTED|GEMINI_API_KEY|API key|Unauthorized|Connexion impossible|Limite du jour/i;
 const FATAL_WORKER = /Worker Playwright|injoignable|Executable doesn't exist|Please update docker image|browserType\.launch|Connexion impossible|Unauthorized/i;
 
 const THREE_DAYS = 3 * 86_400_000;
@@ -110,6 +114,8 @@ export function emptyReport(): PipelineReport {
     found: 0,
     inserted: 0,
     duplicates: 0,
+    alreadyApplied: 0,
+    toReview: 0,
     needsDescription: 0,
     analyzed: 0,
     strong: 0,
@@ -166,6 +172,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRep
         report.found = Number(scan.body.found) || 0;
         report.inserted = Number(scan.body.inserted) || 0;
         report.duplicates = Number(scan.body.duplicates) || 0;
+        report.alreadyApplied = Number(scan.body.alreadyApplied) || 0;
+        report.toReview = (Number(scan.body.toReview) || 0) + (Number(scan.body.suspected) || 0);
         report.needsDescription = Number(scan.body.needsDescription) || 0;
         const reports = (scan.body.reports as { source: string; status: string; message?: string }[]) || [];
         for (const r of reports)
@@ -179,12 +187,23 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRep
     }
 
     // 2. Score the offers that were never analysed --------------------------
-    const { data: rows } = await supabase
+    // Offers in "À vérifier" wait for the user: nothing is spent on them.
+    const select = "id,company,title,description,official_url,source_url,last_checked_at";
+    const first = await supabase
       .from("jobs")
-      .select("id,company,title,description,official_url,source_url,last_checked_at")
+      .select(select)
       .eq("status", "DISCOVERED")
+      .is("review_flag", null)
       .order("created_at", { ascending: false })
       .limit(60);
+    let rows = first.data;
+    if (first.error)
+      ({ data: rows } = await supabase
+        .from("jobs")
+        .select(select)
+        .eq("status", "DISCOVERED")
+        .order("created_at", { ascending: false })
+        .limit(60));
     const now = Date.now();
     const candidates = ((rows || []) as PendingJob[]).filter((job) => {
       // Offers we could not read recently wait for the user to paste the text.
@@ -203,13 +222,16 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRep
       if (analysisStopped) return;
       const analysis = await call(`/api/jobs/${job.id}/analyze`, signal);
       done += 1;
-      if (analysis.ok) {
+      if (analysis.ok && analysis.body.suspected) {
+        report.toReview += 1;
+      } else if (analysis.ok) {
         report.analyzed += 1;
         const total = Number(analysis.body.total) || 0;
         if (total >= threshold) strong.push({ id: job.id, company: job.company, title: job.title, score: total });
       } else {
         const raw = String(analysis.body.error || "Analyse impossible");
         if (/Impossible de lire l’annonce/.test(raw)) report.needsDescription += 1;
+        else if (analysis.body.code === "TO_REVIEW") report.toReview += 1;
         else {
           report.issues.push(issue(`${job.company} · ${job.title}`, raw));
           if (FATAL_ANALYSIS.test(raw)) analysisStopped = true;
@@ -301,6 +323,8 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRep
         generated: report.generated,
         prepared: report.prepared,
         needsDescription: report.needsDescription,
+        toReview: report.toReview,
+        alreadyApplied: report.alreadyApplied,
         issues: report.issues.length,
         noSource: report.noSource,
       },
@@ -311,7 +335,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRep
         user_id: userId,
         notification_type: "PIPELINE_DONE",
         title: "Recherche terminée",
-        message: `${report.inserted} nouvelle(s) offre(s), ${report.strong} très bonne(s) (≥ ${threshold}), ${report.generated} dossier(s) prêt(s)${report.prepared ? `, ${report.prepared} formulaire(s) préparé(s)` : ""}.`,
+        message: `${report.inserted} nouvelle(s) offre(s), ${report.strong} très bonne(s) (≥ ${threshold}), ${report.generated} dossier(s) prêt(s)${report.prepared ? `, ${report.prepared} formulaire(s) préparé(s)` : ""}${report.toReview ? `, ${report.toReview} à vérifier` : ""}.`,
         action_url: null,
         delivery_channels: ["dashboard"],
       });
@@ -329,6 +353,7 @@ export function summarize(report: PipelineReport): string {
   if (report.strong) parts.push(`${report.strong} très bonne${report.strong > 1 ? "s" : ""}`);
   if (report.generated) parts.push(`${report.generated} dossier${report.generated > 1 ? "s" : ""} prêt${report.generated > 1 ? "s" : ""}`);
   if (report.prepared) parts.push(`${report.prepared} formulaire${report.prepared > 1 ? "s" : ""} préparé${report.prepared > 1 ? "s" : ""}`);
+  if (report.toReview) parts.push(`${report.toReview} à vérifier`);
   if (!parts.length) return report.issues.length ? "Rien n’a pu être traité." : "Rien de nouveau pour le moment.";
   return parts.join(" · ");
 }

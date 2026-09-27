@@ -4,6 +4,7 @@ import { loadUserSettings, saveUserSettings } from "@/lib/settings";
 import { configFromPrefs, isRelevant } from "./config";
 import { ingestOffers } from "./ingest";
 import { scanAdzuna } from "./sources/adzuna";
+import { scanAts } from "./sources/ats";
 import { scanFranceTravail } from "./sources/francetravail";
 import { scanGmailAlerts } from "./sources/gmail";
 import { scanJooble } from "./sources/jooble";
@@ -49,6 +50,7 @@ export async function runScan(ctx: {
   const config = configFromPrefs(settings.prefs);
   const reports: SourceReport[] = [];
   const collected: ScannedOffer[] = [];
+  const warnings = new Map<string, string>();
 
   const sources: {
     name: string;
@@ -91,6 +93,20 @@ export async function runScan(ctx: {
       run: () => scanGmailAlerts(env, Math.min(config.maxAgeDays, 14)),
     },
     {
+      name: "Pages carrière (Greenhouse, Lever, Ashby…)",
+      enabled: config.targets.length > 0,
+      missing: "aucune entreprise ajoutée dans Réglages > Recherche",
+      run: async () => {
+        const result = await scanAts(config.targets, config);
+        if (result.errors.length) {
+          if (!result.offers.length && result.errors.length === config.targets.length)
+            throw new Error(result.errors.slice(0, 3).join(" ; "));
+          warnings.set("Pages carrière (Greenhouse, Lever, Ashby…)", result.errors.slice(0, 3).join(" ; "));
+        }
+        return result.offers;
+      },
+    },
+    {
       name: "Scanner externe (SCAN_WEBHOOK_URL)",
       enabled: has("SCAN_WEBHOOK_URL"),
       missing: "SCAN_WEBHOOK_URL",
@@ -116,6 +132,7 @@ export async function runScan(ctx: {
           source: source.name,
           status: "ok",
           found: offers.length,
+          message: warnings.get(source.name),
         });
       } catch (error) {
         reports.push({
@@ -128,6 +145,7 @@ export async function runScan(ctx: {
     }),
   );
 
+  // Company careers pages alone do not need any key.
   const configured = sources.some((s) => s.enabled);
   const relevant = collected.filter(isRelevant);
   const ingest = await ingestOffers(ctx.supabase, ctx.userId, relevant);
@@ -145,6 +163,9 @@ export async function runScan(ctx: {
     relevant: relevant.length,
     inserted: ingest.inserted,
     duplicates: ingest.duplicates,
+    alreadyApplied: ingest.alreadyApplied,
+    toReview: ingest.toReview,
+    suspected: ingest.suspected,
     needsDescription: ingest.needsDescription,
     configured,
   };
@@ -167,6 +188,9 @@ export async function runScan(ctx: {
           relevant: summary.relevant,
           inserted: summary.inserted,
           duplicates: summary.duplicates,
+          alreadyApplied: summary.alreadyApplied,
+          toReview: summary.toReview,
+          suspected: summary.suspected,
         },
         error_message:
           reports
@@ -179,7 +203,7 @@ export async function runScan(ctx: {
         user_id: ctx.userId,
         notification_type: "NEW_OFFERS",
         title: `${summary.inserted} nouvelle(s) offre(s)`,
-        message: `${summary.duplicates} doublon(s) ignoré(s)${summary.needsDescription ? ` · ${summary.needsDescription} offre(s) à compléter avec la description` : ""}.`,
+        message: `${summary.duplicates} doublon(s) regroupé(s)${summary.alreadyApplied ? ` (dont ${summary.alreadyApplied} déjà postulée(s) ailleurs)` : ""}${summary.toReview + summary.suspected ? ` · ${summary.toReview + summary.suspected} à vérifier` : ""}${summary.needsDescription ? ` · ${summary.needsDescription} offre(s) à compléter avec la description` : ""}.`,
         delivery_channels: ["dashboard"],
       });
   }
@@ -189,7 +213,7 @@ export async function runScan(ctx: {
 export function scanMessage(s: ScanSummary): string {
   if (!s.configured) return SETUP_HINT;
   const errors = s.reports.filter((r) => r.status === "error");
-  const head = `Scan terminé : ${s.found} offre(s) trouvée(s), ${s.relevant} pertinente(s), ${s.inserted} nouvelle(s), ${s.duplicates} doublon(s) ignoré(s).`;
+  const head = `Scan terminé : ${s.found} offre(s) trouvée(s), ${s.relevant} pertinente(s), ${s.inserted} nouvelle(s), ${s.duplicates} doublon(s) regroupé(s)${s.alreadyApplied ? ` dont ${s.alreadyApplied} déjà postulée(s) ailleurs` : ""}.${s.toReview + s.suspected ? ` ${s.toReview + s.suspected} offre(s) à vérifier.` : ""}`;
   const extra = s.needsDescription
     ? ` ${s.needsDescription} offre(s) sans description : colle-la pour activer l’analyse.`
     : "";

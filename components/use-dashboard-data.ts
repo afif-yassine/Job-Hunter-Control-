@@ -36,7 +36,7 @@ export function useDashboardData(demo?: Data) {
       return;
     }
     const [j, a, q, d, r, n] = await Promise.all([
-      supabase.from("jobs").select("*").order("created_at", { ascending: false }),
+      supabase.from("jobs").select("*,job_sources(platform,url)").order("created_at", { ascending: false }),
       supabase.from("applications").select("*,jobs(company,title)").order("created_at", { ascending: false }),
       supabase
         .from("application_questions")
@@ -46,6 +46,11 @@ export function useDashboardData(demo?: Data) {
       supabase.from("agent_runs").select("*").order("created_at", { ascending: false }).limit(200),
       supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(100),
     ]);
+    let jobs = j;
+    if (j.error) {
+      // Before the Phase 1 migration there is no job_sources table.
+      jobs = await supabase.from("jobs").select("*").order("created_at", { ascending: false });
+    }
     let questions = q.data as Question[] | null;
     if (q.error) {
       // The join is only a nicety: fall back to the plain table if it fails.
@@ -55,10 +60,10 @@ export function useDashboardData(demo?: Data) {
         .order("created_at", { ascending: false });
       questions = plain.data as Question[] | null;
     }
-    const failure = [j, a, d, r, n].find((x) => x.error)?.error;
+    const failure = [jobs, a, d, r, n].find((x) => x.error)?.error;
     setError(failure ? failure.message : "");
     setData({
-      jobs: (j.data || []) as Job[],
+      jobs: (jobs.data || []) as Job[],
       apps: (a.data || []) as Application[],
       questions: questions || [],
       documents: (d.data || []) as DocumentRecord[],

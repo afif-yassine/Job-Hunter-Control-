@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { generateJson } from "@/lib/ai";
 import { z } from "zod";
 import { authenticatedClient } from "@/lib/api";
 import {
@@ -82,12 +82,7 @@ OFFRE=${JSON.stringify(job)}`;
 
   let root: Record<string, unknown>;
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const result = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: prompt,
-      config: { responseMimeType: "application/json" },
-    });
+    const result = await generateJson(prompt, "writing");
     root = asRecord(parseJson(result.text || ""));
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Erreur inconnue Gemini";

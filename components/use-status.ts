@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { ProviderStatus } from "@/lib/integrations";
+import type { Usage } from "@/lib/quota";
 
 export type SystemStatus = {
   applicationMode: string;
@@ -17,6 +18,8 @@ export type SystemStatus = {
   autoScan: boolean;
   lastScanAt: string | null;
   scheduledScan: boolean;
+  /** Today's use of the daily limits (null before the migration). */
+  usage?: Usage | null;
 };
 
 /** State of the connections (sources, Gemini, Drive, Playwright worker). */
