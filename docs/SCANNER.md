@@ -131,10 +131,14 @@ La page **Admin** (visible des seuls administrateurs ; le premier compte l'est a
 francetravail.io. Elles ne trouvent **pas** d'offres : au mieux elles enrichissent celles déjà trouvées via France
 Travail (seules ces offres portent un code ROME, `jobs.rome_code`).
 
-- **Marché du travail** : tension, volume d'embauches et fourchette de salaire sur ce métier/territoire. Affiché
-  comme une note courte sous l'offre, une fois son scope/URL confirmés (voir plus bas).
+- **Marché du travail** : confirmé live (sept. 2026) — c'est en fait toute une famille de statistiques (demandeurs,
+  embauches, offres, salaires, dynamique de l'emploi…), pas un simple indicateur de tension. Pour le MVP, un seul
+  indicateur est branché : le nombre de demandeurs d'emploi inscrits sur ce métier, dans ce département, par
+  trimestre (endpoint « Stats des demandeurs d'emploi inscrits en fin de trimestre — DE_1 »). Affiché comme une
+  note courte sous l'offre.
 - **Accès à l'emploi des demandeurs d'emploi** : taux de retour à l'emploi à 6 mois par métier — indicateur admin
-  uniquement pour l'instant (pas encore affiché par offre).
+  uniquement pour l'instant (pas encore affiché par offre). Sa forme d'appel (POST + JSON) est déduite de celle,
+  confirmée, de Marché du travail (même famille d'API « stats-* ») : à vérifier dès la première vraie réponse.
 - **Open Formation** : souscrite mais **non utilisée** — vérifié sur la doc live (sept. 2026), ses 3 endpoints ne
   permettent que de consulter les RDV/plages de candidature d'une formation déjà identifiée par un organisme de
   formation (`numeroSession`/`numeroAction`/`numeroFormation`), pas de chercher « quelle formation comble ce
@@ -143,14 +147,15 @@ Travail (seules ces offres portent un code ROME, `jobs.rome_code`).
 
 Pour Marché du travail et Accès à l'emploi : sur `francetravail.io/compte/applications/<id>`, clique « Ajouter »
 sur l'API, puis « Enregistrer ». Une fois souscrite, la page de l'application affiche son **scope** technique (ce
-n'est pas un secret, juste l'identifiant du périmètre d'accès — sûr à coller dans Vercel) et l'URL de base de son
-endpoint de recherche/stats. Mets les deux dans Vercel :
+n'est pas un secret, juste l'identifiant du périmètre d'accès — sûr à coller dans Vercel). L'URL à mettre dans
+Vercel est l'**endpoint complet avec son chemin** (pas juste le domaine — ce sont des `POST` avec un corps JSON,
+pas une recherche `GET` simple) :
 
 ```
-FRANCE_TRAVAIL_MARCHE_SCOPE=...
-FRANCE_TRAVAIL_MARCHE_URL=...
+FRANCE_TRAVAIL_MARCHE_SCOPE=api_stats-offres-demandes-emploiv1 offresetdemandesemploi
+FRANCE_TRAVAIL_MARCHE_URL=https://api.francetravail.io/partenaire/stats-offres-demandes-emploi/v1/indicateur/stat-demandeurs
 FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE=...
-FRANCE_TRAVAIL_ACCES_EMPLOI_URL=...
+FRANCE_TRAVAIL_ACCES_EMPLOI_URL=https://api.francetravail.io/partenaire/stats-perspectives-retour-emploi/v1/...
 ```
 
 Tant qu'une paire scope/URL manque, la page Admin l'affiche « À terminer » dans la section « Enrichissement
@@ -159,6 +164,13 @@ comme les autres sources (`source_runs`, alertes admin en cas d'erreur). Le form
 n'a pas encore été vérifié en conditions réelles (implémentation défensive, plusieurs noms de champ essayés,
 réponse brute conservée) : si un champ affiché semble faux, dis-le, ça se corrige en quelques minutes une fois
 qu'on voit une vraie réponse.
+
+**Jeton OAuth — une incohérence vue dans la doc live** : la page de Open Formation et celle de Mes évènements
+emploi montrent `https://authentification-partenaire.francetravail.io/...` comme URL de jeton (c'est la valeur
+par défaut de l'app depuis sept. 2026), mais celle de Marché du travail montre encore l'ancien domaine
+`https://entreprise.francetravail.fr/...`. Si une des 4 API renvoie une erreur d'authentification alors que la
+clé et le scope sont corrects, ajoute `FRANCE_TRAVAIL_TOKEN_URL=https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire`
+dans Vercel pour cette éventualité.
 
 ## 8. Scanner externe (compatibilité)
 

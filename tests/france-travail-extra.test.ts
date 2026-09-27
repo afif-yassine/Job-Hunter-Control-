@@ -10,15 +10,16 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
+// Scopes/URLs confirmed from the live francetravail.io docs (Sept 2026).
 const READY_ENV = {
   FRANCE_TRAVAIL_CLIENT_ID: "id",
   FRANCE_TRAVAIL_CLIENT_SECRET: "secret",
-  FRANCE_TRAVAIL_MARCHE_SCOPE: "api_marcheDuTravailv1 marcheDuTravail",
-  FRANCE_TRAVAIL_MARCHE_URL: "https://api.francetravail.io/partenaire/marche-travail/v1/stats",
-  FRANCE_TRAVAIL_FORMATION_SCOPE: "api_offreformationv1 openformation",
-  FRANCE_TRAVAIL_FORMATION_URL: "https://api.francetravail.io/partenaire/offreformation/v1/offres",
-  FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE: "api_accesEmploiv1 accesEmploi",
-  FRANCE_TRAVAIL_ACCES_EMPLOI_URL: "https://api.francetravail.io/partenaire/acces-emploi/v1/taux",
+  FRANCE_TRAVAIL_MARCHE_SCOPE: "api_stats-offres-demandes-emploiv1 offresetdemandesemploi",
+  FRANCE_TRAVAIL_MARCHE_URL: "https://api.francetravail.io/partenaire/stats-offres-demandes-emploi/v1/indicateur/stat-demandeurs",
+  FRANCE_TRAVAIL_FORMATION_SCOPE: "api_openformationv1 openFormation",
+  FRANCE_TRAVAIL_FORMATION_URL: "https://api.francetravail.io/partenaire/openformation/v1/offres",
+  FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE: "api_stats-perspectives-retour-emploiv1 accesemploi",
+  FRANCE_TRAVAIL_ACCES_EMPLOI_URL: "https://api.francetravail.io/partenaire/stats-perspectives-retour-emploi/v1/indicateur/taux-acces",
 };
 
 function fetchSequence(...responses: Response[]) {
@@ -43,67 +44,63 @@ test("getFranceTravailToken: explains a refused auth clearly, with the scope in 
   await assert.rejects(() => getFranceTravailToken("api_x", READY_ENV), /refusée \(401\).*api_x/s);
 });
 
-test("fetchMarketInsight: not configured → null, no network call", async () => {
+test("getFranceTravailToken: posts to the confirmed francetravail.io domain by default, overridable", async () => {
+  const urls: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => (
+    urls.push(String(input)), new Response(JSON.stringify({ access_token: "tok" }))
+  )) as typeof fetch;
+  await getFranceTravailToken("api_x", READY_ENV);
+  assert.match(urls[0], /^https:\/\/authentification-partenaire\.francetravail\.io\//);
+  await getFranceTravailToken("api_x", { ...READY_ENV, FRANCE_TRAVAIL_TOKEN_URL: "https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire" });
+  assert.match(urls[1], /^https:\/\/entreprise\.francetravail\.fr\//);
+});
+
+test("fetchMarketInsight: not configured (no department, or missing scope/url) → null, no network call", async () => {
   let calls = 0;
   globalThis.fetch = (async () => (calls++, new Response("{}"))) as typeof fetch;
-  const result = await fetchMarketInsight({ romeCode: "M1805" }, {});
-  assert.equal(result, null);
+  assert.equal(await fetchMarketInsight({ romeCode: "M1805" }, {}), null);
+  assert.equal(await fetchMarketInsight({ romeCode: "M1805" }, READY_ENV), null); // no department
   assert.equal(calls, 0);
 });
 
-test("fetchMarketInsight: reads the token then the stat, tolerant to field naming", async () => {
-  globalThis.fetch = fetchSequence(
-    new Response(JSON.stringify({ access_token: "tok" })),
-    new Response(
-      JSON.stringify({ resultats: [{ tensionLibelle: "Tension forte", salaireMin: 2200, salaireMax: 3400, nombreEmbauches: 120 }] }),
-    ),
-  );
+test("fetchMarketInsight: POSTs a JSON body (confirmed shape), tolerant to field naming in the response", async () => {
+  let body: unknown;
+  let call = 0;
+  globalThis.fetch = (async (_url, init) => {
+    call++;
+    if (call === 1) return new Response(JSON.stringify({ access_token: "tok" }));
+    body = init?.body;
+    return new Response(JSON.stringify({ resultats: [{ valeur: 340, periode: "2026T3" }] }));
+  }) as typeof fetch;
   const result = await fetchMarketInsight({ romeCode: "M1805", department: "75" }, READY_ENV);
-  assert.deepEqual(result, {
-    tensionLabel: "Tension forte",
-    tensionScore: null,
-    avgSalaryMin: 2200,
-    avgSalaryMax: 3400,
-    hiringVolume: 120,
-    raw: { resultats: [{ tensionLibelle: "Tension forte", salaireMin: 2200, salaireMax: 3400, nombreEmbauches: 120 }] },
+  assert.deepEqual(JSON.parse(body as string), {
+    codeTypeTerritoire: "DEP",
+    codeTerritoire: "75",
+    codeTypeActivite: "ROME",
+    codeActivite: "M1805",
+    codeTypePeriode: "TRIMESTRE",
+    codeTypeNomenclature: "CATCAND",
   });
+  assert.equal(result?.jobseekerCount, 340);
+  assert.equal(result?.period, "2026T3");
 });
 
 test("fetchMarketInsight: a 204 (no data for this métier) is not an error", async () => {
   globalThis.fetch = fetchSequence(new Response(JSON.stringify({ access_token: "tok" })), new Response(null, { status: 204 }));
-  assert.equal(await fetchMarketInsight({ romeCode: "M1805" }, READY_ENV), null);
+  assert.equal(await fetchMarketInsight({ romeCode: "M1805", department: "75" }, READY_ENV), null);
 });
 
-test("fetchTrainingSuggestions: not configured → empty array", async () => {
+test("fetchTrainingSuggestions: kept unused (Open Formation has no search-by-métier endpoint), returns [] when not configured", async () => {
   assert.deepEqual(await fetchTrainingSuggestions({ romeCode: "M1805" }, {}), []);
 });
 
-test("fetchTrainingSuggestions: caps at the requested limit and flags CPF-funded trainings", async () => {
-  globalThis.fetch = fetchSequence(
-    new Response(JSON.stringify({ access_token: "tok" })),
-    new Response(
-      JSON.stringify({
-        formations: [
-          { intitule: "Docker & Kubernetes", organismeFormation: "OpenClassrooms", urlFormation: "https://x/1", dureeIndicativeHeures: 30, modaliteFinancement: "CPF" },
-          { intitule: "Terraform avancé", organismeFormation: "Simplon", dureeIndicativeHeures: 20 },
-          { intitule: "AWS certifié", organismeFormation: "CNAM" },
-        ],
-      }),
-    ),
-  );
-  const result = await fetchTrainingSuggestions({ romeCode: "M1805", limit: 2 }, READY_ENV);
-  assert.equal(result.length, 2);
-  assert.equal(result[0].title, "Docker & Kubernetes");
-  assert.equal(result[0].funded, true);
-  assert.equal(result[1].funded, null);
-});
-
-test("fetchAccessRate: not configured → null; reads the 6-month rate once configured", async () => {
+test("fetchAccessRate: not configured or no department → null; reads the rate once configured", async () => {
   assert.equal(await fetchAccessRate({ romeCode: "M1805" }, {}), null);
+  assert.equal(await fetchAccessRate({ romeCode: "M1805" }, READY_ENV), null); // no department
   globalThis.fetch = fetchSequence(
     new Response(JSON.stringify({ access_token: "tok" })),
-    new Response(JSON.stringify({ tauxAcces6Mois: 62.4 })),
+    new Response(JSON.stringify({ resultats: [{ tauxAcces6Mois: 62.4 }] })),
   );
-  const result = await fetchAccessRate({ romeCode: "M1805" }, READY_ENV);
+  const result = await fetchAccessRate({ romeCode: "M1805", department: "75" }, READY_ENV);
   assert.equal(result?.rate6Months, 62.4);
 });

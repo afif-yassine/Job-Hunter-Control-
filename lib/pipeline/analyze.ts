@@ -89,17 +89,8 @@ async function enrichWithFranceTravail(
     try {
       const market = await fetchMarketInsight({ romeCode, department }, env);
       await recordSourceRun(ctx.supabase, "ft:marche", "ok", market ? 1 : 0);
-      if (market) {
-        patch.market_tension_label = market.tensionLabel;
-        const bits = [
-          market.tensionLabel ? `Tension : ${market.tensionLabel}` : null,
-          market.avgSalaryMin || market.avgSalaryMax
-            ? `Salaire constaté : ${market.avgSalaryMin ?? "?"}–${market.avgSalaryMax ?? "?"} €`
-            : null,
-          market.hiringVolume ? `${market.hiringVolume} embauche(s) récente(s) sur ce métier` : null,
-        ].filter(Boolean);
-        if (bits.length) patch.market_note = bits.join(" · ");
-      }
+      if (market?.jobseekerCount != null)
+        patch.market_note = `${market.jobseekerCount} demandeur(s) d’emploi inscrit(s) sur ce métier dans le département${department ? ` ${department}` : ""}${market.period ? ` (${market.period})` : ""}`;
     } catch (e) {
       await recordSourceRun(ctx.supabase, "ft:marche", "error", 0, e instanceof Error ? e.message : "Erreur inconnue");
     }

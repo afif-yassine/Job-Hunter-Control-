@@ -115,11 +115,11 @@ export const ENRICHMENT_SOURCES: EnrichmentSource[] = [
   {
     id: "ft:marche",
     name: "Marché du travail",
-    covers: "Statistiques France Travail / DARES : tension, volume d’embauches, salaires par métier et territoire.",
+    covers: "Grande famille de statistiques France Travail (demandeurs, embauches, offres, salaires…) par métier et territoire.",
     scopeVar: "FRANCE_TRAVAIL_MARCHE_SCOPE",
     urlVar: "FRANCE_TRAVAIL_MARCHE_URL",
     cost: "Gratuit",
-    usedFor: "Ajoute un contexte marché à l’offre (tension, salaire moyen) pour savoir où insister.",
+    usedFor: "Ajoute une note sous l’offre : nombre de demandeurs d’emploi inscrits sur ce métier, dans ce département.",
   },
   {
     id: "ft:acces",
@@ -128,7 +128,7 @@ export const ENRICHMENT_SOURCES: EnrichmentSource[] = [
     scopeVar: "FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE",
     urlVar: "FRANCE_TRAVAIL_ACCES_EMPLOI_URL",
     cost: "Gratuit",
-    usedFor: "Indicateur admin : à quel point un métier « recrute vraiment » sur la durée.",
+    usedFor: "Indicateur admin : à quel point un métier « recrute vraiment » sur la durée (pas encore affiché par offre).",
   },
 ];
 
