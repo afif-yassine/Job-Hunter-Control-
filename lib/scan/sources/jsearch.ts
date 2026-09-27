@@ -99,10 +99,14 @@ export async function scanJSearch(
   const datePosted = config.maxAgeDays <= 3 ? "3days" : config.maxAgeDays <= 7 ? "week" : "month";
   let host = 0;
   for (const query of queries) {
-    // v5 (current, confirmed live Sept 2026): no more "page" — pagination is
-    // cursor-based (num_pages still controls how many pages are fetched).
+    // v5 (current, confirmed live Sept 2026 with a real 200 OK): "query" is
+    // keywords only, the city goes in its own "location" param — packing
+    // "<keywords> in <city>, France" into "query" is what caused our 404s.
+    // No more "page" either — pagination is cursor-based (num_pages still
+    // controls how many pages are fetched).
     const params = new URLSearchParams({
-      query: `${query.keywords} in ${config.city}, France`,
+      query: query.keywords,
+      location: config.city,
       num_pages: "1",
       country: "fr",
       language: "fr",

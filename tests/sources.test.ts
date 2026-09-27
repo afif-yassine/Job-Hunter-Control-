@@ -117,12 +117,19 @@ test("JSearch: a refused call includes the API's own explanation, not just the H
     /HTTP 404 — Not Found/,
   );
 
-  // "page" is no longer part of the v5 request (cursor-based pagination now).
+  // "page" is no longer part of the v5 request (cursor-based pagination now),
+  // and "query"/"location" are sent separately — confirmed by a real 200 OK
+  // in the live RapidAPI console (query="developpeur", location="paris"),
+  // after the packed "<keywords> in <city>, France" form 404'd.
   const urls: string[] = [];
   await scanJSearch({ ...config, queries: [config.queries[0]] }, { JSEARCH_API_KEY: "k" }, async (url) => (
     urls.push(String(url)), json({ data: [] })
   ));
+  const sent = new URL(urls[0]).searchParams;
   assert.ok(!urls[0].includes("page="));
+  assert.equal(sent.get("query"), config.queries[0].keywords);
+  assert.equal(sent.get("location"), config.city);
+  assert.ok(!sent.get("query")!.includes("Paris"));
 });
 
 test("ad page reader: JobPosting JSON-LD first, bot walls and private URLs refused", () => {
