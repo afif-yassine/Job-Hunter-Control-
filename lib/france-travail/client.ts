@@ -7,8 +7,11 @@
  * same way.
  */
 
+// Confirmed from the live francetravail.io API documentation (Sept 2026,
+// "Client Credentials OAuth Flow" panel shown on every endpoint page).
+// Overridable (FRANCE_TRAVAIL_TOKEN_URL) in case France Travail moves it again.
 export const FRANCE_TRAVAIL_TOKEN_URL =
-  "https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire";
+  "https://authentification-partenaire.francetravail.io/connexion/oauth2/access_token?realm=/partenaire";
 
 type Env = Record<string, string | undefined>;
 
@@ -22,7 +25,8 @@ export async function getFranceTravailToken(
 ): Promise<string> {
   const clientId = env.FRANCE_TRAVAIL_CLIENT_ID || "";
   const clientSecret = env.FRANCE_TRAVAIL_CLIENT_SECRET || "";
-  const response = await fetchImpl(FRANCE_TRAVAIL_TOKEN_URL, {
+  const tokenUrl = env.FRANCE_TRAVAIL_TOKEN_URL?.trim() || FRANCE_TRAVAIL_TOKEN_URL;
+  const response = await fetchImpl(tokenUrl, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
