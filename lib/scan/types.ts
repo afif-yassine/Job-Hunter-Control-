@@ -12,6 +12,8 @@ export type ScannedOffer = {
   /** Direct application link when different from `url`. */
   applyUrl?: string | null;
   publishedAt: string | null;
+  /** ROME code (France Travail taxonomy), when the source provides one. */
+  romeCode?: string | null;
 };
 
 export type SourceReport = {

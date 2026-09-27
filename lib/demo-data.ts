@@ -1,7 +1,7 @@
 import type { Data } from "@/components/use-dashboard-data";
 import type { SystemStatus } from "@/components/use-status";
-import { AI_ADVICE, EMBEDDINGS_PLAN, NOT_CONNECTED, SOURCES } from "@/lib/admin/catalog";
-import type { AdminOverview, AdminSource } from "@/lib/admin/overview";
+import { AI_ADVICE, EMBEDDINGS_PLAN, ENRICHMENT_SOURCES, NOT_CONNECTED, SOURCES } from "@/lib/admin/catalog";
+import type { AdminEnrichment, AdminOverview, AdminSource } from "@/lib/admin/overview";
 
 /** Fake data for screenshots (`/demo`, enabled only with DEMO_MODE=1). */
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
@@ -122,6 +122,15 @@ export const demoAdmin: AdminOverview = {
     companies: s.id.startsWith("ats:") ? 0 : null,
     ...demoStates[s.id],
   })),
+  enrichment: ENRICHMENT_SOURCES.map(
+    (e, i): AdminEnrichment => ({
+      ...e,
+      n: i + 1,
+      ready: e.id === "ft:marche",
+      missing: e.id === "ft:marche" ? [] : [e.scopeVar, e.urlVar],
+      lastRun: e.id === "ft:marche" ? { status: "ok", at: ago(40), message: null } : null,
+    }),
+  ),
   notConnected: NOT_CONNECTED,
   automation: { cronConfigured: true, sharedCache: true, lastServerRun: ago(25) },
   worker: { configured: true, online: true, browserReady: true },

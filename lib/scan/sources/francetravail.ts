@@ -1,8 +1,7 @@
+import { getFranceTravailToken } from "@/lib/france-travail/client";
 import type { ScanConfig } from "../config";
 import type { ScannedOffer } from "../types";
 
-const TOKEN_URL =
-  "https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire";
 const SEARCH_URL =
   "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search";
 const SCOPE = "api_offresdemploiv2 o2dsoffre";
@@ -19,6 +18,7 @@ type FtOffer = {
   natureContrat?: string;
   origineOffre?: { urlOrigine?: string };
   contact?: { urlPostulation?: string };
+  romeCode?: string;
 };
 
 export function ftDate(d: Date) {
@@ -41,6 +41,7 @@ export function mapFranceTravailOffer(o: FtOffer): ScannedOffer | null {
     url: detail,
     applyUrl: o.contact?.urlPostulation || o.origineOffre?.urlOrigine || null,
     publishedAt: o.dateCreation || null,
+    romeCode: o.romeCode?.trim() || null,
   };
 }
 
@@ -50,22 +51,7 @@ export async function scanFranceTravail(
   fetchImpl: typeof fetch = fetch,
   now = new Date(),
 ): Promise<ScannedOffer[]> {
-  const tokenResponse = await fetchImpl(TOKEN_URL, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: env.FRANCE_TRAVAIL_CLIENT_ID || "",
-      client_secret: env.FRANCE_TRAVAIL_CLIENT_SECRET || "",
-      scope: SCOPE,
-    }),
-  });
-  if (!tokenResponse.ok)
-    throw new Error(
-      `Authentification France Travail refusée (${tokenResponse.status}). Vérifie FRANCE_TRAVAIL_CLIENT_ID / _SECRET et que l'API « Offres d'emploi v2 » est activée sur francetravail.io.`,
-    );
-  const { access_token: token } = (await tokenResponse.json()) as { access_token?: string };
-  if (!token) throw new Error("France Travail n'a pas renvoyé de jeton.");
+  const token = await getFranceTravailToken(SCOPE, env, fetchImpl);
 
   const since = new Date(now.getTime() - config.maxAgeDays * 86_400_000);
   const offers: ScannedOffer[] = [];

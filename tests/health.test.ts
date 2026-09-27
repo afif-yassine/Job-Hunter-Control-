@@ -177,3 +177,29 @@ test("admin page: numbered sources with state, budget, quality, and the manual a
   assert.ok(o.actions.some((a) => a.level === "recommended" && /JSearch/.test(a.text)));
   assert.ok(!o.actions.some((a) => a.level === "required"));
 });
+
+test("admin page: the 3 secondary France Travail APIs show as 'à terminer' until their scope/URL are set", async () => {
+  const { db } = fakeSupabase({ integrations: [], user_settings: [], source_runs: [], source_budget: [], usage_events: [], notifications: [], agent_runs: [] });
+  const baseEnv = { GEMINI_API_KEY: "x", FRANCE_TRAVAIL_CLIENT_ID: "id", FRANCE_TRAVAIL_CLIENT_SECRET: "secret" };
+  const notReady = await buildAdminOverview({ supabase: db, userId: "admin", env: baseEnv, now: new Date("2026-09-29T10:00:00Z") });
+  assert.equal(notReady.enrichment.length, 3);
+  assert.ok(notReady.enrichment.every((e) => !e.ready));
+  assert.ok(notReady.actions.some((a) => a.level === "recommended" && /API France Travail secondaires/.test(a.text)));
+
+  const ready = await buildAdminOverview({
+    supabase: db,
+    userId: "admin",
+    now: new Date("2026-09-29T10:00:00Z"),
+    env: {
+      ...baseEnv,
+      FRANCE_TRAVAIL_MARCHE_SCOPE: "api_marcheDuTravailv1 marcheDuTravail",
+      FRANCE_TRAVAIL_MARCHE_URL: "https://api.francetravail.io/partenaire/marche-travail/v1/stats",
+      FRANCE_TRAVAIL_FORMATION_SCOPE: "api_offreformationv1 openformation",
+      FRANCE_TRAVAIL_FORMATION_URL: "https://api.francetravail.io/partenaire/offreformation/v1/offres",
+      FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE: "api_accesEmploiv1 accesEmploi",
+      FRANCE_TRAVAIL_ACCES_EMPLOI_URL: "https://api.francetravail.io/partenaire/acces-emploi/v1/taux",
+    },
+  });
+  assert.ok(ready.enrichment.every((e) => e.ready));
+  assert.ok(!ready.actions.some((a) => /API France Travail secondaires/.test(a.text)));
+});

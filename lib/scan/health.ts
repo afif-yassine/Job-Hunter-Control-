@@ -25,7 +25,10 @@ export type SourceId =
   | "ats:ashby"
   | "ats:smartrecruiters"
   | "ats:workable"
-  | "ats:recruitee";
+  | "ats:recruitee"
+  | "ft:formation"
+  | "ft:marche"
+  | "ft:acces";
 
 export function classifyError(message: string): Exclude<SourceStatus, "ok" | "budget"> {
   if (/quota|429|rate.?limit|too many requests|exceeded|RESOURCE_EXHAUSTED|limite atteinte/i.test(message)) return "quota";

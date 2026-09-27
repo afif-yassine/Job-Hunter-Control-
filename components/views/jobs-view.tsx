@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { CheckCheck, ExternalLink, LoaderCircle, Plus, Search, ShieldAlert } from "lucide-react";
+import { CheckCheck, ExternalLink, GraduationCap, LoaderCircle, Plus, Search, ShieldAlert } from "lucide-react";
 import { Chip, Empty, PageHead, ScoreBadge } from "@/components/ui";
 import { REVIEW, jobStatus, platformsOf, timeAgo } from "@/lib/labels";
 import type { Job } from "@/lib/types";
@@ -282,6 +282,29 @@ function JobCard({ job, ctx, working }: { job: Job; ctx: Ctx; working: boolean }
           ) : null}
         </details>
       )}
+      {job.market_note && <p className="muted small-text">📊 {job.market_note}</p>}
+      {job.training_suggestions?.length ? (
+        <details className="why">
+          <summary>
+            <GraduationCap size={14} aria-hidden /> Formation suggérée ({job.training_suggestions.length})
+          </summary>
+          <ul className="plus">
+            {job.training_suggestions.map((t, i) => (
+              <li key={i}>
+                {t.url ? (
+                  <a href={t.url} target="_blank" rel="noreferrer">
+                    {t.title}
+                  </a>
+                ) : (
+                  t.title
+                )}
+                {t.provider ? ` — ${t.provider}` : ""}
+                {t.funded ? " · financée" : ""}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </article>
   );
 }

@@ -48,7 +48,7 @@ type Pending = {
   dupRef: string | null;
 };
 
-const OPTIONAL_COLUMNS = ["review_flag", "review_reason", "duplicate_of", "source_platform", "publication_date"];
+const OPTIONAL_COLUMNS = ["review_flag", "review_reason", "duplicate_of", "source_platform", "publication_date", "rome_code"];
 
 export async function ingestOffers(
   supabase: SupabaseClient,
@@ -154,6 +154,7 @@ export async function ingestOffers(
         source_url: offer.url,
         source_platform: offer.source,
         publication_date: offer.publishedAt ? offer.publishedAt.slice(0, 10) : null,
+        rome_code: offer.romeCode ?? null,
         fingerprint,
         status: "DISCOVERED",
         review_flag: flag,

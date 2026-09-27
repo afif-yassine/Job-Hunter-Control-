@@ -5,6 +5,7 @@ import {
   Bot,
   CircleAlert,
   CircleCheck,
+  GraduationCap,
   Globe,
   LoaderCircle,
   RefreshCw,
@@ -210,6 +211,44 @@ export function AdminView({ ctx }: { ctx: Ctx }) {
             ))}
           </ul>
         </details>
+      </section>
+
+      {/* 4b. Enrichment (extra France Travail APIs) ------------------------------- */}
+      <section className="admin-section">
+        <h2 className="section-title">
+          <GraduationCap size={18} aria-hidden /> Enrichissement (France Travail)
+        </h2>
+        <p className="muted small-text">
+          Trois API gratuites, mêmes identifiants que « Offres d’emploi ». Elles ne trouvent pas d’offres : elles
+          enrichissent celles déjà trouvées (uniquement pour les offres venant de France Travail, qui seules portent
+          un code ROME).
+        </p>
+        <ol className="sources">
+          {data.enrichment.map((e) => (
+            <li key={e.id} className="card source">
+              <div className="source-head">
+                <span className="source-n">{e.n}</span>
+                <div className="source-name">
+                  <strong>{e.name}</strong>
+                  <span className="muted small-text">{e.covers}</span>
+                </div>
+                <Chip tone={e.ready ? "good" : "warn"}>{e.ready ? "Prêt" : "À terminer"}</Chip>
+              </div>
+              <p className="muted small-text">{e.usedFor}</p>
+              <p className="muted small-text">{e.cost}</p>
+              {!e.ready && (
+                <p className="small-text warn-text">
+                  À ajouter dans Vercel une fois souscrite sur francetravail.io : {e.missing.join(", ")}
+                </p>
+              )}
+              {e.lastRun && (
+                <p className={`small-text ${e.lastRun.status === "ok" ? "muted" : "warn-text"}`}>
+                  Dernier appel {timeAgo(e.lastRun.at)} : {e.lastRun.status === "ok" ? "OK" : e.lastRun.message}
+                </p>
+              )}
+            </li>
+          ))}
+        </ol>
       </section>
 
       {/* 5. Automation & services ------------------------------------------------ */}

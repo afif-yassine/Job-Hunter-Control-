@@ -3,7 +3,7 @@ import { aiConfigured, modelFor } from "@/lib/ai";
 import { loadIntegrationEnv } from "@/lib/integrations";
 import { loadUserSettings } from "@/lib/settings";
 import { budgetFor, type SourceId } from "@/lib/scan/health";
-import { AI_ADVICE, EMBEDDINGS_PLAN, NOT_CONNECTED, SOURCES, type CatalogSource } from "./catalog";
+import { AI_ADVICE, EMBEDDINGS_PLAN, ENRICHMENT_SOURCES, NOT_CONNECTED, SOURCES, type CatalogSource, type EnrichmentSource } from "./catalog";
 
 type Env = Record<string, string | undefined>;
 
@@ -24,6 +24,13 @@ export type AdminSource = CatalogSource & {
 
 export type AdminAction = { level: "required" | "recommended" | "before_launch"; text: string };
 
+export type AdminEnrichment = EnrichmentSource & {
+  n: number;
+  ready: boolean;
+  missing: string[];
+  lastRun: { status: string; at: string; message: string | null } | null;
+};
+
 export type AdminOverview = {
   ai: {
     provider: string;
@@ -35,6 +42,7 @@ export type AdminOverview = {
   };
   embeddings: typeof EMBEDDINGS_PLAN;
   sources: AdminSource[];
+  enrichment: AdminEnrichment[];
   notConnected: typeof NOT_CONNECTED;
   automation: { cronConfigured: boolean; sharedCache: boolean; lastServerRun: string | null };
   worker: { configured: boolean; online: boolean; browserReady: boolean | null };
@@ -157,6 +165,23 @@ export async function buildAdminOverview(ctx: {
     };
   });
 
+  const hasCreds = has("FRANCE_TRAVAIL_CLIENT_ID") && has("FRANCE_TRAVAIL_CLIENT_SECRET");
+  const enrichment: AdminEnrichment[] = ENRICHMENT_SOURCES.map((e, i) => {
+    const missing: string[] = [];
+    if (!hasCreds) missing.push("FRANCE_TRAVAIL_CLIENT_ID / FRANCE_TRAVAIL_CLIENT_SECRET");
+    if (!has(e.scopeVar)) missing.push(e.scopeVar);
+    if (!has(e.urlVar)) missing.push(e.urlVar);
+    const mine = runs.filter((r) => r.source === e.id);
+    const last = mine[0] ?? null;
+    return {
+      ...e,
+      n: i + 1,
+      ready: missing.length === 0,
+      missing,
+      lastRun: last ? { status: last.status, at: last.created_at, message: last.message } : null,
+    };
+  });
+
   const usage = ((usageRes.data ?? []) as { kind: string }[]).reduce(
     (acc, r) => ((acc[r.kind as keyof typeof acc] = (acc[r.kind as keyof typeof acc] ?? 0) + 1), acc),
     { scan: 0, analysis: 0, generation: 0 },
@@ -192,6 +217,11 @@ export async function buildAdminOverview(ctx: {
     actions.push({ level: "recommended", text: "La recherche automatique n’a pas tourné depuis plus d’un jour : programme l’appel toutes les 30 min dans Supabase (docs/SCANNER.md §5)." });
   if (!sources.some((s) => s.kind === "careers" && s.companies))
     actions.push({ level: "recommended", text: "Ajoute des pages carrière d’entreprises dans Réglages > Recherche (gratuit, sans clé)." });
+  if (hasCreds && enrichment.some((e) => !e.ready))
+    actions.push({
+      level: "recommended",
+      text: `Termine les API France Travail secondaires (${enrichment.filter((e) => !e.ready).map((e) => e.name).join(", ")}) : ajoute leur scope et leur URL dans Vercel une fois souscrites sur francetravail.io.`,
+    });
   if (has("WORKER_BASE_URL") && ctx.worker && !ctx.worker.online)
     actions.push({ level: "recommended", text: "Le worker Playwright (Railway) ne répond pas : les formulaires ne seront pas lus." });
   actions.push({ level: "before_launch", text: "Active la protection des mots de passe compromis dans Supabase (Authentication > Security)." });
@@ -208,6 +238,7 @@ export async function buildAdminOverview(ctx: {
     },
     embeddings: EMBEDDINGS_PLAN,
     sources,
+    enrichment,
     notConnected: NOT_CONNECTED,
     automation: { cronConfigured, sharedCache: has("SUPABASE_SERVICE_ROLE_KEY"), lastServerRun },
     worker: {

@@ -84,6 +84,54 @@ export const SOURCES: CatalogSource[] = [
   },
 ];
 
+export type EnrichmentSource = {
+  id: "ft:formation" | "ft:marche" | "ft:acces";
+  name: string;
+  covers: string;
+  /** Same FRANCE_TRAVAIL_CLIENT_ID/_SECRET as the job-offers API. */
+  scopeVar: string;
+  urlVar: string;
+  cost: string;
+  usedFor: string;
+};
+
+/**
+ * Three more France Travail APIs — free, same credentials as "Offres
+ * d'emploi" — that don't produce job offers themselves but enrich the ones
+ * already found. Each needs its own OAuth2 scope, subscribed for free on
+ * francetravail.io, then set as an env var (not a secret: it's just a
+ * permission string, safe to paste in chat).
+ */
+export const ENRICHMENT_SOURCES: EnrichmentSource[] = [
+  {
+    id: "ft:formation",
+    name: "Open Formation",
+    covers: "Catalogue des formations France Travail (souvent gratuites, éligibles CPF).",
+    scopeVar: "FRANCE_TRAVAIL_FORMATION_SCOPE",
+    urlVar: "FRANCE_TRAVAIL_FORMATION_URL",
+    cost: "Gratuit",
+    usedFor: "Suggère une formation courte quand l’analyse détecte une compétence manquante.",
+  },
+  {
+    id: "ft:marche",
+    name: "Marché du travail",
+    covers: "Statistiques France Travail / DARES : tension, volume d’embauches, salaires par métier et territoire.",
+    scopeVar: "FRANCE_TRAVAIL_MARCHE_SCOPE",
+    urlVar: "FRANCE_TRAVAIL_MARCHE_URL",
+    cost: "Gratuit",
+    usedFor: "Ajoute un contexte marché à l’offre (tension, salaire moyen) pour savoir où insister.",
+  },
+  {
+    id: "ft:acces",
+    name: "Accès à l’emploi des demandeurs d’emploi",
+    covers: "Taux de retour à l’emploi à 6 mois, par métier et territoire.",
+    scopeVar: "FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE",
+    urlVar: "FRANCE_TRAVAIL_ACCES_EMPLOI_URL",
+    cost: "Gratuit",
+    usedFor: "Indicateur admin : à quel point un métier « recrute vraiment » sur la durée.",
+  },
+];
+
 /** Not connected on purpose, with the reason (shown for transparency). */
 export const NOT_CONNECTED = [
   { name: "LinkedIn, Indeed, Welcome to the Jungle, APEC en direct", why: "Robots interdits par leurs conditions : couverts via JSearch (Google Jobs)." },

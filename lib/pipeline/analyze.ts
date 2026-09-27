@@ -1,8 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { AI_NOT_CONFIGURED, aiConfigured, defaultAi, type AiCall } from "@/lib/ai";
+import { formationApiReady, fetchTrainingSuggestions } from "@/lib/france-travail/formation";
+import { fetchMarketInsight, marketApiReady } from "@/lib/france-travail/market";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
 import { fetchJobText } from "@/lib/scan/enrich";
+import { recordSourceRun } from "@/lib/scan/health";
 import { detectSuspicion } from "@/lib/scan/suspicion";
 
 const output = z.object({
@@ -42,9 +45,73 @@ async function updateJob(ctx: Ctx, patch: Record<string, unknown>) {
   if (error && /column|schema cache|42703|PGRST204/i.test(`${error.code} ${error.message}`)) {
     // Database not migrated yet: save what the old schema knows.
     const rest = { ...patch };
-    for (const c of ["score_model", "review_flag", "review_reason", "duplicate_of"]) delete rest[c];
+    for (const c of [
+      "score_model",
+      "review_flag",
+      "review_reason",
+      "duplicate_of",
+      "market_tension_label",
+      "market_note",
+      "training_suggestions",
+    ])
+      delete rest[c];
     await run(rest);
   }
+}
+
+/** "75 - PARIS 08" → "75". Only France Travail's own offers carry this shape. */
+function departmentOf(location: string | null | undefined): string | null {
+  const m = location?.match(/^(\d{2,3})\s*-/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Best-effort context from France Travail's secondary APIs (Marché du
+ * travail, Open Formation): only for offers that came from France Travail
+ * itself (only they carry a ROME code), never blocks or fails the analysis.
+ */
+async function enrichWithFranceTravail(
+  ctx: Ctx,
+  job: { rome_code?: string | null; location?: string | null },
+  hasGap: boolean,
+): Promise<void> {
+  const env = ctx.env ?? process.env;
+  const romeCode = job.rome_code?.trim();
+  if (!romeCode) return;
+  const department = departmentOf(job.location);
+  const patch: Record<string, unknown> = {};
+
+  if (marketApiReady(env)) {
+    try {
+      const market = await fetchMarketInsight({ romeCode, department }, env);
+      await recordSourceRun(ctx.supabase, "ft:marche", "ok", market ? 1 : 0);
+      if (market) {
+        patch.market_tension_label = market.tensionLabel;
+        const bits = [
+          market.tensionLabel ? `Tension : ${market.tensionLabel}` : null,
+          market.avgSalaryMin || market.avgSalaryMax
+            ? `Salaire constaté : ${market.avgSalaryMin ?? "?"}–${market.avgSalaryMax ?? "?"} €`
+            : null,
+          market.hiringVolume ? `${market.hiringVolume} embauche(s) récente(s) sur ce métier` : null,
+        ].filter(Boolean);
+        if (bits.length) patch.market_note = bits.join(" · ");
+      }
+    } catch (e) {
+      await recordSourceRun(ctx.supabase, "ft:marche", "error", 0, e instanceof Error ? e.message : "Erreur inconnue");
+    }
+  }
+
+  if (hasGap && formationApiReady(env)) {
+    try {
+      const trainings = await fetchTrainingSuggestions({ romeCode, department }, env);
+      await recordSourceRun(ctx.supabase, "ft:formation", "ok", trainings.length);
+      if (trainings.length) patch.training_suggestions = trainings;
+    } catch (e) {
+      await recordSourceRun(ctx.supabase, "ft:formation", "error", 0, e instanceof Error ? e.message : "Erreur inconnue");
+    }
+  }
+
+  if (Object.keys(patch).length) await updateJob(ctx, patch);
 }
 
 /**
@@ -130,6 +197,7 @@ export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
       action: "ANALYZED",
       details: { score: analysis.total, model: result.model, suspected },
     });
+    if (!suspected) await enrichWithFranceTravail(ctx, job, analysis.gaps.length > 0).catch(() => {});
     return { status: 200, body: { ...analysis, suspected, reasons: suspected ? suspicion.reasons : [] } };
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Erreur inconnue Gemini";
