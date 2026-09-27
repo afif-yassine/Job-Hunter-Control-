@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { authenticatedClient } from "@/lib/api";
+import { fetchJobText } from "@/lib/scan/enrich";
 
 const output = z.object({
   score_breakdown: z.record(z.string(), z.number()),
@@ -37,11 +38,34 @@ export async function POST(
   ]);
   if (error || !job)
     return Response.json({ error: "Offer not found" }, { status: 404 });
-  if (!job.description)
+  // Offers from aggregators only carry a short extract: read the ad page to
+  // score the full text (best effort; never bypasses a protection).
+  if ((job.description?.length ?? 0) < 600) {
+    const page = await fetchJobText(job.official_url || job.source_url || "");
+    if (page && page.length > (job.description?.length ?? 0)) {
+      job.description = page;
+      await auth.supabase
+        .from("jobs")
+        .update({ description: page })
+        .eq("id", id)
+        .eq("user_id", auth.userId);
+    }
+  }
+  if (!job.description || job.description.length < 80) {
+    // Remember the attempt so the pipeline does not retry this offer every run.
+    await auth.supabase
+      .from("jobs")
+      .update({ last_checked_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", auth.userId);
     return Response.json(
-      { error: "Ajoutez la description complète de l’offre avant l’analyse." },
+      {
+        error:
+          "Impossible de lire l’annonce automatiquement : ouvre l’offre et colle sa description (bouton « Coller la description »).",
+      },
       { status: 400 },
     );
+  }
   if (!profile)
     return Response.json(
       { error: "Le profil vérifié n’est pas encore synchronisé." },

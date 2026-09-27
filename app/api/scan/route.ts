@@ -9,10 +9,16 @@ export const maxDuration = 60;
  * (+ an optional external scanner), then de-duplicates and stores new offers as
  * DISCOVERED so the smart pipeline can score them.
  */
-export async function POST() {
+export async function POST(req: Request) {
   const auth = await authenticatedClient();
   if ("error" in auth) return auth.error;
-  const summary = await runScan({ supabase: auth.supabase, userId: auth.userId });
+  const body = (await req.json().catch(() => ({}))) as { log?: boolean };
+  const summary = await runScan({
+    supabase: auth.supabase,
+    userId: auth.userId,
+    // The full pipeline writes its own journal entry.
+    log: body.log !== false,
+  });
   if (!summary.configured)
     return Response.json({ error: SETUP_HINT, ...summary }, { status: 503 });
   return Response.json({ message: scanMessage(summary), ...summary });

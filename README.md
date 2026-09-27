@@ -33,7 +33,7 @@ Use the project URL and **publishable key** from Supabase. Never use a service-r
 3. Create a Railway service using `Dockerfile.worker` and set `WORKER_SHARED_SECRET`.
 4. Put the Railway public URL (`WORKER_BASE_URL`) and the same secret (`WORKER_SHARED_SECRET`) into Vercel.
 5. Set `APPLICATION_MODE=PREPARE_ONLY` in both services (a missing value behaves the same; any other value is refused).
-6. Connect the offer scanner: see [docs/SCANNER.md](docs/SCANNER.md).
+6. Connect an offer source from the dashboard (Réglages > Sources; JSearch covers LinkedIn, Indeed, WTTJ… in 3 minutes) and set `INTEGRATIONS_SECRET` in Vercel: see [docs/SCANNER.md](docs/SCANNER.md).
 
 The **Réglages** tab shows which integrations are connected.
 

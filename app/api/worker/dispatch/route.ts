@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { applicationMode, isSafeMode } from "@/lib/config";
 import { queueQuestions } from "@/lib/question-store";
 import type { IncomingQuestion } from "@/lib/questions";
+// The worker may need up to ~55 s to open and read an application page.
+export const maxDuration = 60;
 const payload = z.object({
   applicationId: z.string().uuid(),
   action: z.enum(["inspect", "prepare"]),

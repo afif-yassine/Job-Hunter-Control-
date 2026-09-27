@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { createServer } from "node:http";
+import { existsSync } from "node:fs";
 import { isIP } from "node:net";
 import { inspectPage } from "./inspect";
 const port = Number(process.env.PORT || 3001),
@@ -18,7 +19,15 @@ function allowed(raw: string) {
 const server = createServer(async (req, res) => {
   res.setHeader("content-type", "application/json");
   if (req.url === "/health") {
-    res.end(JSON.stringify({ ok: true, mode: "PREPARE_ONLY" }));
+    // Stays 200 so Railway keeps the service up; browserReady tells the
+    // dashboard whether Chromium is actually installed for this Playwright.
+    let browserReady = false;
+    try {
+      browserReady = existsSync(chromium.executablePath());
+    } catch {
+      browserReady = false;
+    }
+    res.end(JSON.stringify({ ok: true, mode: "PREPARE_ONLY", browserReady }));
     return;
   }
   if (req.method !== "POST" || req.url !== "/jobs") {

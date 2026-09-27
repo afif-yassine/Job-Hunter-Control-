@@ -1,14 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isRelevant, loadScanConfig } from "./config";
+import { loadIntegrationEnv } from "@/lib/integrations";
+import { loadUserSettings, saveUserSettings } from "@/lib/settings";
+import { configFromPrefs, isRelevant } from "./config";
 import { ingestOffers } from "./ingest";
+import { scanAdzuna } from "./sources/adzuna";
 import { scanFranceTravail } from "./sources/francetravail";
 import { scanGmailAlerts } from "./sources/gmail";
+import { scanJooble } from "./sources/jooble";
+import { scanJSearch } from "./sources/jsearch";
 import type { ScanSummary, ScannedOffer, SourceReport } from "./types";
 
-const has = (name: string) => Boolean(process.env[name]?.trim());
-
 export const SETUP_HINT =
-  "Aucune source de scan n'est configurée. Ajoute dans Vercel : FRANCE_TRAVAIL_CLIENT_ID + FRANCE_TRAVAIL_CLIENT_SECRET (offres officielles) et/ou GMAIL_CLIENT_ID + GMAIL_CLIENT_SECRET + GMAIL_REFRESH_TOKEN (alertes LinkedIn / Indeed / Hellowork / APEC / Welcome to the Jungle). Voir docs/SCANNER.md.";
+  "Aucune source d’offres n’est connectée. Va dans Réglages > Sources et ajoute une clé gratuite (JSearch couvre LinkedIn, Indeed, Welcome to the Jungle… en 3 minutes).";
 
 async function callWebhook(userId: string): Promise<ScannedOffer[]> {
   const response = await fetch(process.env.SCAN_WEBHOOK_URL!, {
@@ -20,16 +23,30 @@ async function callWebhook(userId: string): Promise<ScannedOffer[]> {
     body: JSON.stringify({ user_id: userId, mode: "PREPARE_ONLY" }),
     signal: AbortSignal.timeout(50_000),
   });
-  if (!response.ok) throw new Error(`Le scanner externe a répondu HTTP ${response.status}`);
-  const body = (await response.json().catch(() => ({}))) as { offers?: ScannedOffer[] };
+  if (!response.ok)
+    throw new Error(`Le scanner externe a répondu HTTP ${response.status}`);
+  const body = (await response.json().catch(() => ({}))) as {
+    offers?: ScannedOffer[];
+  };
   return Array.isArray(body.offers) ? body.offers : [];
 }
 
 export async function runScan(ctx: {
   supabase: SupabaseClient;
   userId: string;
+  /** Overrides the environment (tests). */
+  env?: Record<string, string | undefined>;
+  /** Write an OFFER_SCAN line in the journal (default true). */
+  log?: boolean;
 }): Promise<ScanSummary> {
-  const config = loadScanConfig();
+  // Keys typed in the dashboard win over Vercel variables.
+  const env = ctx.env ?? {
+    ...process.env,
+    ...(await loadIntegrationEnv(ctx.supabase, ctx.userId)),
+  };
+  const has = (name: string) => Boolean(env[name]?.trim());
+  const settings = await loadUserSettings(ctx.supabase, ctx.userId);
+  const config = configFromPrefs(settings.prefs);
   const reports: SourceReport[] = [];
   const collected: ScannedOffer[] = [];
 
@@ -40,16 +57,38 @@ export async function runScan(ctx: {
     run: () => Promise<ScannedOffer[]>;
   }[] = [
     {
+      name: "JSearch (LinkedIn, Indeed, WTTJ…)",
+      enabled: has("JSEARCH_API_KEY"),
+      missing: "JSEARCH_API_KEY",
+      run: () => scanJSearch(config, env),
+    },
+    {
+      name: "Adzuna",
+      enabled: has("ADZUNA_APP_ID") && has("ADZUNA_APP_KEY"),
+      missing: "ADZUNA_APP_ID / ADZUNA_APP_KEY",
+      run: () => scanAdzuna(config, env),
+    },
+    {
       name: "France Travail",
-      enabled: has("FRANCE_TRAVAIL_CLIENT_ID") && has("FRANCE_TRAVAIL_CLIENT_SECRET"),
+      enabled:
+        has("FRANCE_TRAVAIL_CLIENT_ID") && has("FRANCE_TRAVAIL_CLIENT_SECRET"),
       missing: "FRANCE_TRAVAIL_CLIENT_ID / FRANCE_TRAVAIL_CLIENT_SECRET",
-      run: () => scanFranceTravail(config),
+      run: () => scanFranceTravail(config, env),
+    },
+    {
+      name: "Jooble",
+      enabled: has("JOOBLE_API_KEY"),
+      missing: "JOOBLE_API_KEY",
+      run: () => scanJooble(config, env),
     },
     {
       name: "Alertes e-mail (Gmail)",
-      enabled: has("GMAIL_CLIENT_ID") && has("GMAIL_CLIENT_SECRET") && has("GMAIL_REFRESH_TOKEN"),
+      enabled:
+        has("GMAIL_CLIENT_ID") &&
+        has("GMAIL_CLIENT_SECRET") &&
+        has("GMAIL_REFRESH_TOKEN"),
       missing: "GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN",
-      run: () => scanGmailAlerts(process.env, Math.min(config.maxAgeDays, 14)),
+      run: () => scanGmailAlerts(env, Math.min(config.maxAgeDays, 14)),
     },
     {
       name: "Scanner externe (SCAN_WEBHOOK_URL)",
@@ -62,13 +101,22 @@ export async function runScan(ctx: {
   await Promise.all(
     sources.map(async (source) => {
       if (!source.enabled) {
-        reports.push({ source: source.name, status: "skipped", found: 0, message: `Non configuré (${source.missing})` });
+        reports.push({
+          source: source.name,
+          status: "skipped",
+          found: 0,
+          message: `Non configuré (${source.missing})`,
+        });
         return;
       }
       try {
         const offers = await source.run();
         collected.push(...offers);
-        reports.push({ source: source.name, status: "ok", found: offers.length });
+        reports.push({
+          source: source.name,
+          status: "ok",
+          found: offers.length,
+        });
       } catch (error) {
         reports.push({
           source: source.name,
@@ -84,7 +132,12 @@ export async function runScan(ctx: {
   const relevant = collected.filter(isRelevant);
   const ingest = await ingestOffers(ctx.supabase, ctx.userId, relevant);
   if (ingest.error)
-    reports.push({ source: "Base de données", status: "error", found: 0, message: ingest.error });
+    reports.push({
+      source: "Base de données",
+      status: "error",
+      found: 0,
+      message: ingest.error,
+    });
 
   const summary: ScanSummary = {
     reports,
@@ -97,25 +150,31 @@ export async function runScan(ctx: {
   };
 
   if (configured) {
-    await ctx.supabase.from("agent_runs").insert({
-      user_id: ctx.userId,
-      run_type: "OFFER_SCAN",
-      status: reports.some((r) => r.status === "error") ? "FAILED" : "COMPLETED",
-      started_at: new Date().toISOString(),
-      finished_at: new Date().toISOString(),
-      counters: {
-        found: summary.found,
-        relevant: summary.relevant,
-        inserted: summary.inserted,
-        duplicates: summary.duplicates,
-      },
-      error_message:
-        reports
-          .filter((r) => r.status === "error")
-          .map((r) => `${r.source}: ${r.message}`)
-          .join(" | ") || null,
+    await saveUserSettings(ctx.supabase, ctx.userId, {
+      lastScanAt: new Date().toISOString(),
     });
-    if (summary.inserted)
+    if (ctx.log !== false)
+      await ctx.supabase.from("agent_runs").insert({
+        user_id: ctx.userId,
+        run_type: "OFFER_SCAN",
+        status: reports.some((r) => r.status === "error")
+          ? "FAILED"
+          : "COMPLETED",
+        started_at: new Date().toISOString(),
+        finished_at: new Date().toISOString(),
+        counters: {
+          found: summary.found,
+          relevant: summary.relevant,
+          inserted: summary.inserted,
+          duplicates: summary.duplicates,
+        },
+        error_message:
+          reports
+            .filter((r) => r.status === "error")
+            .map((r) => `${r.source}: ${r.message}`)
+            .join(" | ") || null,
+      });
+    if (summary.inserted && ctx.log !== false)
       await ctx.supabase.from("notifications").insert({
         user_id: ctx.userId,
         notification_type: "NEW_OFFERS",

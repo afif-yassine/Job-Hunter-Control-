@@ -1,488 +1,463 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Activity,
   BriefcaseBusiness,
-  Bell,
+  CircleHelp,
+  Ellipsis,
   FileText,
-  HelpCircle,
-  LayoutDashboard,
-  Play,
+  House,
+  LoaderCircle,
+  LogOut,
+  Search,
   Settings,
   ShieldCheck,
+  X,
+  type LucideIcon,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import type {
-  AgentRun,
-  Application,
-  DocumentRecord,
-  Job,
-  Question,
-  NotificationRecord,
-} from "@/lib/types";
 import { logout } from "@/app/login/actions";
-import { QuestionsPanel, openQuestionCount } from "@/components/questions-panel";
+import { explainError, cleanRaw } from "@/lib/errors";
+import { fingerprintOf } from "@/lib/scan/ingest";
+import type { DocumentRecord, Job } from "@/lib/types";
 import { DocumentDialog, type DocumentDialogState } from "@/components/document-tools";
-type SystemStatus = {
-  applicationMode: string;
-  safeMode: boolean;
-  explicitModeVariable: boolean;
-  gemini: boolean;
-  drive: boolean;
-  worker: boolean;
-  scanSources: { franceTravail: boolean; gmailAlerts: boolean; webhook: boolean };
-  scheduledScan: boolean;
-};
-const ERROR_MESSAGE =
-  /Erreur|impossible|absent|introuvable|Ajoutez|refus|injoignable|non configur|pas encore|invalide|Aucune source/i;
+import { openQuestionCount, QuestionsPanel } from "@/components/questions-panel";
+import { usePipeline } from "@/components/use-pipeline";
+import { useDashboardData, type Data } from "@/components/use-dashboard-data";
+import { useSystemStatus, type SystemStatus } from "@/components/use-status";
+import { Progress } from "@/components/ui";
+import { HomeView } from "@/components/views/home-view";
+import { JobsView } from "@/components/views/jobs-view";
+import { DocumentsView } from "@/components/views/documents-view";
+import { ApplicationsView } from "@/components/views/applications-view";
+import { ActivityView } from "@/components/views/activity-view";
+import { SettingsView } from "@/components/views/settings-view";
+import { MoreView } from "@/components/views/more-view";
+import { PageHead } from "@/components/ui";
+import type { Ctx, JobFilter, Tone, View } from "@/components/views/types";
 
-export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
-  const [tab, setTab] = useState("jobs"),
-    [jobs, setJobs] = useState<Job[]>([]),
-    [apps, setApps] = useState<Application[]>([]),
-    [questions, setQuestions] = useState<Question[]>([]),
-    [documents, setDocuments] = useState<DocumentRecord[]>([]),
-    [notifications, setNotifications] = useState<NotificationRecord[]>([]),
-    [runs, setRuns] = useState<AgentRun[]>([]),
-    [loading, setLoading] = useState(true),
-    [busy, setBusy] = useState(""),
-    [message, setMessage] = useState(""),
-    [docDialog, setDocDialog] = useState<DocumentDialogState>(null),
-    [descJob, setDescJob] = useState<Job | null>(null),
-    [descText, setDescText] = useState(""),
-    [status, setStatus] = useState<SystemStatus | null>(null);
-  const modal = useRef<HTMLDialogElement>(null),
-    descModal = useRef<HTMLDialogElement>(null),
-    supabase = useMemo(() => createClient(), []);
-  async function load() {
-    setLoading(true);
-    if (!supabase) {
-      setMessage("Variables Supabase absentes.");
-      setLoading(false);
-      return;
-    }
-    const [j, a, q, d, r, n] = await Promise.all([
-      supabase
-        .from("jobs")
-        .select("*")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("applications")
-        .select("*,jobs(company,title)")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("application_questions")
-        .select("*,applications(jobs(company,title))")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("documents")
-        .select("*,jobs(company,title)")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("agent_runs")
-        .select("*")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("notifications")
-        .select("*")
-        .order("created_at", { ascending: false }),
-    ]);
-    let questionRows = q.data as Question[] | null;
-    if (q.error) {
-      // The join is only a nicety: fall back to the plain table if it fails.
-      const plain = await supabase
-        .from("application_questions")
-        .select("*")
-        .order("created_at", { ascending: false });
-      questionRows = plain.data as Question[] | null;
-    }
-    setJobs(j.data || []);
-    setApps((a.data || []) as Application[]);
-    setQuestions(questionRows || []);
-    setDocuments((d.data || []) as DocumentRecord[]);
-    setRuns((r.data || []) as AgentRun[]);
-    setNotifications((n.data || []) as NotificationRecord[]);
-    setLoading(false);
-  }
-  useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    if (!supabase) return () => window.clearTimeout(timer);
-    const channel = supabase
-      .channel("job-hunter-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => void load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "applications" }, () => void load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => void load())
-      .subscribe();
-    return () => {
-      window.clearTimeout(timer);
-      void supabase.removeChannel(channel);
+const NAV: { id: View; label: string; icon: LucideIcon }[] = [
+  { id: "home", label: "Accueil", icon: House },
+  { id: "jobs", label: "Offres", icon: Search },
+  { id: "documents", label: "Documents", icon: FileText },
+  { id: "questions", label: "Questions", icon: CircleHelp },
+  { id: "applications", label: "Candidatures", icon: BriefcaseBusiness },
+  { id: "activity", label: "Activité", icon: Activity },
+  { id: "settings", label: "Réglages", icon: Settings },
+];
+const TABS: { id: View; label: string; icon: LucideIcon }[] = [
+  ...NAV.slice(0, 4),
+  { id: "more", label: "Plus", icon: Ellipsis },
+];
+const VIEWS = new Set<string>([...NAV.map((n) => n.id), "more"]);
+const MORE_VIEWS = new Set<View>(["more", "applications", "activity", "settings"]);
+
+/** Server error → one readable sentence. */
+function readable(raw: unknown): string {
+  const text = cleanRaw(String(raw || "Erreur inconnue"));
+  const e = explainError(text);
+  return e ? `${e.title}${e.hint ? ` — ${e.hint}` : ""}` : text;
+}
+
+async function post(url: string, body: unknown = {}) {
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const parsed = (await response.json().catch(() => ({
+      error: `Réponse vide du serveur (HTTP ${response.status})`,
+    }))) as Record<string, unknown>;
+    return { ok: response.ok, body: parsed };
+  } catch (error) {
+    return {
+      ok: false,
+      body: { error: `Connexion impossible : ${error instanceof Error ? error.message : "réseau"}` } as Record<string, unknown>,
     };
-    // The Supabase client is stable for the lifetime of this dashboard.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }
+}
+
+export type DemoState = { data: Data; status: SystemStatus };
+
+export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?: DemoState }) {
+  const { supabase, data, loading, error: loadError, reload } = useDashboardData(demo?.data);
+  const { status, failed: statusFailed, refresh: refreshStatus } = useSystemStatus(Boolean(supabase), demo?.status);
+  const pipeline = usePipeline({ supabase, status, reload, refreshStatus });
+
+  const [view, setView] = useState<View>("home");
+  const [jobFilter, setJobFilter] = useState<JobFilter>("all");
+  const [busy, setBusy] = useState("");
+  const [toast, setToast] = useState<{ text: string; tone: Tone } | null>(null);
+  const [docDialog, setDocDialog] = useState<DocumentDialogState>(null);
+  const [descJob, setDescJob] = useState<Job | null>(null);
+  const [descText, setDescText] = useState("");
+  const addModal = useRef<HTMLDialogElement>(null);
+  const descModal = useRef<HTMLDialogElement>(null);
+  const toastTimer = useRef<number | undefined>(undefined);
+
+  // Restore the tab from the address (#jobs) so a refresh keeps the place.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const hash = window.location.hash.slice(1);
+      if (VIEWS.has(hash)) setView(hash as View);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
-  /** Scores every complete DISCOVERED offer, then prepares documents for >= 80. */
-  async function processPending(): Promise<string> {
-    if (!supabase) return "";
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return "";
-    const { data: pendingRows } = await supabase
-      .from("jobs")
-      .select("*")
-      .eq("status", "DISCOVERED")
-      .not("description", "is", null);
-    const pending = ((pendingRows || []) as Job[]).filter((job) => job.description);
-    if (!pending.length) return "Aucune nouvelle offre complète à traiter.";
-    let analyzed = 0,
-      prepared = 0,
-      failed = 0;
-    const errors: string[] = [];
-    for (const job of pending) {
+
+  const notify = useCallback((text: string, tone: Tone = "info") => {
+    window.clearTimeout(toastTimer.current);
+    setToast(text ? { text, tone } : null);
+    if (text && tone !== "bad") toastTimer.current = window.setTimeout(() => setToast(null), 7000);
+  }, []);
+
+  const go = useCallback((next: View, filter?: JobFilter) => {
+    setView(next);
+    if (filter) setJobFilter(filter);
+    try {
+      window.history.replaceState(null, "", `#${next}`);
+    } catch {
+      // ignore
+    }
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  const locked = pipeline.running ? "pipeline" : busy;
+
+  const run = useCallback(
+    async (id: string, work: () => Promise<void>) => {
+      setBusy(id);
       try {
-        setMessage(`Analyse Gemini ${analyzed + 1}/${pending.length} · ${job.company}`);
-        const analysisResponse = await fetch(`/api/jobs/${job.id}/analyze`, { method: "POST" });
-        const analysis = await analysisResponse
-          .json()
-          .catch(() => ({ error: `Réponse vide du serveur (${analysisResponse.status})` }));
-        if (!analysisResponse.ok) throw new Error(analysis.error || "Analyse impossible");
-        analyzed += 1;
-        if (analysis.total >= 80) {
-          const generationResponse = await fetch(`/api/jobs/${job.id}/generate`, { method: "POST" });
-          const generation = await generationResponse.json();
-          if (!generationResponse.ok) throw new Error(generation.error || "Génération impossible");
-          prepared += 1;
-          const stats = generation.questionStats || {};
-          await supabase.from("notifications").insert({
-            user_id: user.id,
-            notification_type: "DOCUMENTS_READY",
-            title: `${job.company} · documents prêts`,
-            message: `${generation.documents?.length || 0} document(s) généré(s), ${stats.asked ?? generation.questions?.length ?? 0} question(s) à valider${stats.autoAnswered ? `, ${stats.autoAnswered} reprise(s) de ta mémoire` : ""}.`,
-            action_url: job.official_url || job.source_url,
-            delivery_channels: ["dashboard"],
-          });
-        }
-      } catch (e) {
-        failed += 1;
-        if (e instanceof Error && errors.length < 2) errors.push(`${job.company} : ${e.message}`);
+        await work();
+      } finally {
+        setBusy("");
+        await reload();
       }
-    }
-    return `Pipeline terminé : ${analyzed} analysée(s), ${prepared} préparée(s), ${failed} échec(s).${errors.length ? ` Erreur : ${errors.join(" ; ")}` : ""}`;
-  }
-  async function runSmartPipeline() {
-    setBusy("pipeline");
-    try {
-      setMessage(await processPending());
-    } finally {
-      setBusy("");
-    }
-    await load();
-  }
-  async function scanOffers() {
-    setBusy("scan");
-    setMessage("");
-    try {
-      const response = await fetch("/api/scan", { method: "POST" });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || "Scan impossible");
-      let text: string = body.message || "Scan terminé.";
-      await load();
-      if (body.inserted > body.needsDescription) {
-        // New offers with a full description: score them right away.
-        setMessage(`${text} Analyse des nouvelles offres…`);
-        text += ` ${await processPending()}`;
-      }
-      setMessage(text);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Scan impossible.");
-    } finally {
-      setBusy("");
-      await load();
-    }
-  }
+    },
+    [reload],
+  );
+
+  const act: Ctx["act"] = useMemo(
+    () => ({
+      analyze: (job) =>
+        run(job.id, async () => {
+          notify(`Analyse de « ${job.company} » en cours…`);
+          const r = await post(`/api/jobs/${job.id}/analyze`);
+          if (!r.ok) return notify(readable(r.body.error), "bad");
+          notify(`${job.company} : compatibilité ${r.body.total}/100.`, "good");
+        }),
+      generate: (job) =>
+        run(job.id, async () => {
+          notify(`Rédaction du CV et de la lettre pour « ${job.company} »…`);
+          const r = await post(`/api/jobs/${job.id}/generate`);
+          if (!r.ok) return notify(readable(r.body.error), "bad");
+          const stats = (r.body.questionStats as { asked?: number }) || {};
+          notify(
+            `Documents prêts${stats.asked ? ` · ${stats.asked} question(s) à valider` : ""}.`,
+            "good",
+          );
+        }),
+      approve: (doc) =>
+        run(doc.id, async () => {
+          const r = await post(`/api/documents/${doc.id}/approve`);
+          notify(r.ok ? "Document approuvé." : readable(r.body.error), r.ok ? "good" : "bad");
+        }),
+      upload: (doc) =>
+        run(doc.id, async () => {
+          notify("Envoi vers Google Drive…");
+          const r = await post(`/api/documents/${doc.id}/drive`);
+          notify(r.ok ? "Document envoyé sur Google Drive." : readable(r.body.error), r.ok ? "good" : "bad");
+        }),
+      prepare: (applicationId) =>
+        run(applicationId, async () => {
+          notify("Lecture du formulaire de candidature… (jusqu’à 1 minute)");
+          const r = await post("/api/worker/dispatch", { applicationId, action: "prepare" });
+          if (!r.ok) return notify(readable(r.body.error), "bad");
+          const fields = (r.body.fields as unknown[] | undefined)?.length ?? 0;
+          const questions = (r.body.questions as unknown[] | undefined)?.length ?? 0;
+          notify(
+            `Formulaire lu : ${fields} champ(s)${questions ? `, ${questions} question(s) à traiter` : ""}. Rien n’a été envoyé.`,
+            "good",
+          );
+        }),
+      pasteDescription: (job) => {
+        setDescJob(job);
+        setDescText("");
+        descModal.current?.showModal();
+      },
+      addJob: () => addModal.current?.showModal(),
+      markRead: async (id) => {
+        if (!supabase) return;
+        await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
+        await reload();
+      },
+      markAllRead: async () => {
+        if (!supabase) return;
+        await supabase
+          .from("notifications")
+          .update({ read_at: new Date().toISOString() })
+          .is("read_at", null);
+        await reload();
+      },
+      openDocument: (state) => setDocDialog(state),
+    }),
+    [notify, reload, run, supabase],
+  );
+
   async function saveDescription() {
     if (!supabase || !descJob || descText.trim().length < 50) return;
     const { error } = await supabase
       .from("jobs")
-      .update({ description: descText.trim() })
+      .update({ description: descText.trim(), last_checked_at: null })
       .eq("id", descJob.id);
-    setMessage(error ? `Erreur : ${error.message}` : "Description enregistrée : tu peux analyser l’offre.");
     descModal.current?.close();
     setDescJob(null);
     setDescText("");
-    await load();
+    notify(error ? error.message : "Description enregistrée : tu peux analyser l’offre.", error ? "bad" : "good");
+    await reload();
   }
-  async function markNotificationRead(id: string) {
-    if (!supabase) return;
-    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
-    await load();
-  }
+
   async function addJob(form: FormData) {
     if (!supabase) return;
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
-    const company = String(form.get("company")),
-      title = String(form.get("title"));
+    const company = String(form.get("company") || "").trim();
+    const title = String(form.get("title") || "").trim();
+    const location = String(form.get("location") || "").trim();
+    const url = String(form.get("official_url") || "").trim();
+    const description = String(form.get("description") || "").trim();
+    if (!description && !url) {
+      notify("Ajoute le lien de l’offre ou colle sa description.", "bad");
+      return;
+    }
     const { error } = await supabase.from("jobs").insert({
       user_id: user.id,
       company,
       title,
-      contract_type: form.get("contract_type"),
-      location: form.get("location"),
-      description: form.get("description"),
-      official_url: form.get("official_url") || null,
-      source_url: form.get("official_url") || null,
-      fingerprint: `${company}|${title}|${form.get("location")}`.toLowerCase(),
+      contract_type: String(form.get("contract_type") || ""),
+      location,
+      description: description || null,
+      official_url: url || null,
+      source_url: url || null,
+      source_platform: "manual",
+      fingerprint: fingerprintOf({ company, title, location }),
       status: "DISCOVERED",
     });
-    setMessage(error ? error.message : "Offre enregistrée.");
-    if (!error) {
-      modal.current?.close();
-      await load();
+    if (error) {
+      notify(error.code === "23505" ? "Cette offre existe déjà." : error.message, "bad");
+      return;
     }
+    addModal.current?.close();
+    notify("Offre ajoutée. Lance l’analyse depuis sa carte.", "good");
+    go("jobs", "all");
+    await reload();
   }
-  async function action(label: string, url: string) {
-    setBusy(label);
-    setMessage("");
-    try {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: "{}",
-      });
-      const body = await r.json();
-      if (!r.ok) throw new Error(body.error || "Action impossible");
-      setMessage(
-        label === "analyze"
-          ? `Analyse terminée : ${body.total}/100.`
-          : label === "generate"
-            ? `${body.documents?.length || 0} document(s) créé(s), ${body.questions?.length || 0} question(s) bloquante(s).`
-            : "Action terminée.",
-      );
-      await load();
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Erreur");
-    } finally {
-      setBusy("");
-    }
-  }
-  async function prepare(applicationId: string) {
-    setBusy(applicationId);
-    try {
-      const r = await fetch("/api/worker/dispatch", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ applicationId, action: "prepare" }),
-      });
-      const body = await r.json();
-      if (!r.ok) throw new Error(body.error || "Worker indisponible");
-      setMessage(
-        `Inspection terminée : ${body.fields?.length || 0} champ(s), ${body.questions?.length || 0} blocage(s).`,
-      );
-      await load();
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Erreur");
-    } finally {
-      setBusy("");
-    }
-  }
-  useEffect(() => {
-    if (tab !== "settings") return;
-    void fetch("/api/status")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body) => setStatus(body))
-      .catch(() => setStatus(null));
-  }, [tab]);
-  const high = jobs.filter((j) => (j.match_score || 0) >= 80).length;
-  const unread = notifications.filter((n) => !n.read_at).length;
+
+  const ctx: Ctx = {
+    data,
+    supabase,
+    status,
+    statusFailed,
+    refreshStatus,
+    pipeline,
+    busy: locked,
+    userEmail,
+    go,
+    notify,
+    reload,
+    jobFilter,
+    setJobFilter,
+    act,
+  };
+
+  const replaced = new Set(data.documents.map((d) => d.based_on_document_id).filter(Boolean));
+  const toApprove = data.documents.filter((d: DocumentRecord) => !d.approved && !replaced.has(d.id)).length;
+  const unread = data.notifications.filter((n) => !n.read_at).length;
+  const openQuestions = openQuestionCount(data.questions);
+  const badge = (id: View) =>
+    id === "questions" ? openQuestions : id === "documents" ? toApprove : id === "activity" ? unread : id === "more" ? unread : 0;
+  const activeTab: View = MORE_VIEWS.has(view) ? "more" : view;
+
+  const p = pipeline.progress;
+  const phases = ["scan", "analyze", "generate", "prepare"] as const;
+  const percent = p
+    ? ((phases.indexOf(p.phase) + (p.total ? p.done / p.total : 0)) / phases.length) * 100
+    : 0;
+
   return (
-    <main className="shell">
-      <header className="top">
+    <div className="app">
+      <aside className="side">
         <div className="brand">
           <div className="mark">JH</div>
           <div>
-            <div className="eyebrow">AI Agent Hunter</div>
-            <h1>Job Hunter Control</h1>
-            <div className="muted">Pipeline sécurisé de Yassine</div>
+            <strong>Job Hunter</strong>
+            <span className="muted">Ton assistant candidatures</span>
           </div>
         </div>
-        <div className="toolbar">
-          <span className="muted">{userEmail}</span>
-          <span className="mode">
-            <ShieldCheck size={14} /> PREPARE_ONLY
-          </span>
-          {userEmail && (
-            <form action={logout}>
-              <button className="btn secondary">Déconnexion</button>
-            </form>
-          )}
-        </div>
-      </header>
-      <section className="grid">
-        <Metric label="Offres" value={jobs.length} />
-        <Metric label="Score ≥ 80" value={high} />
-        <Metric label="À traiter" value={jobs.filter((j) => j.status === "DISCOVERED").length} />
-        <Metric label="Documents" value={documents.length} />
-        <Metric label="Blocages" value={openQuestionCount(questions)} />
-      </section>
-      <section className="layout">
-        <nav className="card nav">
-          {[
-            ["jobs", LayoutDashboard, "Offres"],
-            ["applications", BriefcaseBusiness, "Candidatures"],
-            ["documents", FileText, "Documents"],
-            ["notifications", Bell, `Notifications${unread ? ` (${unread})` : ""}`],
-            ["questions", HelpCircle, "Questions"],
-            ["runs", Play, "Exécutions"],
-            ["settings", Settings, "Réglages"],
-          ].map(([id, Icon, label]) => (
+        <nav aria-label="Navigation principale">
+          {NAV.map(({ id, label, icon: Icon }) => (
             <button
-              key={String(id)}
-              className={tab === id ? "active" : ""}
-              onClick={() => {
-                setTab(String(id));
-                setMessage("");
-              }}
+              key={id}
+              className={view === id ? "navlink active" : "navlink"}
+              onClick={() => go(id)}
+              aria-current={view === id ? "page" : undefined}
             >
-              <Icon size={16} /> {String(label)}
+              <Icon size={18} aria-hidden />
+              <span>{label}</span>
+              {badge(id) > 0 && <b className="badge">{badge(id)}</b>}
             </button>
           ))}
         </nav>
-        <div className="card">
-          {message && (
-            <p
-              className={ERROR_MESSAGE.test(message) ? "error" : "alert"}
-            >
-              {message}
-            </p>
-          )}
-          <div className="panel-head">
-            <div>
-              <h2>
-                {
-                  (
-                    {
-                      jobs: "Pipeline des offres",
-                      applications: "Candidatures",
-                      documents: "Documents générés",
-                      notifications: "Centre de notifications",
-                      questions: "Questions à valider",
-                      runs: "Journal d’exécution",
-                      settings: "Configuration",
-                    } as Record<string, string>
-                  )[tab]
-                }
-              </h2>
-              <p className="muted">
-                Analyse, génération et préparation contrôlées. La soumission
-                reste désactivée.
-              </p>
-            </div>
-            {tab === "jobs" && (
-              <div className="toolbar">
-                <button className="btn smart" disabled={Boolean(busy)} onClick={() => void runSmartPipeline()}>
-                  {busy === "pipeline" ? "Pipeline en cours…" : "Lancer le pipeline intelligent"}
-                </button>
-                <button className="btn" disabled={Boolean(busy)} onClick={() => void scanOffers()}>
-                  {busy === "scan" ? "Scan en cours…" : "Scanner les offres maintenant"}
-                </button>
-                <button className="btn secondary" onClick={() => void load()}>
-                  Actualiser
-                </button>
-                <button
-                  className="btn"
-                  onClick={() => modal.current?.showModal()}
-                >
-                  Ajouter une offre
-                </button>
-              </div>
-            )}
-          </div>
-          {loading ? (
-            <div className="empty">Chargement…</div>
-          ) : tab === "jobs" ? (
-            <Jobs
-              jobs={jobs}
-              busy={busy}
-              action={action}
-              addDescription={(job) => {
-                setDescJob(job);
-                setDescText("");
-                descModal.current?.showModal();
-              }}
-            />
-          ) : tab === "applications" ? (
-            <Applications rows={apps} busy={busy} prepare={prepare} />
-          ) : tab === "documents" ? (
-            <Documents
-              rows={documents}
-              busy={busy}
-              approve={(id) => action(id, `/api/documents/${id}/approve`)}
-              upload={(id) => action(id, `/api/documents/${id}/drive`)}
-              revise={(doc) => setDocDialog({ doc, mode: "revise" })}
-              edit={(doc) => setDocDialog({ doc, mode: "edit" })}
-            />
-          ) : tab === "notifications" ? (
-            <Notifications rows={notifications} markRead={markNotificationRead} />
-          ) : tab === "questions" ? (
-            <QuestionsPanel
-              rows={questions}
-              supabase={supabase}
-              reload={load}
-              notify={setMessage}
-            />
-          ) : tab === "runs" ? (
-            <Runs rows={runs} />
-          ) : (
-            <SettingsPanel configured={Boolean(supabase)} status={status} />
+        <div className="sidefoot">
+          <span className="chip good">
+            <ShieldCheck size={13} aria-hidden /> Jamais d’envoi automatique
+          </span>
+          {userEmail && <span className="muted small-text">{userEmail}</span>}
+          {userEmail && (
+            <form action={logout}>
+              <button className="btn ghost small">
+                <LogOut size={14} aria-hidden /> Déconnexion
+              </button>
+            </form>
           )}
         </div>
-      </section>
+      </aside>
+
+      <div className="main">
+        <header className="topbar">
+          <div className="brand">
+            <div className="mark">JH</div>
+            <strong>Job Hunter</strong>
+          </div>
+          <span className="chip good">
+            <ShieldCheck size={13} aria-hidden /> Aucun envoi auto
+          </span>
+        </header>
+
+        {pipeline.running && (
+          <div className="runbar" role="status">
+            <LoaderCircle size={16} className="spin" aria-hidden />
+            <div className="runbar-text">
+              <strong>{p?.label || "Recherche en cours…"}</strong>
+              <Progress value={percent} />
+            </div>
+            <button className="btn ghost small" onClick={pipeline.cancel}>
+              Arrêter
+            </button>
+          </div>
+        )}
+
+        <main className="content">
+          {loadError && (
+            <div className="callout bad" style={{ marginBottom: 16 }}>
+              <div className="callout-body">
+                <strong>Impossible de charger les données</strong>
+                <div>{loadError}</div>
+              </div>
+            </div>
+          )}
+          {loading ? (
+            <div className="empty">
+              <LoaderCircle className="spin" aria-hidden /> Chargement…
+            </div>
+          ) : view === "home" ? (
+            <HomeView ctx={ctx} />
+          ) : view === "jobs" ? (
+            <JobsView ctx={ctx} />
+          ) : view === "documents" ? (
+            <DocumentsView ctx={ctx} />
+          ) : view === "questions" ? (
+            <>
+              <PageHead
+                title="Questions"
+                subtitle="Réponds une fois : ta réponse est mémorisée pour les prochaines candidatures."
+              />
+              <QuestionsPanel rows={data.questions} supabase={supabase} reload={reload} notify={(t) => notify(t, "info")} />
+            </>
+          ) : view === "applications" ? (
+            <ApplicationsView ctx={ctx} />
+          ) : view === "activity" ? (
+            <ActivityView ctx={ctx} />
+          ) : view === "settings" ? (
+            <SettingsView ctx={ctx} />
+          ) : (
+            <MoreView ctx={ctx} badge={badge} />
+          )}
+        </main>
+      </div>
+
+      <nav className="tabbar" aria-label="Navigation mobile">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            className={activeTab === id ? "tab active" : "tab"}
+            onClick={() => go(id)}
+            aria-current={activeTab === id ? "page" : undefined}
+          >
+            <span className="tabicon">
+              <Icon size={22} aria-hidden />
+              {badge(id) > 0 && <b className="badge">{badge(id)}</b>}
+            </span>
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {toast && (
+        <div className={`toast ${toast.tone}`} role="status">
+          <span>{toast.text}</span>
+          <button className="iconbtn" aria-label="Fermer" onClick={() => notify("")}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       <DocumentDialog
         state={docDialog}
         onClose={() => setDocDialog(null)}
         onDone={async (text) => {
-          setMessage(text);
-          await load();
+          notify(text, "good");
+          await reload();
         }}
       />
+
       <dialog ref={descModal} onClose={() => setDescJob(null)}>
         <div className="form">
           <div className="wide">
-            <h2>Description de l’offre</h2>
+            <h2>Coller la description</h2>
             <p className="muted">
-              {descJob ? `${descJob.company} · ${descJob.title}` : ""} — colle le texte complet de
-              l’annonce (missions, profil, contrat) pour activer l’analyse Gemini.
+              {descJob ? `${descJob.company} · ${descJob.title}` : ""} — copie le texte de l’annonce
+              (missions, profil, contrat) : c’est ce que l’IA lit pour calculer ton score.
             </p>
           </div>
           <label className="wide">
-            Description complète
-            <textarea rows={12} value={descText} onChange={(e) => setDescText(e.target.value)} />
+            Texte de l’annonce
+            <textarea rows={10} value={descText} onChange={(e) => setDescText(e.target.value)} />
           </label>
-          <div className="wide toolbar">
+          <div className="wide toolbar end">
             <button type="button" className="btn secondary" onClick={() => descModal.current?.close()}>
               Annuler
             </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={descText.trim().length < 50}
-              onClick={() => void saveDescription()}
-            >
+            <button type="button" className="btn" disabled={descText.trim().length < 50} onClick={() => void saveDescription()}>
               Enregistrer
             </button>
           </div>
         </div>
       </dialog>
-      <dialog ref={modal}>
+
+      <dialog ref={addModal}>
         <form action={addJob} className="form">
           <div className="wide">
-            <h2>Nouvelle offre</h2>
+            <h2>Ajouter une offre</h2>
             <p className="muted">
-              Collez la description complète pour activer l’analyse Gemini.
+              Colle le lien de l’annonce : l’assistant la lit tout seul. Sinon colle son texte.
             </p>
           </div>
+          <label className="wide">
+            Lien de l’offre
+            <input name="official_url" type="url" placeholder="https://…" />
+          </label>
           <label>
             Entreprise
             <input name="company" required />
@@ -493,10 +468,11 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
           </label>
           <label>
             Contrat
-            <select name="contract_type">
+            <select name="contract_type" defaultValue="Alternance">
               <option>Alternance</option>
               <option>Stage</option>
               <option>CDI</option>
+              <option>CDD</option>
             </select>
           </label>
           <label>
@@ -504,367 +480,17 @@ export function Dashboard({ userEmail = "" }: { userEmail?: string }) {
             <input name="location" defaultValue="Paris" />
           </label>
           <label className="wide">
-            URL officielle
-            <input name="official_url" type="url" />
+            Description (facultatif si tu as mis le lien)
+            <textarea name="description" rows={6} />
           </label>
-          <label className="wide">
-            Description complète
-            <textarea name="description" rows={10} required />
-          </label>
-          <div className="wide toolbar">
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={() => modal.current?.close()}
-            >
+          <div className="wide toolbar end">
+            <button type="button" className="btn secondary" onClick={() => addModal.current?.close()}>
               Annuler
             </button>
-            <button className="btn">Enregistrer</button>
+            <button className="btn">Ajouter</button>
           </div>
         </form>
       </dialog>
-    </main>
-  );
-}
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="card">
-      <div className="muted">{label}</div>
-      <div className="metric">{value}</div>
     </div>
   );
-}
-function Jobs({
-  jobs,
-  busy,
-  action,
-  addDescription,
-}: {
-  jobs: Job[];
-  busy: string;
-  action: (l: string, u: string) => Promise<void>;
-  addDescription: (job: Job) => void;
-}) {
-  return jobs.length ? (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Entreprise / poste</th>
-            <th>Score</th>
-            <th>Source</th>
-            <th>Statut</th>
-            <th>Commandes</th>
-          </tr>
-        </thead>
-        <tbody>
-          {jobs.map((j) => (
-            <tr key={j.id}>
-              <td>
-                <strong>{j.company}</strong>
-                <br />
-                <span className="muted">
-                  {j.title} · {j.location || "—"}
-                </span>
-              </td>
-              <td className="score">{j.match_score ?? "—"}</td>
-              <td>{j.source_url ? <a href={j.source_url} target="_blank">Ouvrir</a> : "Manuelle"}</td>
-              <td>
-                <span className={`status ${j.status.toLowerCase()}`}>
-                  {j.status}
-                </span>
-              </td>
-              <td>
-                <div className="toolbar">
-                  {!j.description && (
-                    <button
-                      className="btn secondary small"
-                      disabled={Boolean(busy)}
-                      onClick={() => addDescription(j)}
-                    >
-                      Coller la description
-                    </button>
-                  )}
-                  <button
-                    className="btn small"
-                    disabled={Boolean(busy) || !j.description}
-                    onClick={() =>
-                      action("analyze", `/api/jobs/${j.id}/analyze`)
-                    }
-                  >
-                    Analyser
-                  </button>
-                  <button
-                    className="btn secondary small"
-                    disabled={Boolean(busy) || j.status !== "ANALYZED"}
-                    onClick={() =>
-                      action("generate", `/api/jobs/${j.id}/generate`)
-                    }
-                  >
-                    Générer CV/lettre
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  ) : (
-    <Empty text="Aucune offre. Ajoutez une offre et sa description." />
-  );
-}
-function Notifications({ rows, markRead }: { rows: NotificationRecord[]; markRead: (id: string) => Promise<void> }) {
-  return rows.length ? (
-    <div className="feed">
-      {rows.map((n) => (
-        <article className={`notice ${n.read_at ? "read" : "unread"}`} key={n.id}>
-          <div>
-            <span className="eyebrow">{n.notification_type}</span>
-            <h3>{n.title}</h3>
-            <p>{n.message}</p>
-            <span className="muted">{new Date(n.created_at).toLocaleString("fr-FR")}</span>
-          </div>
-          <div className="toolbar">
-            {n.action_url && <a className="btn secondary small" href={n.action_url} target="_blank">Ouvrir</a>}
-            {!n.read_at && <button className="btn small" onClick={() => void markRead(n.id)}>Marquer lu</button>}
-          </div>
-        </article>
-      ))}
-    </div>
-  ) : <Empty text="Aucune notification." />;
-}
-function Applications({
-  rows,
-  busy,
-  prepare,
-}: {
-  rows: Application[];
-  busy: string;
-  prepare: (id: string) => Promise<void>;
-}) {
-  return rows.length ? (
-    <table>
-      <thead>
-        <tr>
-          <th>Entreprise / poste</th>
-          <th>Statut</th>
-          <th>Commande</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((a) => (
-          <tr key={a.id}>
-            <td>
-              {a.jobs?.company || "—"}
-              <br />
-              <span className="muted">{a.jobs?.title}</span>
-            </td>
-            <td>
-              <span className="status">{a.status}</span>
-            </td>
-            <td>
-              <button
-                className="btn small"
-                disabled={Boolean(busy)}
-                onClick={() => prepare(a.id)}
-              >
-                Inspecter avec Playwright
-              </button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <Empty text="Aucune candidature préparée." />
-  );
-}
-function Documents({
-  rows,
-  busy,
-  approve,
-  upload,
-  revise,
-  edit,
-}: {
-  rows: DocumentRecord[];
-  busy: string;
-  approve: (id: string) => Promise<void>;
-  upload: (id: string) => Promise<void>;
-  revise: (doc: DocumentRecord) => void;
-  edit: (doc: DocumentRecord) => void;
-}) {
-  // A document is "replaced" once a newer version was created from it.
-  const replacedBy = new Map<string, DocumentRecord>();
-  for (const d of rows)
-    if (d.based_on_document_id) replacedBy.set(d.based_on_document_id, d);
-  return rows.length ? (
-    <table>
-      <thead>
-        <tr>
-          <th>Document</th>
-          <th>Version</th>
-          <th>État</th>
-          <th>Commandes</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((d) => {
-          const newer = replacedBy.get(d.id);
-          return (
-            <tr key={d.id} className={newer ? "replaced" : ""}>
-              <td>
-                <strong>{d.filename}</strong>
-                <br />
-                <span className="muted">
-                  {d.jobs?.company} · {d.kind}
-                </span>
-              </td>
-              <td>v{d.version}</td>
-              <td>
-                {newer ? (
-                  `Remplacé par v${newer.version}`
-                ) : d.storage_path ? (
-                  <a href={d.storage_path} target="_blank">
-                    Drive
-                  </a>
-                ) : d.approved ? (
-                  "Approuvé"
-                ) : (
-                  "Brouillon"
-                )}
-              </td>
-              <td>
-                <div className="toolbar">
-                  <a
-                    className="btn secondary small"
-                    href={`/api/documents/${d.id}/pdf`}
-                    target="_blank"
-                  >
-                    Aperçu PDF
-                  </a>
-                  {!newer && (
-                    <>
-                      <button
-                        className="btn secondary small"
-                        disabled={Boolean(busy)}
-                        onClick={() => revise(d)}
-                      >
-                        Demander une modification
-                      </button>
-                      <button
-                        className="btn secondary small"
-                        disabled={Boolean(busy)}
-                        onClick={() => edit(d)}
-                      >
-                        Modifier moi-même
-                      </button>
-                    </>
-                  )}
-                  {!newer && !d.approved && (
-                    <button
-                      className="btn small"
-                      disabled={Boolean(busy)}
-                      onClick={() => approve(d.id)}
-                    >
-                      Approuver
-                    </button>
-                  )}
-                  {!newer && d.approved && !d.storage_path && (
-                    <button
-                      className="btn small"
-                      disabled={Boolean(busy)}
-                      onClick={() => upload(d.id)}
-                    >
-                      Envoyer vers Drive
-                    </button>
-                  )}
-                </div>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  ) : (
-    <Empty text="Aucun document généré." />
-  );
-}
-function Runs({ rows }: { rows: AgentRun[] }) {
-  return rows.length ? (
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Statut</th>
-          <th>Date</th>
-          <th>Détail</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.id}>
-            <td>{r.run_type}</td>
-            <td>
-              <span className="status">{r.status}</span>
-            </td>
-            <td>{new Date(r.created_at).toLocaleString("fr-FR")}</td>
-            <td>{r.error_message || JSON.stringify(r.counters)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <Empty text="Aucune exécution enregistrée." />
-  );
-}
-function Flag({ ok, label, hint }: { ok: boolean; label: string; hint?: string }) {
-  return (
-    <p>
-      {label} : <strong className={ok ? "ok" : "error"}>{ok ? "connecté" : "non configuré"}</strong>
-      {!ok && hint && <span className="muted"> — {hint}</span>}
-    </p>
-  );
-}
-function SettingsPanel({
-  configured,
-  status,
-}: {
-  configured: boolean;
-  status: SystemStatus | null;
-}) {
-  return (
-    <div>
-      <p className="alert">
-        PREPARE_ONLY : jamais de clic final. CAPTCHA, MFA, consentement légal ou
-        donnée inconnue provoquent une pause.
-      </p>
-      <p>
-        Supabase : <strong>{configured ? "configuré" : "absent"}</strong>
-      </p>
-      {!status ? (
-        <p className="muted">Chargement de l’état des connexions…</p>
-      ) : (
-        <>
-          <p>
-            Mode : <strong>{status.applicationMode}</strong>
-            {!status.explicitModeVariable && (
-              <span className="muted"> (par défaut ; APPLICATION_MODE n’est pas défini dans Vercel)</span>
-            )}
-          </p>
-          <Flag ok={status.gemini} label="Gemini (analyse + CV)" hint="GEMINI_API_KEY" />
-          <Flag ok={status.drive} label="Google Drive" hint="GOOGLE_SERVICE_ACCOUNT_JSON + IDs de dossiers" />
-          <Flag ok={status.worker} label="Playwright (Railway)" hint="WORKER_BASE_URL + WORKER_SHARED_SECRET" />
-          <Flag ok={status.scanSources.franceTravail} label="Scan · France Travail" hint="FRANCE_TRAVAIL_CLIENT_ID / _SECRET" />
-          <Flag ok={status.scanSources.gmailAlerts} label="Scan · alertes e-mail (LinkedIn, Indeed, Hellowork…)" hint="GMAIL_CLIENT_ID / _SECRET / GMAIL_REFRESH_TOKEN" />
-          <Flag ok={status.scanSources.webhook} label="Scan · scanner externe" hint="SCAN_WEBHOOK_URL (optionnel)" />
-          <Flag ok={status.scheduledScan} label="Scan automatique quotidien" hint="CRON_SECRET + SCAN_USER_ID + SUPABASE_SERVICE_ROLE_KEY (optionnel)" />
-        </>
-      )}
-    </div>
-  );
-}
-function Empty({ text }: { text: string }) {
-  return <div className="empty">{text}</div>;
 }

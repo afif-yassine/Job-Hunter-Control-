@@ -1,28 +1,47 @@
-# Scanner d'offres
+# Recherche d'offres sur tout internet
 
-Le bouton **Scanner les offres maintenant** lance `POST /api/scan`. Il interroge les sources
-configurées, ne garde que les offres pertinentes (alternance / stage tech), **supprime les
-doublons** (URL canonique + entreprise/titre/ville) puis enregistre les nouvelles offres en
-`DISCOVERED`. Si elles ont une description, le tableau de bord les analyse aussitôt avec Gemini.
+Le bouton **Lancer la recherche** (page Accueil) enchaîne : chercher les offres → calculer le score
+avec Gemini → rédiger CV + lettre pour les offres ≥ 80 → lire le formulaire de candidature avec Playwright.
+Rien n'est jamais envoyé (mode `PREPARE_ONLY`). Le même enchaînement démarre tout seul à l'ouverture
+de l'application quand la dernière recherche a plus de 12 h (désactivable dans Réglages).
 
-Il n'existe pas de « scan de 100 sites » fiable. Le scanner combine donc deux sources conformes :
+Les offres sont dédoublonnées (URL canonique + entreprise/titre/ville) puis enregistrées en `DISCOVERED`.
+Quand une offre n'a qu'un extrait, l'analyse lit la page de l'annonce (JSON-LD `JobPosting`, sans contourner
+de protection). Si la page est protégée, l'offre attend dans « À compléter » (bouton **Coller la description**).
 
-| Source | Couvre | Description complète | Variables |
+## Pourquoi pas « tout scraper » ?
+
+LinkedIn, Indeed, Glassdoor… interdisent le scraping automatisé et bloquent les robots (CAPTCHA, murs de connexion).
+L'appli n'essaie pas de les contourner. À la place, elle interroge des **services qui les regroupent légalement** :
+
+| Source | Couvre | Description | Clé |
 | --- | --- | --- | --- |
-| API France Travail (officielle) | Offres France Travail et partenaires | Oui | `FRANCE_TRAVAIL_CLIENT_ID`, `FRANCE_TRAVAIL_CLIENT_SECRET` |
-| Alertes e-mail lues dans Gmail | LinkedIn, Indeed, Hellowork, APEC, Welcome to the Jungle | Non (à coller) | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` |
+| **JSearch** (recommandée) | Google Emplois : LinkedIn, Indeed, Glassdoor, Welcome to the Jungle, Hellowork, APEC… | complète | `JSEARCH_API_KEY` |
+| Adzuna | Des milliers de sites d'emploi français | extrait (complété depuis l'annonce) | `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` |
+| France Travail (officiel) | Offres France Travail et partenaires | complète | `FRANCE_TRAVAIL_CLIENT_ID`, `FRANCE_TRAVAIL_CLIENT_SECRET` |
+| Jooble | Moteur multi-sites | extrait | `JOOBLE_API_KEY` |
+| Alertes e-mail Gmail (avancé) | Alertes LinkedIn, Indeed, Hellowork, APEC, WTTJ | non | `GMAIL_*` |
 
-LinkedIn et Indeed interdisent le scraping et bloquent les robots : leurs alertes e-mail sont le
-moyen propre d'obtenir leurs offres. Une offre issue d'une alerte n'a pas de description :
-le bouton **Coller la description** apparaît dans la liste, puis **Analyser**.
+**Il suffit d'en connecter une.** JSearch a un plan gratuit (~200 requêtes/mois : l'appli en utilise 3 par recherche).
 
-## 1. France Travail (5 min)
+## Connecter une source (dans l'appli)
+
+Réglages → « 1 · Où chercher les offres » : chaque carte explique les étapes, ouvre la bonne page, et
+a un champ pour coller la clé + un bouton **Tester**. Les clés saisies sont chiffrées (AES-256-GCM) avec
+`INTEGRATIONS_SECRET` (variable Vercel) avant d'être stockées dans la table `integrations`; elles ne sont
+jamais renvoyées au navigateur (on n'affiche que les 4 derniers caractères). Les variables Vercel restent
+possibles et servent de repli.
+
+Préférences de recherche (contrats, mots-clés, ville, départements, ancienneté) : Réglages → « 2 · Ce que tu cherches »
+(table `user_settings`).
+
+## France Travail (5 min)
 
 1. Créer un compte sur <https://francetravail.io> et une application.
 2. Activer l'API **Offres d'emploi v2** pour cette application.
 3. Copier l'identifiant et la clé secrète dans Vercel : `FRANCE_TRAVAIL_CLIENT_ID`, `FRANCE_TRAVAIL_CLIENT_SECRET`.
 
-## 2. Alertes e-mail via Gmail (15 min)
+## Alertes e-mail via Gmail (15 min, avancé)
 
 1. Sur LinkedIn, Indeed, Hellowork, APEC et Welcome to the Jungle : créer des **alertes emploi** (par exemple « alternance développeur Paris », « stage IA »), envoyées à ta boîte Gmail.
 2. Dans Gmail : créer le libellé `job-alerts` et un filtre qui l'applique aux e-mails de ces plateformes

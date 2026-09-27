@@ -6,8 +6,59 @@ export type ScanConfig = {
   queries: SearchQuery[];
   /** French département codes (France Travail accepts up to 5). */
   departments: string[];
+  /** Town used by the aggregator APIs (Adzuna, Jooble, JSearch). */
+  city: string;
   maxAgeDays: number;
 };
+
+/** What the user edits in Réglages > Recherche. */
+export type ScanPrefs = {
+  contracts: string[];
+  keywords: string[];
+  city: string;
+  departments: string[];
+  maxAgeDays: number;
+};
+
+export const DEFAULT_PREFS: ScanPrefs = {
+  contracts: ["alternance", "stage"],
+  keywords: ["développeur", "intelligence artificielle", "data"],
+  city: "Paris",
+  departments: ["75", "92", "93", "94", "91"],
+  maxAgeDays: 14,
+};
+
+const list = (value: unknown, max: number) =>
+  Array.isArray(value)
+    ? [...new Set(value.map((v) => String(v).trim()).filter(Boolean))].slice(0, max)
+    : [];
+
+/** Any stored value → valid preferences (missing fields fall back to defaults). */
+export function normalizePrefs(value: unknown): ScanPrefs {
+  const v = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const days = Number(v.maxAgeDays);
+  const departments = list(v.departments, 5)
+    .map((d) => d.replace(/\D/g, ""))
+    .filter(Boolean)
+    .map((d) => d.padStart(2, "0"))
+    .filter((d) => d.length <= 3 && d !== "00");
+  return {
+    contracts: list(v.contracts, 4).length ? list(v.contracts, 4) : DEFAULT_PREFS.contracts,
+    keywords: list(v.keywords, 8).length ? list(v.keywords, 8) : DEFAULT_PREFS.keywords,
+    city: typeof v.city === "string" && v.city.trim() ? v.city.trim().slice(0, 60) : DEFAULT_PREFS.city,
+    departments: departments.length ? departments : DEFAULT_PREFS.departments,
+    maxAgeDays: Number.isFinite(days) && days >= 1 && days <= 60 ? Math.round(days) : DEFAULT_PREFS.maxAgeDays,
+  };
+}
+
+/** contracts × keywords → search queries (capped to keep API quotas safe). */
+export function configFromPrefs(prefs: ScanPrefs, maxQueries = 8): ScanConfig {
+  const queries: SearchQuery[] = [];
+  for (const keyword of prefs.keywords)
+    for (const contract of prefs.contracts)
+      if (queries.length < maxQueries) queries.push({ keywords: `${contract} ${keyword}` });
+  return { queries, departments: prefs.departments.slice(0, 5), city: prefs.city, maxAgeDays: prefs.maxAgeDays };
+}
 
 /**
  * Default search: alternance / stage in tech + AI around Paris.
@@ -24,6 +75,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
     { keywords: "stage machine learning" },
   ],
   departments: ["75", "92", "93", "94", "91"],
+  city: "Paris",
   maxAgeDays: 14,
 };
 
@@ -38,6 +90,7 @@ export function loadScanConfig(env: Record<string, string | undefined> = process
         ? parsed.departments
         : DEFAULT_CONFIG.departments
       ).slice(0, 5),
+      city: parsed.city || DEFAULT_CONFIG.city,
       maxAgeDays: parsed.maxAgeDays || DEFAULT_CONFIG.maxAgeDays,
     };
   } catch {

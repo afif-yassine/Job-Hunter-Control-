@@ -53,7 +53,7 @@ test("France Travail: OAuth client credentials + search mapping", async () => {
     return new Response(JSON.stringify({ resultats: [{ id: "1", intitule: "Alternance Développeur Web", description: "…", entreprise: { nom: "Acme" }, lieuTravail: { libelle: "75 - PARIS 08" } }, { id: "no-title" }] }), { status: 206 });
   };
   const offers = await scanFranceTravail(
-    { queries: [{ keywords: "alternance développeur" }, { keywords: "alternance intelligence artificielle" }], departments: ["75", "92"], maxAgeDays: 14 },
+    { queries: [{ keywords: "alternance développeur" }, { keywords: "alternance intelligence artificielle" }], departments: ["75", "92"], city: "Paris", maxAgeDays: 14 },
     { FRANCE_TRAVAIL_CLIENT_ID: "i", FRANCE_TRAVAIL_CLIENT_SECRET: "s" },
     fakeFetch,
     new Date("2026-09-20T00:00:00Z"),
