@@ -93,6 +93,38 @@ test("JSearch: uses the publisher as source, falls back to the second host, expl
   assert.equal(count, 3);
 });
 
+test("JSearch: a refused call includes the API's own explanation, not just the HTTP code", async () => {
+  // Real body confirmed live on jsearch.p.rapidapi.com (v5, Sept 2026).
+  await assert.rejects(
+    scanJSearch(
+      { ...config, queries: [config.queries[0]] },
+      { JSEARCH_API_KEY: "k" },
+      async () =>
+        json(
+          {
+            status: "ERROR",
+            error: { mess: "Invalid date posted value. Date posted value should be 'anytime', 'today', '3days', 'week' or 'month'.", code: 400 },
+          },
+          404,
+        ),
+    ),
+    /HTTP 404 — Invalid date posted value/,
+  );
+
+  // Plain-text (non-JSON) error bodies are also surfaced, truncated.
+  await assert.rejects(
+    scanJSearch({ ...config, queries: [config.queries[0]] }, { JSEARCH_API_KEY: "k" }, async () => new Response("Not Found", { status: 404 })),
+    /HTTP 404 — Not Found/,
+  );
+
+  // "page" is no longer part of the v5 request (cursor-based pagination now).
+  const urls: string[] = [];
+  await scanJSearch({ ...config, queries: [config.queries[0]] }, { JSEARCH_API_KEY: "k" }, async (url) => (
+    urls.push(String(url)), json({ data: [] })
+  ));
+  assert.ok(!urls[0].includes("page="));
+});
+
 test("ad page reader: JobPosting JSON-LD first, bot walls and private URLs refused", () => {
   const description = "<p>Missions : " + "développer des API. ".repeat(30) + "</p>";
   const html = `<html><head><script type="application/ld+json">${JSON.stringify({

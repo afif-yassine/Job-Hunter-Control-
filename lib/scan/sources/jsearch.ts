@@ -62,6 +62,31 @@ const HOSTS = [
   },
 ];
 
+/**
+ * The API always explains a refusal in its body (e.g. "Invalid date posted
+ * value. Date posted value should be 'anytime' (default), 'today', '3days',
+ * 'week' or 'month'." — confirmed live, Sept 2026). Surfacing that text is
+ * what turns a bare "HTTP 404" into something actually debuggable, instead
+ * of having to reproduce the call from a screenshot every time.
+ */
+async function readErrorDetail(response: Response): Promise<string> {
+  try {
+    const body = (await response.clone().json()) as Record<string, unknown>;
+    const err = body.error as Record<string, unknown> | undefined;
+    const message = (err?.mess ?? err?.message ?? body.message ?? body.mess) as string | undefined;
+    if (typeof message === "string" && message.trim()) return message.trim();
+  } catch {
+    // Not JSON: fall through to the raw text below.
+  }
+  try {
+    const text = (await response.text()).trim();
+    if (text) return text.slice(0, 300);
+  } catch {
+    // Body already consumed or unreadable.
+  }
+  return "";
+}
+
 export async function scanJSearch(
   config: ScanConfig,
   env: Record<string, string | undefined> = process.env,
@@ -74,9 +99,10 @@ export async function scanJSearch(
   const datePosted = config.maxAgeDays <= 3 ? "3days" : config.maxAgeDays <= 7 ? "week" : "month";
   let host = 0;
   for (const query of queries) {
+    // v5 (current, confirmed live Sept 2026): no more "page" — pagination is
+    // cursor-based (num_pages still controls how many pages are fetched).
     const params = new URLSearchParams({
       query: `${query.keywords} in ${config.city}, France`,
-      page: "1",
       num_pages: "1",
       country: "fr",
       language: "fr",
@@ -89,13 +115,20 @@ export async function scanJSearch(
       });
       if (response.status !== 401 && response.status !== 403) break;
     }
-    if (!response || response.status === 401 || response.status === 403)
+    if (!response || response.status === 401 || response.status === 403) {
+      const detail = response ? await readErrorDetail(response) : "";
       throw new Error(
-        "Clé JSearch refusée : vérifie la clé et que tu es bien abonné au plan Basic gratuit.",
+        `Clé JSearch refusée : vérifie la clé et que tu es bien abonné au plan Basic gratuit.${detail ? ` (${detail})` : ""}`,
       );
-    if (response.status === 429)
-      throw new Error("Quota JSearch atteint pour ce mois (plan gratuit).");
-    if (!response.ok) throw new Error(`JSearch « ${query.keywords} » : HTTP ${response.status}`);
+    }
+    if (response.status === 429) {
+      const detail = await readErrorDetail(response);
+      throw new Error(`Quota JSearch atteint pour ce mois (plan gratuit).${detail ? ` (${detail})` : ""}`);
+    }
+    if (!response.ok) {
+      const detail = await readErrorDetail(response);
+      throw new Error(`JSearch « ${query.keywords} » : HTTP ${response.status}${detail ? ` — ${detail}` : ""}`);
+    }
     const body = (await response.json()) as { data?: JSearchJob[] };
     for (const raw of body.data ?? []) {
       const mapped = mapJSearchOffer(raw);
