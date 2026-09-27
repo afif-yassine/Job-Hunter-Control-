@@ -125,36 +125,37 @@ La page **Admin** (visible des seuls administrateurs ; le premier compte l'est a
 `app_admins`) montre l'IA utilisée, chaque point de recherche numéroté avec son état, son budget, sa qualité sur
 30 jours, l'automatisation, et la liste de ce qu'il faut faire à la main.
 
-## 7b. France Travail — 3 API d'enrichissement (gratuites, mêmes identifiants)
+## 7b. France Travail — 3 API secondaires (gratuites, mêmes identifiants)
 
 `FRANCE_TRAVAIL_CLIENT_ID` / `_SECRET` donnent aussi accès, gratuitement, à 3 autres API du même compte
-francetravail.io. Elles ne trouvent **pas** d'offres : elles enrichissent celles déjà trouvées via France Travail
-(seules ces offres portent un code ROME, `jobs.rome_code`).
+francetravail.io. Elles ne trouvent **pas** d'offres : au mieux elles enrichissent celles déjà trouvées via France
+Travail (seules ces offres portent un code ROME, `jobs.rome_code`).
 
-- **Open Formation** : suggère jusqu'à 3 formations courtes (souvent CPF) quand l'analyse détecte une compétence
-  manquante dans le profil vérifié. Affiché sous l'offre, dans « Formation suggérée ».
 - **Marché du travail** : tension, volume d'embauches et fourchette de salaire sur ce métier/territoire. Affiché
-  comme une note courte sous l'offre.
+  comme une note courte sous l'offre, une fois son scope/URL confirmés (voir plus bas).
 - **Accès à l'emploi des demandeurs d'emploi** : taux de retour à l'emploi à 6 mois par métier — indicateur admin
   uniquement pour l'instant (pas encore affiché par offre).
+- **Open Formation** : souscrite mais **non utilisée** — vérifié sur la doc live (sept. 2026), ses 3 endpoints ne
+  permettent que de consulter les RDV/plages de candidature d'une formation déjà identifiée par un organisme de
+  formation (`numeroSession`/`numeroAction`/`numeroFormation`), pas de chercher « quelle formation comble ce
+  manque de compétence ». Gardée pour plus tard si France Travail (ou un autre fournisseur, ex. Mon Compte
+  Formation) expose un jour une vraie recherche par métier — voir `lib/france-travail/formation.ts`.
 
-Pour chacune : sur `francetravail.io/compte/applications/<id>`, clique « Ajouter » sur l'API, puis « Enregistrer ».
-Une fois souscrite, la page de l'application affiche son **scope** technique (ce n'est pas un secret, juste
-l'identifiant du périmètre d'accès — sûr à coller dans Vercel) et l'URL de base de son endpoint de recherche/stats.
-Mets les deux dans Vercel :
+Pour Marché du travail et Accès à l'emploi : sur `francetravail.io/compte/applications/<id>`, clique « Ajouter »
+sur l'API, puis « Enregistrer ». Une fois souscrite, la page de l'application affiche son **scope** technique (ce
+n'est pas un secret, juste l'identifiant du périmètre d'accès — sûr à coller dans Vercel) et l'URL de base de son
+endpoint de recherche/stats. Mets les deux dans Vercel :
 
 ```
 FRANCE_TRAVAIL_MARCHE_SCOPE=...
 FRANCE_TRAVAIL_MARCHE_URL=...
-FRANCE_TRAVAIL_FORMATION_SCOPE=...
-FRANCE_TRAVAIL_FORMATION_URL=...
 FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE=...
 FRANCE_TRAVAIL_ACCES_EMPLOI_URL=...
 ```
 
 Tant qu'une paire scope/URL manque, la page Admin l'affiche « À terminer » dans la section « Enrichissement
 (France Travail) » et rien n'est appelé : aucun risque de casser le scan principal. Chaque appel est enregistré
-comme les autres sources (`source_runs`, alertes admin en cas d'erreur). Le format exact des réponses de ces 3 API
+comme les autres sources (`source_runs`, alertes admin en cas d'erreur). Le format exact des réponses de ces 2 API
 n'a pas encore été vérifié en conditions réelles (implémentation défensive, plusieurs noms de champ essayés,
 réponse brute conservée) : si un champ affiché semble faux, dis-le, ça se corrige en quelques minutes une fois
 qu'on voit une vraie réponse.

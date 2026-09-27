@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { AI_NOT_CONFIGURED, aiConfigured, defaultAi, type AiCall } from "@/lib/ai";
-import { formationApiReady, fetchTrainingSuggestions } from "@/lib/france-travail/formation";
 import { fetchMarketInsight, marketApiReady } from "@/lib/france-travail/market";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
 import { fetchJobText } from "@/lib/scan/enrich";
@@ -66,14 +65,19 @@ function departmentOf(location: string | null | undefined): string | null {
 }
 
 /**
- * Best-effort context from France Travail's secondary APIs (Marché du
- * travail, Open Formation): only for offers that came from France Travail
- * itself (only they carry a ROME code), never blocks or fails the analysis.
+ * Best-effort context from France Travail's "Marché du travail" API: only
+ * for offers that came from France Travail itself (only they carry a ROME
+ * code), never blocks or fails the analysis.
+ *
+ * Open Formation was dropped from here (confirmed Sept 2026): its 3
+ * endpoints only look up RDV/candidature windows for an already-known
+ * formation (by numeroSession/numeroAction/numeroFormation) — it has no
+ * search-by-métier endpoint, so it can't power a "suggest a training"
+ * feature. See lib/france-travail/formation.ts for the full note.
  */
 async function enrichWithFranceTravail(
   ctx: Ctx,
   job: { rome_code?: string | null; location?: string | null },
-  hasGap: boolean,
 ): Promise<void> {
   const env = ctx.env ?? process.env;
   const romeCode = job.rome_code?.trim();
@@ -98,16 +102,6 @@ async function enrichWithFranceTravail(
       }
     } catch (e) {
       await recordSourceRun(ctx.supabase, "ft:marche", "error", 0, e instanceof Error ? e.message : "Erreur inconnue");
-    }
-  }
-
-  if (hasGap && formationApiReady(env)) {
-    try {
-      const trainings = await fetchTrainingSuggestions({ romeCode, department }, env);
-      await recordSourceRun(ctx.supabase, "ft:formation", "ok", trainings.length);
-      if (trainings.length) patch.training_suggestions = trainings;
-    } catch (e) {
-      await recordSourceRun(ctx.supabase, "ft:formation", "error", 0, e instanceof Error ? e.message : "Erreur inconnue");
     }
   }
 
@@ -197,7 +191,7 @@ export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
       action: "ANALYZED",
       details: { score: analysis.total, model: result.model, suspected },
     });
-    if (!suspected) await enrichWithFranceTravail(ctx, job, analysis.gaps.length > 0).catch(() => {});
+    if (!suspected) await enrichWithFranceTravail(ctx, job).catch(() => {});
     return { status: 200, body: { ...analysis, suspected, reasons: suspected ? suspicion.reasons : [] } };
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Erreur inconnue Gemini";

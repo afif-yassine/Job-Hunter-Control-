@@ -106,11 +106,11 @@ export const ENRICHMENT_SOURCES: EnrichmentSource[] = [
   {
     id: "ft:formation",
     name: "Open Formation",
-    covers: "Catalogue des formations France Travail (souvent gratuites, éligibles CPF).",
+    covers: "RDV et plages de candidature pour une formation déjà identifiée (usage organisme de formation).",
     scopeVar: "FRANCE_TRAVAIL_FORMATION_SCOPE",
     urlVar: "FRANCE_TRAVAIL_FORMATION_URL",
     cost: "Gratuit",
-    usedFor: "Suggère une formation courte quand l’analyse détecte une compétence manquante.",
+    usedFor: "Pas de recherche par métier possible avec cette API : non utilisée dans Job Hunter Control pour l’instant (voir lib/france-travail/formation.ts).",
   },
   {
     id: "ft:marche",
