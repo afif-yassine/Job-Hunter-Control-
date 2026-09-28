@@ -4,10 +4,16 @@
  * registering, by métier/territory. Admin-facing insight only for the MVP
  * (not shown per offer): how "live" a given métier really is.
  *
- * Sibling API of "Marché du travail" (same "stats-*" platform, same request
- * shape confirmed there: POST with a JSON body, not GET/querystring) — the
- * body shape below follows that confirmed pattern but hasn't been verified
- * against this specific endpoint's own live response yet.
+ * Confirmed live (Sept 2026) straight from the "Stats d'accès à l'emploi...
+ * (ACC_1)" endpoint page: POST body {codeTypeTerritoire, codeTerritoire,
+ * codeTypeActivite, codeActivite, codeTypePeriode, codeTypeNomenclature:
+ * "DUREEEMP"}, scopes "api_stats-perspectives-retour-emploiv1" +
+ * "retouremploi". One detail is NOT taken as-is: the page's own example uses
+ * codeTypeTerritoire "REG" with codeTerritoire "75" — but its sibling
+ * endpoint (Marché du travail's DE_1, same "stats-*" family, same
+ * territoire-type enum) confirmed "DEP" works, and "DEP" is the only level
+ * our own data has (jobs only carry a department, never a region), so "DEP"
+ * is what's sent here too.
  * Free · https://francetravail.io/produits-partages/catalogue/acces-emploi-demandeurs-emploi
  */
 import { franceTravailApiReady, getFranceTravailToken, pickArray, pickNumber } from "./client";
@@ -35,6 +41,8 @@ export async function fetchAccessRate(
     codeTerritoire: params.department,
     codeTypeActivite: "ROME",
     codeActivite: params.romeCode,
+    codeTypePeriode: "TRIMESTRE",
+    codeTypeNomenclature: "DUREEEMP",
   };
   const response = await fetchImpl(env[URL_VAR]!, {
     method: "POST",

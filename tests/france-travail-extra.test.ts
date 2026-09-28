@@ -18,8 +18,8 @@ const READY_ENV = {
   FRANCE_TRAVAIL_MARCHE_URL: "https://api.francetravail.io/partenaire/stats-offres-demandes-emploi/v1/indicateur/stat-demandeurs",
   FRANCE_TRAVAIL_FORMATION_SCOPE: "api_openformationv1 openFormation",
   FRANCE_TRAVAIL_FORMATION_URL: "https://api.francetravail.io/partenaire/openformation/v1/offres",
-  FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE: "api_stats-perspectives-retour-emploiv1 accesemploi",
-  FRANCE_TRAVAIL_ACCES_EMPLOI_URL: "https://api.francetravail.io/partenaire/stats-perspectives-retour-emploi/v1/indicateur/taux-acces",
+  FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE: "api_stats-perspectives-retour-emploiv1 retouremploi",
+  FRANCE_TRAVAIL_ACCES_EMPLOI_URL: "https://api.francetravail.io/partenaire/stats-perspectives-retour-emploi/v1/indicateur/stat-acces-emploi",
 };
 
 function fetchSequence(...responses: Response[]) {
@@ -103,4 +103,24 @@ test("fetchAccessRate: not configured or no department → null; reads the rate 
   );
   const result = await fetchAccessRate({ romeCode: "M1805", department: "75" }, READY_ENV);
   assert.equal(result?.rate6Months, 62.4);
+});
+
+test("fetchAccessRate: POSTs the confirmed ACC_1 body shape (own endpoint docs, Sept 2026)", async () => {
+  let body: unknown;
+  let call = 0;
+  globalThis.fetch = (async (_url, init) => {
+    call++;
+    if (call === 1) return new Response(JSON.stringify({ access_token: "tok" }));
+    body = init?.body;
+    return new Response(JSON.stringify({ resultats: [{ tauxAcces6Mois: 62.4 }] }));
+  }) as typeof fetch;
+  await fetchAccessRate({ romeCode: "A1203", department: "75" }, READY_ENV);
+  assert.deepEqual(JSON.parse(body as string), {
+    codeTypeTerritoire: "DEP",
+    codeTerritoire: "75",
+    codeTypeActivite: "ROME",
+    codeActivite: "A1203",
+    codeTypePeriode: "TRIMESTRE",
+    codeTypeNomenclature: "DUREEEMP",
+  });
 });

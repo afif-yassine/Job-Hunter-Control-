@@ -137,8 +137,13 @@ Travail (seules ces offres portent un code ROME, `jobs.rome_code`).
   trimestre (endpoint « Stats des demandeurs d'emploi inscrits en fin de trimestre — DE_1 »). Affiché comme une
   note courte sous l'offre.
 - **Accès à l'emploi des demandeurs d'emploi** : taux de retour à l'emploi à 6 mois par métier — indicateur admin
-  uniquement pour l'instant (pas encore affiché par offre). Sa forme d'appel (POST + JSON) est déduite de celle,
-  confirmée, de Marché du travail (même famille d'API « stats-* ») : à vérifier dès la première vraie réponse.
+  uniquement pour l'instant (pas encore affiché par offre). Confirmé live (sept. 2026) sur l'endpoint « Stats
+  d'accès à l'emploi... catégories A et B (ACC_1) » : `POST .../stats-perspectives-retour-emploi/v1/indicateur/
+  stat-acces-emploi`, scopes `api_stats-perspectives-retour-emploiv1` + `retouremploi`, corps `{codeTypeTerritoire,
+  codeTerritoire, codeTypeActivite, codeActivite, codeTypePeriode, codeTypeNomenclature: "DUREEEMP"}`. Seul détail
+  non repris tel quel : l'exemple de la doc utilise `codeTypeTerritoire: "REG"` — on envoie `"DEP"` à la place, comme
+  pour Marché du travail (même famille, même énumération de territoire), car nos offres ne portent qu'un
+  département. Le format exact de la **réponse**, lui, n'a pas encore été vu en conditions réelles.
 - **Open Formation** : souscrite mais **non utilisée** — vérifié sur la doc live (sept. 2026), ses 3 endpoints ne
   permettent que de consulter les RDV/plages de candidature d'une formation déjà identifiée par un organisme de
   formation (`numeroSession`/`numeroAction`/`numeroFormation`), pas de chercher « quelle formation comble ce
@@ -154,8 +159,8 @@ pas une recherche `GET` simple) :
 ```
 FRANCE_TRAVAIL_MARCHE_SCOPE=api_stats-offres-demandes-emploiv1 offresetdemandesemploi
 FRANCE_TRAVAIL_MARCHE_URL=https://api.francetravail.io/partenaire/stats-offres-demandes-emploi/v1/indicateur/stat-demandeurs
-FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE=...
-FRANCE_TRAVAIL_ACCES_EMPLOI_URL=https://api.francetravail.io/partenaire/stats-perspectives-retour-emploi/v1/...
+FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE=api_stats-perspectives-retour-emploiv1 retouremploi
+FRANCE_TRAVAIL_ACCES_EMPLOI_URL=https://api.francetravail.io/partenaire/stats-perspectives-retour-emploi/v1/indicateur/stat-acces-emploi
 ```
 
 Tant qu'une paire scope/URL manque, la page Admin l'affiche « À terminer » dans la section « Enrichissement
