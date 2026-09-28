@@ -41,7 +41,9 @@ export function parseAtsTarget(raw: string): AtsTarget | null {
   const host = url.hostname.toLowerCase().replace(/^www\./, "");
   const first = url.pathname.split("/").filter(Boolean)[0] ?? "";
   const pick = (ats: AtsId, slug: string) => (SLUG.test(slug) ? { ats, slug: slug.toLowerCase() } : null);
-  if (/^(job-boards|boards)(\.eu)?\.greenhouse\.io$/.test(host)) return pick("greenhouse", first);
+  if (/^(job-boards|boards)(\.eu)?\.greenhouse\.io$/.test(host))
+    // Embedded application form: boards.greenhouse.io/embed/job_app?for=<company>&token=…
+    return pick("greenhouse", first === "embed" ? (url.searchParams.get("for") ?? "") : first);
   if (/^jobs(\.eu)?\.lever\.co$/.test(host)) return pick("lever", first);
   if (host === "jobs.ashbyhq.com") return pick("ashby", first);
   if (/^(careers|jobs)\.smartrecruiters\.com$/.test(host)) return pick("smartrecruiters", first);
@@ -54,6 +56,25 @@ export function parseAtsTarget(raw: string): AtsTarget | null {
 }
 
 export const targetKey = (t: AtsTarget) => `${t.ats}:${t.slug}`;
+
+/** The company's public careers page on its platform (what a person would open). */
+export function boardUrl(t: AtsTarget): string {
+  const s = encodeURIComponent(t.slug);
+  switch (t.ats) {
+    case "greenhouse":
+      return `https://job-boards.greenhouse.io/${s}`;
+    case "lever":
+      return `https://jobs.lever.co/${s}`;
+    case "ashby":
+      return `https://jobs.ashbyhq.com/${s}`;
+    case "smartrecruiters":
+      return `https://jobs.smartrecruiters.com/${s}`;
+    case "workable":
+      return `https://apply.workable.com/${s}`;
+    case "recruitee":
+      return `https://${s}.recruitee.com`;
+  }
+}
 
 const pretty = (slug: string) =>
   slug

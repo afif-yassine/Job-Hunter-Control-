@@ -1,7 +1,18 @@
 import { z } from "zod";
 import { authenticatedClient } from "@/lib/api";
 import { normalizePrefs } from "@/lib/scan/config";
+import { loadDiscovered } from "@/lib/scan/discover";
 import { loadUserSettings, saveUserSettings } from "@/lib/settings";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+/** Settings + the companies found automatically (empty before the migration). */
+async function settingsWithDiscovered(supabase: SupabaseClient, userId: string) {
+  const [settings, discovered] = await Promise.all([
+    loadUserSettings(supabase, userId),
+    loadDiscovered(supabase, userId),
+  ]);
+  return { ...settings, discovered: discovered?.items ?? [] };
+}
 
 const body = z.object({
   prefs: z.unknown().optional(),
@@ -11,7 +22,7 @@ const body = z.object({
 export async function GET() {
   const auth = await authenticatedClient();
   if ("error" in auth) return auth.error;
-  return Response.json(await loadUserSettings(auth.supabase, auth.userId));
+  return Response.json(await settingsWithDiscovered(auth.supabase, auth.userId));
 }
 
 export async function PUT(req: Request) {
@@ -32,5 +43,5 @@ export async function PUT(req: Request) {
       },
       { status: 400 },
     );
-  return Response.json(await loadUserSettings(auth.supabase, auth.userId));
+  return Response.json(await settingsWithDiscovered(auth.supabase, auth.userId));
 }

@@ -16,6 +16,8 @@ type JSearchJob = {
   job_employment_types?: string[];
   job_posted_at_datetime_utc?: string;
   job_publisher?: string;
+  /** Same offer on other sites — often the company's own careers board. */
+  apply_options?: { apply_link?: string; publisher?: string }[];
 };
 
 const CONTRACT: Record<string, string> = {
@@ -44,6 +46,7 @@ export function mapJSearchOffer(j: JSearchJob): ScannedOffer | null {
     url,
     applyUrl: j.job_apply_link || null,
     publishedAt: j.job_posted_at_datetime_utc || null,
+    links: (j.apply_options ?? []).map((o) => o.apply_link).filter((l): l is string => Boolean(l)),
   };
 }
 

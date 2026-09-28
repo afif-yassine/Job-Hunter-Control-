@@ -4,7 +4,8 @@ import { loadUserSettings, saveUserSettings } from "@/lib/settings";
 import { configFromPrefs, isRelevant } from "./config";
 import { ingestOffers } from "./ingest";
 import { scanAdzuna } from "./sources/adzuna";
-import { scanAts } from "./sources/ats";
+import { discoveredTargets, loadDiscovered, mergeDiscovered, saveDiscovered } from "./discover";
+import { scanAts, targetKey } from "./sources/ats";
 import { scanFranceTravail } from "./sources/francetravail";
 import { scanGmailAlerts } from "./sources/gmail";
 import { scanJooble } from "./sources/jooble";
@@ -78,6 +79,12 @@ export async function runScan(ctx: {
   const platformKey = (keys: string[]) => keys.every((k) => process.env[k] && env[k] === process.env[k]);
   const settings = await loadUserSettings(ctx.supabase, ctx.userId);
   const config = configFromPrefs(settings.prefs);
+  // Companies the app found by itself on a recruitment platform (see discover.ts)
+  // are read like the ones typed in Réglages. null = column not migrated yet.
+  const discovered = await loadDiscovered(ctx.supabase, ctx.userId);
+  const manualKeys = new Set(config.targets.map(targetKey));
+  if (discovered)
+    for (const t of discoveredTargets(discovered)) if (!manualKeys.has(targetKey(t))) config.targets.push(t);
   const reports: SourceReport[] = [];
   const collected: ScannedOffer[] = [];
   const cacheDb = ctx.cacheDb !== undefined ? ctx.cacheDb : serviceClient();
@@ -227,6 +234,14 @@ export async function runScan(ctx: {
 
   await Promise.all([...sources.map(runSource), runCareers()]);
 
+  // Learn new companies from the links of what was just found.
+  let discoveredCount = 0;
+  if (discovered) {
+    const { next, added } = mergeDiscovered(discovered, collected, manualKeys);
+    discoveredCount = added.length;
+    if (JSON.stringify(next) !== JSON.stringify(discovered)) await saveDiscovered(ctx.supabase, ctx.userId, next);
+  }
+
   // Company careers pages alone do not need any key.
   const configured = sources.some((s) => s.enabled) || config.targets.length > 0;
   const relevant = collected.filter(isRelevant);
@@ -250,6 +265,7 @@ export async function runScan(ctx: {
     suspected: ingest.suspected,
     needsDescription: ingest.needsDescription,
     configured,
+    discovered: discoveredCount,
   };
 
   if (configured) {
@@ -296,11 +312,14 @@ export function scanMessage(s: ScanSummary): string {
   if (!s.configured) return SETUP_HINT;
   const errors = s.reports.filter((r) => r.status === "error");
   const head = `Scan terminé : ${s.found} offre(s) trouvée(s), ${s.relevant} pertinente(s), ${s.inserted} nouvelle(s), ${s.duplicates} doublon(s) regroupé(s)${s.alreadyApplied ? ` dont ${s.alreadyApplied} déjà postulée(s) ailleurs` : ""}.${s.toReview + s.suspected ? ` ${s.toReview + s.suspected} offre(s) à vérifier.` : ""}`;
+  const learned = s.discovered
+    ? ` ${s.discovered} entreprise(s) repérée(s) sur une plateforme de recrutement : leurs offres seront lues directement à la prochaine recherche.`
+    : "";
   const extra = s.needsDescription
     ? ` ${s.needsDescription} offre(s) sans description : colle-la pour activer l’analyse.`
     : "";
   const problems = errors.length
     ? ` Erreur : ${errors.map((e) => `${e.source} — ${e.message}`).join(" ; ")}`
     : "";
-  return head + extra + problems;
+  return head + learned + extra + problems;
 }

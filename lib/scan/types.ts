@@ -14,6 +14,8 @@ export type ScannedOffer = {
   publishedAt: string | null;
   /** ROME code (France Travail taxonomy), when the source provides one. */
   romeCode?: string | null;
+  /** Other application links (JSearch lists the same offer on several sites). */
+  links?: string[];
 };
 
 export type SourceReport = {
@@ -38,4 +40,6 @@ export type ScanSummary = {
   suspected: number;
   needsDescription: number;
   configured: boolean;
+  /** Companies found on a recruitment platform during this scan, now followed. */
+  discovered?: number;
 };

@@ -74,6 +74,23 @@ Dans Réglages > Recherche, « Entreprises à surveiller » : colle le lien de l
 les offres de leurs clients en JSON public, prévu pour être lu (`lib/scan/sources/ats.ts`). Les offres hors de
 France (sauf télétravail) et celles de plus de 30 jours sont ignorées.
 
+### Entreprises trouvées automatiquement
+
+Personne n'a besoin de savoir quelle plateforme utilise une entreprise : chaque plateforme héberge les pages
+carrière de ses clients à une adresse reconnaissable, avec l'identifiant de l'entreprise dedans
+(`jobs.lever.co/<entreprise>`, `boards.greenhouse.io/<entreprise>` ou `job-boards.greenhouse.io/<entreprise>`,
+`boards.greenhouse.io/embed/job_app?for=<entreprise>`, `jobs.ashbyhq.com/<entreprise>`,
+`jobs.smartrecruiters.com/<entreprise>`, `apply.workable.com/<entreprise>`, `<entreprise>.recruitee.com`). À chaque
+recherche, l'appli regarde les liens des offres trouvées par JSearch (y compris ses autres liens de candidature),
+France Travail, Adzuna… Si l'un d'eux a cette forme, l'entreprise est ajoutée à la liste « Entreprises trouvées
+automatiquement » (Réglages → Ce que tu cherches), et ses offres sont lues directement dès la recherche suivante.
+
+La liste garde au plus 40 entreprises lues par recherche (les plus récemment vues), oublie celles qui n'apparaissent
+plus depuis 90 jours, et « Ne plus suivre » retire une entreprise pour de bon. Stockage :
+`user_settings.discovered_targets` (migration `20260930090000_discovered_targets.sql`) ; avant la migration, la
+découverte est simplement ignorée. Limite : une entreprise qui affiche la plateforme sous son propre domaine
+(`carrieres.entreprise.fr?gh_jid=…`) ne donne pas son identifiant dans le lien, elle n'est donc pas reconnue.
+
 ## 5. Recherche automatique sur le serveur (toutes les heures ou demi-heures)
 
 `/api/cron/tick` fait, pour **chaque compte**, sans navigateur ouvert : recherche (au plus toutes les 12 h par

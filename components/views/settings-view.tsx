@@ -5,8 +5,8 @@ import { Callout, Chip, PageHead } from "@/components/ui";
 import { PROVIDERS, type ProviderDef } from "@/lib/providers";
 import type { ProviderStatus } from "@/lib/integrations";
 import { DEFAULT_PREFS, MAX_TARGETS, type ScanPrefs } from "@/lib/scan/config";
-import { parseAtsTarget } from "@/lib/scan/sources/ats";
-import { remainingSuggestions, suggestionLine, type SuggestedTarget } from "@/lib/scan/suggested-targets";
+import type { DiscoveredTarget } from "@/lib/scan/discover";
+import { ATS_LABEL, boardUrl, parseAtsTarget } from "@/lib/scan/sources/ats";
 import { timeAgo } from "@/lib/labels";
 import type { SystemStatus } from "@/components/use-status";
 import type { Ctx } from "./types";
@@ -222,6 +222,37 @@ function ProviderCard({
 
 /* ------------------------------------------------------------------- Search */
 
+/** "jsearch:linkedin" → "LinkedIn (JSearch)", "francetravail" → "France Travail"… */
+function sourceLabel(via: string): string {
+  const [kind, detail] = via.split(":");
+  const known: Record<string, string> = {
+    linkedin: "LinkedIn",
+    indeed: "Indeed",
+    welcometothejungle: "Welcome to the Jungle",
+    hellowork: "HelloWork",
+    glassdoor: "Glassdoor",
+    apec: "APEC",
+    adzuna: "Adzuna",
+    jooble: "Jooble",
+  };
+  const nice = (w: string) => known[w] ?? (w ? w[0].toUpperCase() + w.slice(1) : w);
+  if (kind === "jsearch") return detail ? `${nice(detail)} (JSearch)` : "JSearch";
+  if (kind === "francetravail") return "France Travail";
+  if (kind === "gmail") return "une alerte e-mail";
+  return nice(kind || "une offre");
+}
+
+/** "https://jobs.lever.co/acme/1234-…/apply" → "jobs.lever.co/acme/…" */
+function shortLink(link: string): string {
+  try {
+    const u = new URL(link);
+    const parts = u.pathname.split("/").filter(Boolean);
+    return `${u.hostname.replace(/^www\./, "")}/${parts[0] ?? ""}${parts.length > 1 || u.search ? "/…" : ""}`;
+  } catch {
+    return link.slice(0, 40);
+  }
+}
+
 const CONTRACTS = [
   ["alternance", "Alternance"],
   ["stage", "Stage"],
@@ -241,6 +272,7 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
   const [keywords, setKeywords] = useState(DEFAULT_PREFS.keywords.join(", "));
   const [departments, setDepartments] = useState(DEFAULT_PREFS.departments.join(", "));
   const [targets, setTargets] = useState("");
+  const [discovered, setDiscovered] = useState<DiscoveredTarget[]>([]);
   const [auto, setAuto] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -255,6 +287,7 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
         setKeywords(body.prefs.keywords.join(", "));
         setDepartments(body.prefs.departments.join(", "));
         setTargets((body.prefs.targets ?? []).join("\n"));
+        setDiscovered(body.discovered ?? []);
         setAuto(body.autoScan !== false);
         setLoaded(true);
       })
@@ -297,10 +330,18 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
 
   const lines = targets.split(/\n+/).map((t) => t.trim()).filter(Boolean);
   const unknown = lines.filter((line) => !parseAtsTarget(line));
-  const suggestions = remainingSuggestions(lines);
-  const full = lines.length >= MAX_TARGETS;
-  const addTargets = (list: SuggestedTarget[]) =>
-    setTargets([...lines, ...list.map(suggestionLine)].slice(0, MAX_TARGETS).join("\n"));
+
+  async function unfollow(item: DiscoveredTarget) {
+    const response = await fetch("/api/settings/discovered", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key: item.key }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) return notify(body.error || "Impossible de retirer cette entreprise.", "bad");
+    setDiscovered(body.discovered ?? []);
+    notify(`${item.company} ne sera plus suivie.`, "good");
+  }
 
   const toggle = (value: string) =>
     setPrefs({
@@ -377,34 +418,52 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
             </small>
           )}
         </label>
-        {suggestions.length > 0 && (
-          <div className="wide target-suggestions">
+        <div className="wide discovered">
+          <div className="discovered-head">
+            <strong>Entreprises trouvées automatiquement ({discovered.length})</strong>
             <small className="muted">
-              Suggestions : entreprises qui recrutent en France, page carrière vérifiée. ★ = stages ou alternances déjà
-              repérés. Un clic ajoute l’entreprise à la liste, puis « Enregistrer ».
+              Quand une offre trouvée par JSearch, France Travail, Adzuna… a un lien de candidature hébergé par une plateforme
+              de recrutement, l’appli reconnaît l’entreprise à l’adresse du lien — par exemple{" "}
+              <code>jobs.lever.co/<b>entreprise</b></code> = Lever, <code>boards.greenhouse.io/<b>entreprise</b></code> =
+              Greenhouse, <code>jobs.ashbyhq.com/<b>entreprise</b></code> = Ashby — puis lit toutes ses offres directement à
+              chaque recherche.
             </small>
-            <div className="chips">
-              {suggestions.map((s) => (
-                <button
-                  key={`${s.ats}:${s.slug}`}
-                  type="button"
-                  className="pill"
-                  disabled={full}
-                  onClick={() => addTargets([s])}
-                >
-                  {s.juniors ? "★ " : ""}
-                  {s.name}
-                </button>
-              ))}
-              {suggestions.length > 1 && (
-                <button type="button" className="pill active" disabled={full} onClick={() => addTargets(suggestions)}>
-                  Tout ajouter
-                </button>
-              )}
-            </div>
-            {full && <small className="warn-text">Liste pleine ({MAX_TARGETS} entreprises maximum).</small>}
           </div>
-        )}
+          {discovered.length === 0 ? (
+            <small className="muted">
+              Aucune pour l’instant : la liste se remplit toute seule au fil des recherches.
+            </small>
+          ) : (
+            <ul className="discovered-list">
+              {discovered.map((item) => {
+                const target = parseAtsTarget(item.key);
+                if (!target) return null;
+                return (
+                  <li key={item.key}>
+                    <div>
+                      <a href={boardUrl(target)} target="_blank" rel="noreferrer">
+                        {item.company} <ExternalLink size={12} aria-hidden />
+                      </a>
+                      <Chip tone="neutral">{ATS_LABEL[target.ats]}</Chip>
+                      <small className="muted">
+                        repérée via {sourceLabel(item.via)} · {timeAgo(item.firstSeen)}
+                        {item.link && (
+                          <>
+                            {" · lien : "}
+                            <span className="discovered-link">{shortLink(item.link)}</span>
+                          </>
+                        )}
+                      </small>
+                    </div>
+                    <button type="button" className="btn secondary small" onClick={() => void unfollow(item)}>
+                      Ne plus suivre
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
         <label className="check switch wide">
           <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
           {status?.scheduledScan
