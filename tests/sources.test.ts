@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cleanRaw, explainError } from "../lib/errors";
-import { decryptValues, encryptValues, saveIntegration } from "../lib/integrations";
+import { cleanKey, decryptValues, encryptValues, saveIntegration } from "../lib/integrations";
 import { runSummary } from "../lib/run-summary";
 import { configFromPrefs, DEFAULT_PREFS, normalizePrefs, type ScanConfig } from "../lib/scan/config";
 import { extractJobText, isPublicHttpsUrl } from "../lib/scan/enrich";
@@ -186,6 +186,15 @@ test("saved API keys are encrypted and never stored in clear", async () => {
   assert.ok(!JSON.stringify(tables.integrations).includes("sk-super-secret"));
   const missing = await saveIntegration(db, "u1", "adzuna", { ADZUNA_APP_ID: "x" });
   assert.equal(missing.ok, false);
+});
+
+test("a key copied from the provider's e-mail loses its quotes and final period", () => {
+  const key = "4a1b2c3d-258d-4e5f-9a6b-0c1d2cae870";
+  assert.equal(cleanKey(`"${key}".`), key); // Jooble's e-mail format
+  assert.equal(cleanKey(`  « ${key} »  `), key);
+  assert.equal(cleanKey(`“${key}”`), key);
+  assert.equal(cleanKey(key), key); // ordinary key untouched
+  assert.equal(cleanKey("GOCSPX-abc.def"), "GOCSPX-abc.def"); // a dot inside is kept
 });
 
 test("search preferences: sane defaults, capped queries", () => {

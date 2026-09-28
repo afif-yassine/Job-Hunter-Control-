@@ -107,6 +107,17 @@ export async function integrationStatus(
   });
 }
 
+/**
+ * Keys are often copied straight from the provider's e-mail, where they sit
+ * between quotes followed by a period (Jooble: `Votre clé API unique : "…".`).
+ * Only a value wrapped in quotes is touched: an ordinary key stays as typed.
+ */
+export function cleanKey(raw: string): string {
+  const value = raw.trim();
+  const quoted = value.match(/^["'“”«»‘’`]\s*([\s\S]*?)\s*["'“”«»‘’`][.,;:!]?$/);
+  return quoted ? quoted[1] : value;
+}
+
 export async function saveIntegration(
   supabase: SupabaseClient,
   userId: string,
@@ -117,7 +128,7 @@ export async function saveIntegration(
   if (!provider) return { ok: false, error: "Source inconnue." };
   const values: Record<string, string> = {};
   for (const field of provider.fields) {
-    const value = typeof input[field.key] === "string" ? (input[field.key] as string).trim() : "";
+    const value = typeof input[field.key] === "string" ? cleanKey(input[field.key] as string) : "";
     if (!value) return { ok: false, error: `Champ manquant : ${field.label}.` };
     if (value.length > 600) return { ok: false, error: `${field.label} est trop long.` };
     values[field.key] = value;
