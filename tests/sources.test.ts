@@ -130,6 +130,10 @@ test("JSearch: a refused call includes the API's own explanation, not just the H
   assert.equal(sent.get("query"), config.queries[0].keywords);
   assert.equal(sent.get("location"), config.city);
   assert.ok(!sent.get("query")!.includes("Paris"));
+
+  // "/search" was renamed to "/search-v2" — confirmed from RapidAPI's own
+  // captured request line (Sept 2026); the old path now 404s.
+  assert.ok(urls[0].startsWith("https://jsearch.p.rapidapi.com/search-v2?"));
 });
 
 test("ad page reader: JobPosting JSON-LD first, bot walls and private URLs refused", () => {

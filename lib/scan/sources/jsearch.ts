@@ -50,14 +50,22 @@ export function mapJSearchOffer(j: JSearchJob): ScannedOffer | null {
 /**
  * The key can come from RapidAPI (x-rapidapi-key) or from OpenWeb Ninja
  * (x-api-key): the first host that accepts it is used.
+ *
+ * "/search" was renamed to "/search-v2" (confirmed Sept 2026 straight from
+ * RapidAPI's own console: the sidebar still labels the endpoint "Job
+ * Search", but the raw captured request line is
+ * "GET https://jsearch.p.rapidapi.com/search-v2?...") — calling the old
+ * "/search" path now gets a clean "Endpoint '/search' does not exist" from
+ * RapidAPI's gateway itself, which is the exact 404 this was chasing.
+ * OpenWeb Ninja (same underlying data) is switched by analogy, unconfirmed.
  */
 const HOSTS = [
   {
-    url: "https://jsearch.p.rapidapi.com/search",
+    url: "https://jsearch.p.rapidapi.com/search-v2",
     headers: (key: string) => ({ "x-rapidapi-key": key, "x-rapidapi-host": "jsearch.p.rapidapi.com" }),
   },
   {
-    url: "https://api.openwebninja.com/jsearch/search",
+    url: "https://api.openwebninja.com/jsearch/search-v2",
     headers: (key: string) => ({ "x-api-key": key }),
   },
 ];
