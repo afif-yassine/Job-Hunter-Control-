@@ -73,6 +73,8 @@ const job = (id: string, extra: Record<string, unknown> = {}) => ({
   description: LONG,
   status: "DISCOVERED",
   review_flag: null,
+  // A source that gives the whole ad: no page read unless a test asks for it.
+  source_platform: "francetravail",
   official_url: "https://example.com/offre",
   created_at: `2026-09-2${id.length}T10:00:00Z`,
   ...extra,
@@ -106,6 +108,37 @@ test("analysis: a short extract is completed from the ad page first", async () =
   await analyzeJob({ supabase: db, userId: "u1", jobId: "j1", ai, fetchPage: async () => LONG });
   assert.equal(tables.jobs[0].description, LONG);
   assert.ok(calls[0].prompt.includes("FastAPI"));
+});
+
+test("analysis: aggregator offers get their page read even when long; full-text sources don't", async () => {
+  const MORE = `${LONG}${LONG}`; // twice as long: the extract had been cut
+  const noisy = `${LONG} Menu Accueil Contact`; // barely longer: same ad plus menus
+
+  // JSearch, long description, page clearly longer → replaced.
+  const cut = world([job("j1", { source_platform: "jsearch:linkedin" })]);
+  let reads = 0;
+  await analyzeJob({ supabase: cut.db, userId: "u1", jobId: "j1", ai: aiReturning(ANALYSIS(70)).ai, fetchPage: async () => (reads++, MORE) });
+  assert.equal(reads, 1);
+  assert.equal(cut.tables.jobs[0].description, MORE);
+
+  // Same, but the page only adds menus → the clean text is kept.
+  const same = world([job("j1", { source_platform: "adzuna" })]);
+  await analyzeJob({ supabase: same.db, userId: "u1", jobId: "j1", ai: aiReturning(ANALYSIS(70)).ai, fetchPage: async () => noisy });
+  assert.equal(same.tables.jobs[0].description, LONG);
+
+  // Careers page (ATS) or France Travail with a long text → no request at all.
+  for (const source_platform of ["ats:greenhouse", "francetravail"]) {
+    const full = world([job("j1", { source_platform })]);
+    let calls = 0;
+    await analyzeJob({ supabase: full.db, userId: "u1", jobId: "j1", ai: aiReturning(ANALYSIS(70)).ai, fetchPage: async () => (calls++, MORE) });
+    assert.equal(calls, 0, source_platform);
+  }
+
+  // Unknown source (database not migrated yet) → treated as an extract, page read.
+  const unknown = world([job("j1", { source_platform: null })]);
+  let unknownReads = 0;
+  await analyzeJob({ supabase: unknown.db, userId: "u1", jobId: "j1", ai: aiReturning(ANALYSIS(70)).ai, fetchPage: async () => (unknownReads++, null) });
+  assert.equal(unknownReads, 1);
 });
 
 test("analysis: obvious scams never reach the AI; AI-detected ones are flagged", async () => {

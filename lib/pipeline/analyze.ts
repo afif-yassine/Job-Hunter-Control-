@@ -25,8 +25,29 @@ const output = z.object({
 
 export type StepResult = { status: number; body: Record<string, unknown> };
 
-/** Aggregators give a short extract: below this, the ad page is read first. */
+/** Below this, a description is certainly an extract, whatever its source. */
 export const FULL_TEXT = 1500;
+
+/**
+ * Sources whose API already returns the whole ad (France Travail, companies'
+ * careers pages): reading the page again adds nothing and costs time in the
+ * scheduled run's 45 s budget. Every other source (JSearch, Adzuna, Jooble,
+ * e-mail alerts, manual links…) may have cut the text, even a long one.
+ */
+export function hasFullTextNatively(source: string | null | undefined): boolean {
+  return source === "francetravail" || Boolean(source?.startsWith("ats:"));
+}
+
+/**
+ * Should the ad page's text replace the stored one? Any gain for a short
+ * extract; for a text that already looks complete, only a clear gain (+20 %),
+ * since menus and footers alone can make a page slightly longer.
+ */
+export function pageIsBetter(current: string | null | undefined, page: string | null): page is string {
+  if (!page) return false;
+  const length = current?.length ?? 0;
+  return length < FULL_TEXT ? page.length > length : page.length >= length * 1.2;
+}
 
 type Ctx = {
   supabase: SupabaseClient;
@@ -117,11 +138,11 @@ export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
       body: { error: "Cette offre est dans « À vérifier » : confirme-la d’abord.", code: "TO_REVIEW" },
     };
 
-  // Always score the full ad: read the page when we only have an extract
-  // (best effort; never gets around a protection).
-  if ((job.description?.length ?? 0) < FULL_TEXT) {
+  // Always score the full ad: read the page unless the source is known to give
+  // the whole text already (best effort; never gets around a protection).
+  if ((job.description?.length ?? 0) < FULL_TEXT || !hasFullTextNatively(job.source_platform)) {
     const page = await (ctx.fetchPage ?? fetchJobText)(job.official_url || job.source_url || "");
-    if (page && page.length > (job.description?.length ?? 0)) {
+    if (pageIsBetter(job.description, page)) {
       job.description = page;
       await updateJob(ctx, { description: page });
     }
