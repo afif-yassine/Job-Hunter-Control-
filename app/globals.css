@@ -424,9 +424,13 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .source-n { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line); font-weight: 700; font-size: 13px; }
 .source-name { flex: 1; display: grid; gap: 2px; min-width: 0; }
 .source-meta { display: flex; flex-wrap: wrap; gap: 4px 6px; padding-left: 40px; }
-.source > p { margin: 0; padding-left: 40px; }
+.source > p, .source > .warn-text { margin: 0; padding-left: 40px; }
 .source .budget { padding-left: 40px; display: grid; gap: 6px; max-width: 420px; }
 @media (max-width: 639px) {
   .kv > div > span:first-child { min-width: 100%; }
-  .source-meta, .source > p, .source .budget { padding-left: 0; }
+  .source-meta, .source > p, .source > .warn-text, .source .budget { padding-left: 0; }
 }
+.env-values { display: grid; gap: 6px; margin: 8px 0 0; }
+.env-values > div { display: grid; gap: 2px; }
+.env-values dd { margin: 0; }
+.env-values code { font-size: 12px; word-break: break-all; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--text); }

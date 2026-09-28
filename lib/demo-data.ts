@@ -127,7 +127,7 @@ export const demoAdmin: AdminOverview = {
       ...e,
       n: i + 1,
       ready: e.id === "ft:marche",
-      missing: e.id === "ft:marche" ? [] : [e.scopeVar, e.urlVar],
+      missing: e.id === "ft:marche" || e.unused ? [] : [e.scopeVar, e.urlVar],
       lastRun: e.id === "ft:marche" ? { status: "ok", at: ago(40), message: null } : null,
     }),
   ),

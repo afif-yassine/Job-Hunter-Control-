@@ -93,6 +93,11 @@ export type EnrichmentSource = {
   urlVar: string;
   cost: string;
   usedFor: string;
+  /** Subscribed but not used by the app: nothing to configure, never nagged about. */
+  unused?: boolean;
+  /** Confirmed values (Sept 2026, live francetravail.io docs) to paste in Vercel. */
+  scopeValue?: string;
+  urlValue?: string;
 };
 
 /**
@@ -109,6 +114,7 @@ export const ENRICHMENT_SOURCES: EnrichmentSource[] = [
     covers: "RDV et plages de candidature pour une formation déjà identifiée (usage organisme de formation).",
     scopeVar: "FRANCE_TRAVAIL_FORMATION_SCOPE",
     urlVar: "FRANCE_TRAVAIL_FORMATION_URL",
+    unused: true,
     cost: "Gratuit",
     usedFor: "Pas de recherche par métier possible avec cette API : non utilisée dans Job Hunter Control pour l’instant (voir lib/france-travail/formation.ts).",
   },
@@ -118,6 +124,8 @@ export const ENRICHMENT_SOURCES: EnrichmentSource[] = [
     covers: "Grande famille de statistiques France Travail (demandeurs, embauches, offres, salaires…) par métier et territoire.",
     scopeVar: "FRANCE_TRAVAIL_MARCHE_SCOPE",
     urlVar: "FRANCE_TRAVAIL_MARCHE_URL",
+    scopeValue: "api_stats-offres-demandes-emploiv1 offresetdemandesemploi",
+    urlValue: "https://api.francetravail.io/partenaire/stats-offres-demandes-emploi/v1/indicateur/stat-demandeurs",
     cost: "Gratuit",
     usedFor: "Ajoute une note sous l’offre : nombre de demandeurs d’emploi inscrits sur ce métier, dans ce département.",
   },
@@ -127,6 +135,8 @@ export const ENRICHMENT_SOURCES: EnrichmentSource[] = [
     covers: "Taux de retour à l’emploi à 6 mois, par métier et territoire.",
     scopeVar: "FRANCE_TRAVAIL_ACCES_EMPLOI_SCOPE",
     urlVar: "FRANCE_TRAVAIL_ACCES_EMPLOI_URL",
+    scopeValue: "api_stats-perspectives-retour-emploiv1 retouremploi",
+    urlValue: "https://api.francetravail.io/partenaire/stats-perspectives-retour-emploi/v1/indicateur/stat-acces-emploi",
     cost: "Gratuit",
     usedFor: "Indicateur admin : à quel point un métier « recrute vraiment » sur la durée (pas encore affiché par offre).",
   },

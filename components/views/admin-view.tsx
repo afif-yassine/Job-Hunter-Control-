@@ -219,9 +219,9 @@ export function AdminView({ ctx }: { ctx: Ctx }) {
           <GraduationCap size={18} aria-hidden /> Enrichissement (France Travail)
         </h2>
         <p className="muted small-text">
-          Trois API gratuites, mêmes identifiants que « Offres d’emploi ». Elles ne trouvent pas d’offres : elles
+          API gratuites, mêmes identifiants que « Offres d’emploi ». Elles ne trouvent pas d’offres : elles
           enrichissent celles déjà trouvées (uniquement pour les offres venant de France Travail, qui seules portent
-          un code ROME).
+          un code ROME). Open Formation est souscrite mais pas utilisée : rien à configurer.
         </p>
         <ol className="sources">
           {data.enrichment.map((e) => (
@@ -232,14 +232,29 @@ export function AdminView({ ctx }: { ctx: Ctx }) {
                   <strong>{e.name}</strong>
                   <span className="muted small-text">{e.covers}</span>
                 </div>
-                <Chip tone={e.ready ? "good" : "warn"}>{e.ready ? "Prêt" : "À terminer"}</Chip>
+                <Chip tone={e.unused ? "neutral" : e.ready ? "good" : "warn"}>
+                  {e.unused ? "Non utilisée" : e.ready ? "Prêt" : "À terminer"}
+                </Chip>
               </div>
               <p className="muted small-text">{e.usedFor}</p>
               <p className="muted small-text">{e.cost}</p>
-              {!e.ready && (
-                <p className="small-text warn-text">
-                  À ajouter dans Vercel une fois souscrite sur francetravail.io : {e.missing.join(", ")}
-                </p>
+              {!e.ready && !e.unused && (
+                <div className="small-text warn-text">
+                  À ajouter dans Vercel (Settings → Environment Variables) :
+                  <dl className="env-values">
+                    {e.missing.map((name) => {
+                      const value = name === e.scopeVar ? e.scopeValue : name === e.urlVar ? e.urlValue : undefined;
+                      return (
+                        <div key={name}>
+                          <dt>
+                            <code>{name}</code>
+                          </dt>
+                          <dd>{value ? <code>{value}</code> : <span className="muted">tes identifiants francetravail.io</span>}</dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                </div>
               )}
               {e.lastRun && (
                 <p className={`small-text ${e.lastRun.status === "ok" ? "muted" : "warn-text"}`}>

@@ -168,15 +168,17 @@ export async function buildAdminOverview(ctx: {
   const hasCreds = has("FRANCE_TRAVAIL_CLIENT_ID") && has("FRANCE_TRAVAIL_CLIENT_SECRET");
   const enrichment: AdminEnrichment[] = ENRICHMENT_SOURCES.map((e, i) => {
     const missing: string[] = [];
-    if (!hasCreds) missing.push("FRANCE_TRAVAIL_CLIENT_ID / FRANCE_TRAVAIL_CLIENT_SECRET");
-    if (!has(e.scopeVar)) missing.push(e.scopeVar);
-    if (!has(e.urlVar)) missing.push(e.urlVar);
+    if (!e.unused) {
+      if (!hasCreds) missing.push("FRANCE_TRAVAIL_CLIENT_ID / FRANCE_TRAVAIL_CLIENT_SECRET");
+      if (!has(e.scopeVar)) missing.push(e.scopeVar);
+      if (!has(e.urlVar)) missing.push(e.urlVar);
+    }
     const mine = runs.filter((r) => r.source === e.id);
     const last = mine[0] ?? null;
     return {
       ...e,
       n: i + 1,
-      ready: missing.length === 0,
+      ready: !e.unused && missing.length === 0,
       missing,
       lastRun: last ? { status: last.status, at: last.created_at, message: last.message } : null,
     };
@@ -217,10 +219,11 @@ export async function buildAdminOverview(ctx: {
     actions.push({ level: "recommended", text: "La recherche automatique n’a pas tourné depuis plus d’un jour : programme l’appel toutes les 30 min dans Supabase (docs/SCANNER.md §5)." });
   if (!sources.some((s) => s.kind === "careers" && s.companies))
     actions.push({ level: "recommended", text: "Ajoute des pages carrière d’entreprises dans Réglages > Recherche (gratuit, sans clé)." });
-  if (hasCreds && enrichment.some((e) => !e.ready))
+  const toFinish = enrichment.filter((e) => !e.ready && !e.unused);
+  if (hasCreds && toFinish.length)
     actions.push({
       level: "recommended",
-      text: `Termine les API France Travail secondaires (${enrichment.filter((e) => !e.ready).map((e) => e.name).join(", ")}) : ajoute leur scope et leur URL dans Vercel une fois souscrites sur francetravail.io.`,
+      text: `Termine les API France Travail secondaires (${toFinish.map((e) => e.name).join(", ")}) : ajoute leur scope et leur URL dans Vercel (valeurs exactes dans la section « Enrichissement » ci-dessous).`,
     });
   if (has("WORKER_BASE_URL") && ctx.worker && !ctx.worker.online)
     actions.push({ level: "recommended", text: "Le worker Playwright (Railway) ne répond pas : les formulaires ne seront pas lus." });
