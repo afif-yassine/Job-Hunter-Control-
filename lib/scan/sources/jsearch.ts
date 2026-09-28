@@ -95,6 +95,19 @@ async function readErrorDetail(response: Response): Promise<string> {
   return "";
 }
 
+/**
+ * "/search-v2" wraps the jobs in an object (`data: { jobs: [...], cursor }`)
+ * instead of the old "/search"'s bare array (`data: [...]`) — confirmed live
+ * Sept 2026. Accepting both shapes means a future host or fallback that
+ * still returns the old array form won't crash ("object is not iterable").
+ */
+function extractJobs(body: unknown): JSearchJob[] {
+  const data = (body as { data?: unknown } | null | undefined)?.data;
+  if (Array.isArray(data)) return data as JSearchJob[];
+  const jobs = (data as { jobs?: unknown } | null | undefined)?.jobs;
+  return Array.isArray(jobs) ? (jobs as JSearchJob[]) : [];
+}
+
 export async function scanJSearch(
   config: ScanConfig,
   env: Record<string, string | undefined> = process.env,
@@ -141,8 +154,8 @@ export async function scanJSearch(
       const detail = await readErrorDetail(response);
       throw new Error(`JSearch « ${query.keywords} » : HTTP ${response.status}${detail ? ` — ${detail}` : ""}`);
     }
-    const body = (await response.json()) as { data?: JSearchJob[] };
-    for (const raw of body.data ?? []) {
+    const body: unknown = await response.json();
+    for (const raw of extractJobs(body)) {
       const mapped = mapJSearchOffer(raw);
       if (mapped) offers.push(mapped);
     }

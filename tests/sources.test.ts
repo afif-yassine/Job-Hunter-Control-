@@ -136,6 +136,24 @@ test("JSearch: a refused call includes the API's own explanation, not just the H
   assert.ok(urls[0].startsWith("https://jsearch.p.rapidapi.com/search-v2?"));
 });
 
+test("JSearch: /search-v2's real shape (data.jobs, not a bare data array) doesn't crash", async () => {
+  // Real body confirmed live: {status,request_id,parameters,data:{jobs:[...],cursor}}.
+  const offers = await scanJSearch(
+    { ...config, queries: [config.queries[0]] },
+    { JSEARCH_API_KEY: "k" },
+    async () =>
+      json({
+        status: "OK",
+        data: {
+          jobs: [{ job_title: "Développeur Python", job_apply_link: "https://a.test/1" }],
+          cursor: null,
+        },
+      }),
+  );
+  assert.equal(offers.length, 1);
+  assert.equal(offers[0].title, "Développeur Python");
+});
+
 test("ad page reader: JobPosting JSON-LD first, bot walls and private URLs refused", () => {
   const description = "<p>Missions : " + "développer des API. ".repeat(30) + "</p>";
   const html = `<html><head><script type="application/ld+json">${JSON.stringify({
