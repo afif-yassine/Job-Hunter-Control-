@@ -6,6 +6,7 @@ import { PROVIDERS, type ProviderDef } from "@/lib/providers";
 import type { ProviderStatus } from "@/lib/integrations";
 import { DEFAULT_PREFS, MAX_TARGETS, type ScanPrefs } from "@/lib/scan/config";
 import { parseAtsTarget } from "@/lib/scan/sources/ats";
+import { remainingSuggestions, suggestionLine, type SuggestedTarget } from "@/lib/scan/suggested-targets";
 import { timeAgo } from "@/lib/labels";
 import type { SystemStatus } from "@/components/use-status";
 import type { Ctx } from "./types";
@@ -296,6 +297,10 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
 
   const lines = targets.split(/\n+/).map((t) => t.trim()).filter(Boolean);
   const unknown = lines.filter((line) => !parseAtsTarget(line));
+  const suggestions = remainingSuggestions(lines);
+  const full = lines.length >= MAX_TARGETS;
+  const addTargets = (list: SuggestedTarget[]) =>
+    setTargets([...lines, ...list.map(suggestionLine)].slice(0, MAX_TARGETS).join("\n"));
 
   const toggle = (value: string) =>
     setPrefs({
@@ -358,7 +363,7 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
             className="targets"
             value={targets}
             onChange={(e) => setTargets(e.target.value)}
-            placeholder={"https://jobs.lever.co/mistral\nhttps://boards.greenhouse.io/doctolib\nhttps://jobs.ashbyhq.com/qonto"}
+            placeholder={"https://job-boards.greenhouse.io/doctolib\nhttps://jobs.lever.co/blablacar\nhttps://jobs.ashbyhq.com/qonto"}
           />
           <small className="muted">
             Colle le lien de la page carrière d’une entreprise (une par ligne, {MAX_TARGETS} maximum). Pris en charge :
@@ -372,6 +377,34 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
             </small>
           )}
         </label>
+        {suggestions.length > 0 && (
+          <div className="wide target-suggestions">
+            <small className="muted">
+              Suggestions : entreprises qui recrutent en France, page carrière vérifiée. ★ = stages ou alternances déjà
+              repérés. Un clic ajoute l’entreprise à la liste, puis « Enregistrer ».
+            </small>
+            <div className="chips">
+              {suggestions.map((s) => (
+                <button
+                  key={`${s.ats}:${s.slug}`}
+                  type="button"
+                  className="pill"
+                  disabled={full}
+                  onClick={() => addTargets([s])}
+                >
+                  {s.juniors ? "★ " : ""}
+                  {s.name}
+                </button>
+              ))}
+              {suggestions.length > 1 && (
+                <button type="button" className="pill active" disabled={full} onClick={() => addTargets(suggestions)}>
+                  Tout ajouter
+                </button>
+              )}
+            </div>
+            {full && <small className="warn-text">Liste pleine ({MAX_TARGETS} entreprises maximum).</small>}
+          </div>
+        )}
         <label className="check switch wide">
           <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
           {status?.scheduledScan

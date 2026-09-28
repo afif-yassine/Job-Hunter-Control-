@@ -226,6 +226,19 @@ test("a key copied from the provider's e-mail loses its quotes and final period"
   assert.equal(cleanKey("GOCSPX-abc.def"), "GOCSPX-abc.def"); // a dot inside is kept
 });
 
+test("suggested companies: every link is recognised, and already-listed boards are not suggested again", async () => {
+  const { SUGGESTED_TARGETS, remainingSuggestions, suggestionLine } = await import("../lib/scan/suggested-targets");
+  const { parseAtsTarget } = await import("../lib/scan/sources/ats");
+  assert.ok(SUGGESTED_TARGETS.length >= 20);
+  for (const s of SUGGESTED_TARGETS) assert.deepEqual(parseAtsTarget(suggestionLine(s)), { ats: s.ats, slug: s.slug }, s.name);
+  const keys = SUGGESTED_TARGETS.map((s) => `${s.ats}:${s.slug}`);
+  assert.equal(new Set(keys).size, keys.length); // no duplicate
+  // Doctolib already there under another link form → not suggested again.
+  const left = remainingSuggestions(["https://boards.greenhouse.io/doctolib", "not a link"]);
+  assert.ok(!left.some((s) => s.slug === "doctolib"));
+  assert.equal(left.length, SUGGESTED_TARGETS.length - 1);
+});
+
 test("search preferences: sane defaults, capped queries", () => {
   assert.deepEqual(normalizePrefs(null), DEFAULT_PREFS);
   const prefs = normalizePrefs({
