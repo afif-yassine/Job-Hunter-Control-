@@ -61,6 +61,35 @@ test("Jooble: filters old offers", async () => {
   assert.deepEqual(offers.map((o) => o.title), ["Alternant dev"]);
 });
 
+test("Jooble: French site first (keys are per country), then jooble.org, then a clear refusal", async () => {
+  const one = { ...config, queries: [config.queries[0]] };
+  const hosts: string[] = [];
+  const frOnly: typeof fetch = async (url) => {
+    hosts.push(new URL(String(url)).host);
+    return json({ jobs: [{ title: "Alternant dev", link: "https://j.test/1" }] });
+  };
+  await scanJooble(one, { JOOBLE_API_KEY: "k" }, frOnly);
+  assert.deepEqual(hosts, ["fr.jooble.org"]);
+
+  // Key registered on the international site: fr refuses, jooble.org accepts.
+  const seen: string[] = [];
+  const intl: typeof fetch = async (url) => {
+    const host = new URL(String(url)).host;
+    seen.push(host);
+    return host === "fr.jooble.org" ? json({}, 403) : json({ jobs: [] });
+  };
+  await scanJooble(config, { JOOBLE_API_KEY: "k" }, intl);
+  assert.deepEqual(seen, ["fr.jooble.org", "jooble.org", "jooble.org"]); // 2nd query goes straight there
+
+  const forced: string[] = [];
+  await scanJooble(one, { JOOBLE_API_KEY: "k", JOOBLE_HOST: "https://uk.jooble.org/" }, async (url) => (
+    forced.push(new URL(String(url)).host), json({ jobs: [] })
+  ));
+  assert.deepEqual(forced, ["uk.jooble.org"]);
+
+  await assert.rejects(scanJooble(one, { JOOBLE_API_KEY: "k" }, async () => json({}, 403)), /refusée par fr\.jooble\.org et jooble\.org/);
+});
+
 test("JSearch: uses the publisher as source, falls back to the second host, explains quota", async () => {
   const mapped = mapJSearchOffer({
     job_title: "Stage IA",
