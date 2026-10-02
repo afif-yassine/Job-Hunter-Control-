@@ -1,5 +1,5 @@
 "use client";
-import { Activity, BriefcaseBusiness, ChevronRight, Gauge, LogOut, Settings, ShieldCheck } from "lucide-react";
+import { Activity, BriefcaseBusiness, ChevronRight, Gauge, LogOut, Map as MapIcon, Settings, ShieldCheck } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { PageHead } from "@/components/ui";
 import type { Ctx, View } from "./types";
@@ -8,6 +8,7 @@ const ITEMS: { id: View; label: string; text: string; icon: typeof Settings }[] 
   { id: "applications", label: "Candidatures", text: "État de chaque dossier et de son formulaire", icon: BriefcaseBusiness },
   { id: "activity", label: "Activité", text: "Journal et notifications", icon: Activity },
   { id: "settings", label: "Réglages", text: "Sources d’offres, recherche, connexions", icon: Settings },
+  { id: "roadmap", label: "Feuille de route", text: "Ce qui marche, ce qui est en cours, ce qui arrive", icon: MapIcon },
 ];
 
 export function MoreView({ ctx, badge }: { ctx: Ctx; badge: (id: View) => number }) {

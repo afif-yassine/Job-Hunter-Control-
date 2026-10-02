@@ -1,6 +1,6 @@
 "use client";
 import { ExternalLink, LoaderCircle } from "lucide-react";
-import { Chip, Empty, PageHead } from "@/components/ui";
+import { Chip, Empty, PageHead, Soon } from "@/components/ui";
 import { cleanRaw, explainError } from "@/lib/errors";
 import { applicationStatus, timeAgo } from "@/lib/labels";
 import { runSummary } from "@/lib/run-summary";
@@ -14,6 +14,7 @@ export function ApplicationsView({ ctx }: { ctx: Ctx }) {
     return (
       <>
         <PageHead title="Candidatures" subtitle="Les dossiers prêts à envoyer, avec l’état de leur formulaire." />
+        <TrackingSoon />
         <Empty
           title="Aucune candidature pour l’instant"
           text="Une candidature est créée dès que les documents d’une offre sont rédigés."
@@ -32,6 +33,7 @@ export function ApplicationsView({ ctx }: { ctx: Ctx }) {
         title="Candidatures"
         subtitle="« Lire le formulaire » ouvre la page de candidature et repère les champs. Rien n’est jamais envoyé."
       />
+      <TrackingSoon />
       <div className="cards">
         {data.apps.map((app) => {
           const status = applicationStatus(app.status);
@@ -79,6 +81,17 @@ export function ApplicationsView({ ctx }: { ctx: Ctx }) {
           );
         })}
       </div>
+    </>
+  );
+}
+
+/** The tracking features of sprint 4, shown where they will land. */
+function TrackingSoon() {
+  return (
+    <>
+      <Soon id="tracking" />
+      <Soon id="extension" />
+      <Soon id="interview" />
     </>
   );
 }

@@ -434,3 +434,7 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .env-values > div { display: grid; gap: 2px; }
 .env-values dd { margin: 0; }
 .env-values code { font-size: 12px; word-break: break-all; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--text); }
+.soon { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 12px; margin: 12px 0; }
+.soon strong { font-weight: 600; }
+.roadmap { list-style: none; margin: 0; padding: 0; }
+.roadmap .row { cursor: default; }

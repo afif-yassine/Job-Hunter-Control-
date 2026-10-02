@@ -280,7 +280,11 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
   useEffect(() => {
     let cancelled = false;
     void fetch("/api/settings")
-      .then((r) => (r.ok ? r.json() : null))
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+        return body;
+      })
       .then((body) => {
         if (cancelled || !body) return;
         setPrefs(body.prefs);
@@ -291,11 +295,13 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
         setAuto(body.autoScan !== false);
         setLoaded(true);
       })
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        if (!cancelled) notify(`Réglages de recherche illisibles : ${error instanceof Error ? error.message : "erreur"}`, "bad");
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [notify]);
 
   async function save() {
     setSaving(true);

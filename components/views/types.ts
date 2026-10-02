@@ -15,7 +15,8 @@ export type View =
   | "applications"
   | "activity"
   | "settings"
-  | "admin";
+  | "admin"
+  | "roadmap";
 
 export type JobFilter = "all" | "best" | "todo" | "missing" | "ready" | "review" | "applied";
 

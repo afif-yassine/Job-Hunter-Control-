@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Check, CircleAlert, Info, TriangleAlert } from "lucide-react";
 import type { Tone } from "@/lib/labels";
+import { feature, STATE_LABEL } from "@/lib/roadmap";
 
 export function Chip({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
   return <span className={`chip ${tone}`}>{children}</span>;
@@ -85,6 +86,26 @@ export function Progress({ value }: { value: number }) {
   return (
     <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value)}>
       <span style={{ width: `${Math.max(3, Math.min(100, value))}%` }} />
+    </div>
+  );
+}
+
+/**
+ * A feature that is not in the app yet: shown where it will land, never
+ * hidden, so nobody mistakes a missing part for a bug.
+ */
+export function Soon({ id }: { id: string }) {
+  const f = feature(id);
+  return (
+    <div className="soon" role="note">
+      <span className={`chip ${f.state === "doing" ? "info" : "neutral"}`}>
+        {STATE_LABEL[f.state]}
+        {f.sprint ? ` · sprint ${f.sprint}` : ""}
+      </span>
+      <span>
+        <strong>{f.label}</strong>
+        {f.detail && <span className="muted"> — {f.detail}</span>}
+      </span>
     </div>
   );
 }

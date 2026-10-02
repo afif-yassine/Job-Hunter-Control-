@@ -1,6 +1,6 @@
 "use client";
 import { CloudUpload, Code2, ExternalLink, FileText, Pencil, Sparkles } from "lucide-react";
-import { Chip, Empty, PageHead } from "@/components/ui";
+import { Chip, Empty, PageHead, Soon } from "@/components/ui";
 import { DOCUMENT_KIND } from "@/lib/labels";
 import type { DocumentRecord } from "@/lib/types";
 import type { Ctx } from "./types";
@@ -80,6 +80,7 @@ export function DocumentsView({ ctx }: { ctx: Ctx }) {
   return (
     <>
       <PageHead title="Documents" subtitle="Relis, modifie si besoin, puis approuve. L’envoi vers Drive se fait après approbation." />
+      <Soon id="versions" />
       <div className="cards">
         {groups.map((group) => {
           const current = group.docs.filter((d) => !replacedBy.has(d.id));

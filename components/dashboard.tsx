@@ -25,7 +25,9 @@ import { openQuestionCount, QuestionsPanel } from "@/components/questions-panel"
 import { usePipeline } from "@/components/use-pipeline";
 import { useDashboardData, type Data } from "@/components/use-dashboard-data";
 import { useSystemStatus, type SystemStatus } from "@/components/use-status";
-import { Progress } from "@/components/ui";
+import { Callout, Progress } from "@/components/ui";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { RoadmapView } from "@/components/views/roadmap-view";
 import { HomeView } from "@/components/views/home-view";
 import { JobsView } from "@/components/views/jobs-view";
 import { DocumentsView } from "@/components/views/documents-view";
@@ -52,8 +54,8 @@ const TABS: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "more", label: "Plus", icon: Ellipsis },
 ];
 const ADMIN_NAV = { id: "admin" as View, label: "Admin", icon: Gauge };
-const VIEWS = new Set<string>([...NAV.map((n) => n.id), "more", "admin"]);
-const MORE_VIEWS = new Set<View>(["more", "applications", "activity", "settings", "admin"]);
+const VIEWS = new Set<string>([...NAV.map((n) => n.id), "more", "admin", "applications", "activity", "settings", "roadmap"]);
+const MORE_VIEWS = new Set<View>(["more", "applications", "activity", "settings", "admin", "roadmap"]);
 
 /** Server error → one readable sentence. */
 function readable(raw: unknown): string {
@@ -113,6 +115,20 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
     setToast(text ? { text, tone } : null);
     if (text && tone !== "bad") toastTimer.current = window.setTimeout(() => setToast(null), 7000);
   }, []);
+
+  // Nothing fails silently: any error the page did not handle is shown.
+  useEffect(() => {
+    const show = (message: string) => notify(`Erreur inattendue : ${message}`, "bad");
+    const onError = (e: ErrorEvent) => show(e.message || "erreur JavaScript");
+    const onRejection = (e: PromiseRejectionEvent) =>
+      show(e.reason instanceof Error ? e.reason.message : String(e.reason ?? "promesse rejetée"));
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, [notify]);
 
   const go = useCallback((next: View, filter?: JobFilter) => {
     setView(next);
@@ -369,6 +385,14 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
         )}
 
         <main className="content">
+          {statusFailed && !status && view !== "settings" && (
+            <div style={{ marginBottom: 16 }}>
+              <Callout tone="warn" title="État des connexions illisible">
+                Le serveur n’a pas répondu à /api/status : les sources et l’IA peuvent ne pas fonctionner. Recharge la page ;
+                si ça continue, regarde les journaux Vercel.
+              </Callout>
+            </div>
+          )}
           {loadError && (
             <div className="callout bad" style={{ marginBottom: 16 }}>
               <div className="callout-body">
@@ -377,6 +401,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
               </div>
             </div>
           )}
+          <ErrorBoundary key={view} name={view}>
           {loading ? (
             <div className="empty">
               <LoaderCircle className="spin" aria-hidden /> Chargement…
@@ -403,9 +428,12 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
             <SettingsView ctx={ctx} />
           ) : view === "admin" && status?.isAdmin ? (
             <AdminView ctx={ctx} />
+          ) : view === "roadmap" ? (
+            <RoadmapView />
           ) : (
             <MoreView ctx={ctx} badge={badge} />
           )}
+          </ErrorBoundary>
         </main>
       </div>
 

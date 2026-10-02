@@ -13,7 +13,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { openQuestionCount } from "@/components/questions-panel";
-import { Callout, Chip, PageHead, Progress, ScoreBadge } from "@/components/ui";
+import { Callout, Chip, PageHead, Progress, ScoreBadge, Soon } from "@/components/ui";
 import { summarize } from "@/lib/pipeline-client";
 import { sourceLabel, timeAgo } from "@/lib/labels";
 import type { Ctx } from "./types";
@@ -119,6 +119,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
   return (
     <>
       <PageHead title="Accueil" subtitle="Cherche, choisis, postule : l’assistant prépare tout, tu valides." />
+      <Soon id="cv-import" />
 
       <section className="hero card">
         {running ? (

@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { CheckCheck, ExternalLink, LoaderCircle, Plus, Search, ShieldAlert } from "lucide-react";
-import { Chip, Empty, PageHead, ScoreBadge } from "@/components/ui";
+import { Chip, Empty, PageHead, ScoreBadge, Soon } from "@/components/ui";
 import { REVIEW, jobStatus, platformsOf, timeAgo } from "@/lib/labels";
 import type { Job } from "@/lib/types";
 import type { Ctx, JobFilter } from "./types";
@@ -85,6 +85,9 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
           </button>
         }
       />
+
+      <Soon id="filters" />
+      <Soon id="summary" />
 
       <div className="filters" role="tablist" aria-label="Filtrer les offres">
         {FILTERS.map((f) => (
