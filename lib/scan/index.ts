@@ -10,6 +10,7 @@ import { scanFranceTravail } from "./sources/francetravail";
 import { scanGmailAlerts } from "./sources/gmail";
 import { scanJooble } from "./sources/jooble";
 import { scanJSearch } from "./sources/jsearch";
+import { DEFAULT_TECH_ROMES, scanLba } from "./sources/lba";
 import { serviceClient } from "@/lib/supabase/admin";
 import {
   BudgetReached,
@@ -44,6 +45,19 @@ async function callWebhook(userId: string): Promise<ScannedOffer[]> {
     offers?: ScannedOffer[];
   };
   return Array.isArray(body.offers) ? body.offers : [];
+}
+
+/**
+ * The métiers (ROME codes) of this account, learnt from its France Travail
+ * offers — the only source that gives them. Tech defaults until there are some.
+ */
+async function userRomes(supabase: SupabaseClient, userId: string): Promise<string[]> {
+  const { data } = await supabase.from("jobs").select("rome_code").eq("user_id", userId).not("rome_code", "is", null).limit(500);
+  const count = new Map<string, number>();
+  for (const r of (data ?? []) as { rome_code: string | null }[])
+    if (r.rome_code) count.set(r.rome_code, (count.get(r.rome_code) ?? 0) + 1);
+  const top = [...count.entries()].sort((a, b) => b[1] - a[1]).map(([code]) => code).slice(0, 10);
+  return top.length ? top : DEFAULT_TECH_ROMES;
 }
 
 type SourceDef = {
@@ -127,6 +141,15 @@ export async function runScan(ctx: {
       keys: ["JOOBLE_API_KEY"],
       cacheable: true,
       run: (f) => scanJooble(config, env, f),
+    },
+    {
+      id: "lba",
+      name: "La bonne alternance",
+      enabled: has("LBA_API_KEY"),
+      missing: "LBA_API_KEY (et l’accord d’usage commercial de La bonne alternance)",
+      keys: ["LBA_API_KEY"],
+      cacheable: true,
+      run: async (f) => scanLba(config, env, f, await userRomes(ctx.supabase, ctx.userId)),
     },
     {
       id: "gmail",

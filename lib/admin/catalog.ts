@@ -49,6 +49,16 @@ export const SOURCES: CatalogSource[] = [
     launchNote: "Usage commercial restreint : licence à demander à Adzuna avant l’ouverture publique.",
   },
   {
+    id: "lba",
+    name: "La bonne alternance",
+    kind: "api",
+    covers: "Offres d’alternance de La bonne alternance et de ses partenaires (France Travail, Météojobs, flux d’entreprises).",
+    keys: ["LBA_API_KEY"],
+    cost: "Clé gratuite (espace développeurs api.apprentissage.beta.gouv.fr)",
+    launchNote: "Usage commercial interdit sans accord écrit de La bonne alternance : ne mets la clé en production qu’une fois l’accord obtenu.",
+    optional: true,
+  },
+  {
     id: "jooble",
     name: "Jooble",
     kind: "api",

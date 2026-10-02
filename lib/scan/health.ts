@@ -18,6 +18,7 @@ export type SourceId =
   | "jsearch"
   | "adzuna"
   | "jooble"
+  | "lba"
   | "gmail"
   | "webhook"
   | "ats:greenhouse"
