@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { runScan } from "../lib/scan";
-import { dayBucket, harvestOffers, offerFingerprint, queryCacheParts, withinDays } from "../lib/scan/catalogue";
+import { dayBucket, harvestOffers, normalizeQuery, offerFingerprint, queryCacheParts, withinDays } from "../lib/scan/catalogue";
 import type { ScanConfig } from "../lib/scan/config";
 import { ingestOffers } from "../lib/scan/ingest";
 import type { ScannedOffer } from "../lib/scan/types";
@@ -38,6 +38,14 @@ test("cache identity: same query whatever the case, spaces, department order; 10
     now,
   );
   assert.equal(kept.length, 2); // the 18-day-old one is cut, an undated one is kept
+});
+
+test("same job typed differently = one shared search: case, accents, order, synonyms", () => {
+  const key = (keywords: string) => normalizeQuery({ keywords });
+  const same = ["Alternance Développeur Web", "alternance developpeur web", "web developer alternant", "Alternance - Dev  WEB (H/F)"];
+  for (const k of same) assert.equal(key(k), key(same[0]), k);
+  assert.notEqual(key("alternance développeur web"), key("alternance développeur mobile"));
+  assert.notEqual(key("stage data"), key("alternance data"));
 });
 
 test("harvest: offers go to the catalogue once, with a clean link and the same identity as the account's list", async () => {

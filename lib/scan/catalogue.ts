@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeText } from "@/lib/questions";
 import type { ScanConfig, SearchQuery } from "./config";
 import { canonicalUrl, fingerprintOf } from "./ingest";
 import type { ScannedOffer } from "./types";
@@ -33,8 +34,43 @@ export function dayBucket(days: number): number {
   return days <= 7 ? 7 : days <= 14 ? 14 : 31;
 }
 
+/** Words that do not change what a search finds. */
+const QUERY_NOISE = new Set("de d du des la le les l en et a au aux pour h f x hf fh".split(" "));
+
+/** Different words, same job: they share one cached search. */
+const QUERY_SYNONYMS: Record<string, string> = {
+  dev: "developpeur",
+  developer: "developpeur",
+  developpeuse: "developpeur",
+  engineer: "ingenieur",
+  ingenieure: "ingenieur",
+  alternant: "alternance",
+  alternante: "alternance",
+  apprentissage: "alternance",
+  apprenti: "alternance",
+  apprentie: "alternance",
+  apprenticeship: "alternance",
+  stagiaire: "stage",
+  internship: "stage",
+  intern: "stage",
+  ai: "ia",
+  fullstack: "full stack",
+  frontend: "front end",
+  backend: "back end",
+};
+
+/**
+ * Identity of a query for the shared cache: case, accents, punctuation, word
+ * order, filler words and common synonyms do not matter —
+ * "Alternance Développeur Web", "alternance developpeur web" and
+ * "web developer alternant" are the same search.
+ */
 export function normalizeQuery(q: SearchQuery): string {
-  return q.keywords.toLowerCase().normalize("NFC").replace(/\s+/g, " ").trim();
+  const words = normalizeText(q.keywords)
+    .split(" ")
+    .flatMap((w) => (QUERY_SYNONYMS[w] ?? w).split(" "))
+    .filter((w) => w && !QUERY_NOISE.has(w));
+  return [...new Set(words)].sort().join(" ");
 }
 
 /** What makes two single-query searches identical for a source. */
