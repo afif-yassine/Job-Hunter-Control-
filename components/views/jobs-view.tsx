@@ -150,6 +150,35 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
   );
 }
 
+const FT_LICENCE = "https://francetravail.io/produits-partages/documentation/conditions-dutilisation-api/licence-offres-emploi";
+
+/** Credits the sources' terms require next to each offer. */
+function SourceCredits({ job }: { job: Job }) {
+  const sources = new Set([job.source_platform ?? "", ...(job.job_sources ?? []).map((s) => s.platform ?? "")]);
+  const ft = [...sources].some((s) => s === "francetravail" || s.startsWith("lba:francetravail"));
+  const adzuna = sources.has("adzuna");
+  if (!ft && !adzuna) return null;
+  const updated = job.publication_date ? new Date(`${job.publication_date}T12:00:00`).toLocaleDateString("fr-FR") : null;
+  return (
+    <p className="credits small-text muted">
+      {ft && (
+        <>
+          Source : France Travail{updated ? ` · publiée le ${updated}` : ""} ·{" "}
+          <a href={FT_LICENCE} target="_blank" rel="noreferrer">
+            licence de réutilisation
+          </a>
+        </>
+      )}
+      {ft && adzuna && " · "}
+      {adzuna && (
+        <a href="https://www.adzuna.fr" target="_blank" rel="noreferrer">
+          Jobs by Adzuna
+        </a>
+      )}
+    </p>
+  );
+}
+
 function JobCard({ job, ctx, working }: { job: Job; ctx: Ctx; working: boolean }) {
   const { act, busy, go } = ctx;
   const status = jobStatus(job.status);
@@ -212,6 +241,7 @@ function JobCard({ job, ctx, working }: { job: Job; ctx: Ctx; working: boolean }
         <Chip>{platforms.length > 1 ? `Vu sur ${platforms.length} sites` : platforms[0]}</Chip>
         {age && <span className="muted small-text">{age}</span>}
       </div>
+      <SourceCredits job={job} />
       <div className="jobactions">
         {primary}
         {url && (

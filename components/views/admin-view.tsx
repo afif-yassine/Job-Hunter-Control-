@@ -130,6 +130,8 @@ export function AdminView({ ctx }: { ctx: Ctx }) {
         </ul>
       </section>
 
+      <HarvestSection ctx={ctx} />
+
       {/* 2. AI -------------------------------------------------------------------- */}
       <section className="admin-section">
         <h2 className="section-title">
@@ -375,5 +377,151 @@ function SourceRow({ s }: { s: AdminSource }) {
       )}
       {s.launchNote && s.keyOrigin !== "none" && <p className="small-text muted">Avant l’ouverture : {s.launchNote}</p>}
     </li>
+  );
+}
+
+type HarvestRun = { id: string; status: "running" | "done" | "partial"; started_at: string; finished_at: string | null; counters: Record<string, number> };
+type HarvestState = { runs: HarvestRun[]; tasks: Record<string, number>; errors: { key: string; error: string | null }[]; openOffers: number };
+
+const RUN_TONE: Record<HarvestRun["status"], ChipTone> = { running: "info", done: "good", partial: "warn" };
+const RUN_LABEL: Record<HarvestRun["status"], string> = { running: "En cours", done: "Terminée", partial: "Terminée avec erreurs" };
+
+/** Platform harvest: last runs, progress, errors, and a button to move it forward. */
+function HarvestSection({ ctx }: { ctx: Ctx }) {
+  const [state, setState] = useState<HarvestState | null>(null);
+  const [error, setError] = useState("");
+  const [working, setWorking] = useState(false);
+
+  const load = useCallback(async () => {
+    if (ctx.adminDemo) return;
+    try {
+      const response = await fetch("/api/admin/harvest");
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+      setState(body as HarvestState);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur");
+    }
+  }, [ctx.adminDemo]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+
+  async function advance() {
+    setWorking(true);
+    try {
+      const response = await fetch("/api/admin/harvest", { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+      ctx.notify(
+        body.finished
+          ? `Collecte ${body.run} terminée : ${body.offers} offre(s) enregistrée(s) dans cette tranche.`
+          : `Tranche faite : ${body.processed} tâche(s), ${body.offers} offre(s). Encore ${body.pending} tâche(s).`,
+        "good",
+      );
+      await load();
+    } catch (e) {
+      ctx.notify(e instanceof Error ? e.message : "Collecte impossible", "bad");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  const run = state?.runs[0];
+  const total = state ? Object.values(state.tasks).reduce((a, b) => a + b, 0) : 0;
+  const done = state ? (state.tasks.done ?? 0) + (state.tasks.error ?? 0) : 0;
+
+  return (
+    <section className="admin-section">
+      <h2 className="section-title">
+        <Server size={18} aria-hidden /> Collecte plateforme (2 fois par jour)
+      </h2>
+      <div className="card kv">
+        <p className="muted">
+          À 6 h et 14 h (heure de Paris), la plateforme collecte pour tout le monde les stages, alternances et CDD
+          informatique, numérique et bureautique : France Travail dans toute la France, Adzuna dans 5 grandes villes,
+          toutes les pages carrière connues. Les étudiants piochent ensuite dans ce catalogue, sans appel aux sites.
+        </p>
+        {error && (
+          <Callout tone="bad" title="État de la collecte indisponible">
+            {error}
+          </Callout>
+        )}
+        {ctx.adminDemo && <p className="muted small-text">Démo : pas de collecte réelle.</p>}
+        {state && (
+          <>
+            <div>
+              <span>Offres ouvertes dans le catalogue</span>
+              <strong>{state.openOffers}</strong>
+            </div>
+            {run ? (
+              <>
+                <div>
+                  <span>Dernière collecte</span>
+                  <strong>{run.id.replace("T", " · ")} h UTC</strong>
+                  <Chip tone={RUN_TONE[run.status]}>{RUN_LABEL[run.status]}</Chip>
+                </div>
+                <div>
+                  <span>Avancement</span>
+                  <Progress value={(done / Math.max(total, 1)) * 100} />
+                  <strong>
+                    {done}/{total} tâches
+                  </strong>
+                </div>
+                {run.status !== "running" && (
+                  <div>
+                    <span>Résultat</span>
+                    <strong>
+                      {run.counters.francetravail ?? 0} France Travail · {run.counters.adzuna ?? 0} Adzuna ·{" "}
+                      {run.counters.ats ?? 0} pages carrière · {run.counters.closed ?? 0} retirée(s)
+                    </strong>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="muted">Aucune collecte encore lancée.</p>
+            )}
+            {state.errors.length > 0 && (
+              <details className="why">
+                <summary>{state.tasks.error} tâche(s) en erreur</summary>
+                <ul>
+                  {state.errors.map((e) => (
+                    <li key={e.key}>
+                      <code>{e.key}</code> — {e.error}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </>
+        )}
+        <div className="jobactions">
+          <button className="btn" onClick={() => void advance()} disabled={working || Boolean(ctx.adminDemo)}>
+            {working ? <LoaderCircle size={16} className="spin" aria-hidden /> : <RefreshCw size={16} aria-hidden />} Avancer la
+            collecte (≈ 45 s)
+          </button>
+        </div>
+        <details className="why">
+          <summary>Automatiser (Supabase pg_cron, toutes les 10 min)</summary>
+          <p className="muted small-text">
+            Vercel coupe chaque appel après 60 s : la collecte avance par tranches. Dans Supabase &gt; SQL Editor, avec ton
+            CRON_SECRET (jamais dans le code) :
+          </p>
+          <pre className="env-values">{`create extension if not exists pg_cron;
+create extension if not exists pg_net;
+select vault.create_secret('<CRON_SECRET>', 'cron_secret');
+select cron.schedule('job-hunter-harvest', '*/10 * * * *', $$
+  select net.http_post(
+    url := 'https://job-hunter-control.vercel.app/api/cron/harvest',
+    headers := jsonb_build_object('Authorization', 'Bearer ' ||
+      (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret')),
+    timeout_milliseconds := 60000);
+$$);`}</pre>
+        </details>
+      </div>
+    </section>
   );
 }

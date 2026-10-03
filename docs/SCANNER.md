@@ -154,6 +154,34 @@ score, statut, documents).
 - Tout passe par la clé `SUPABASE_SERVICE_ROLE_KEY` (déjà requise pour le
   cache). Sans elle, la recherche marche comme avant, sans catalogue.
 
+## 6c. Collecte plateforme (2 fois par jour) et catégories de métiers
+
+Périmètre : **stages, alternances et CDD** en informatique, numérique et
+bureautique, rangés en 11 catégories (`lib/scan/categories.ts`, codes ROME 4.0).
+
+- **Quand** : une collecte démarre à 04:00 et 12:00 UTC (6 h et 14 h à Paris en
+  été). Vercel coupe chaque appel après 60 s, donc `/api/cron/harvest` avance par
+  tranches de ~45 s et reprend où il s'est arrêté (tables `harvest_runs` et
+  `harvest_tasks`). Appelle-le toutes les 10 min avec Supabase pg_cron (SQL dans
+  Admin > Collecte plateforme), ou clique « Avancer la collecte » dans Admin.
+- **France Travail** : toute la France, une recherche par région et par contrat
+  (apprentissage, professionnalisation, CDD) sur le domaine M18 + les codes ROME
+  des autres catégories ; découpée par département au-delà de 3 150 offres.
+  France Travail ne publie pas de stages.
+- **Adzuna** : chaque catégorie × alternance/stage dans 5 grandes villes, à la
+  collecte du matin seulement (budget gratuit 250/jour).
+- **Pages carrière** : toutes celles connues de la plateforme (catalogue,
+  saisies ou découvertes par les comptes).
+- Jooble (500 requêtes à vie) et JSearch (~200/mois) restent pour les recherches
+  ponctuelles ; La bonne alternance reste éteinte (usage commercial interdit).
+- **Licence France Travail** : synchronisation au moins toutes les 24 h ; quand
+  toutes les recherches France Travail d'une collecte ont réussi, ses offres plus
+  listées sont fermées et leur texte effacé ; chaque offre affiche « Source :
+  France Travail » et le lien vers la licence. Adzuna : « Jobs by Adzuna ».
+- **Côté étudiant** : Réglages > Métiers, il coche ses catégories (avec le nombre
+  d'offres déjà connues autour de lui) ; ses offres viennent du catalogue sans
+  aucun appel aux sites.
+
 ## 7. Santé des sources, budgets et alertes (page Admin)
 
 Chaque passage de chaque source est enregistré (`source_runs`). Quand une source n'a plus de quota, que sa clé

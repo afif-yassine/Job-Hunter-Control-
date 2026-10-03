@@ -5,6 +5,7 @@ import { Callout, Chip, PageHead } from "@/components/ui";
 import { PROVIDERS, type ProviderDef } from "@/lib/providers";
 import type { ProviderStatus } from "@/lib/integrations";
 import { DEFAULT_PREFS, MAX_TARGETS, type ScanPrefs } from "@/lib/scan/config";
+import { CATEGORIES } from "@/lib/scan/categories";
 import type { DiscoveredTarget } from "@/lib/scan/discover";
 import { ATS_LABEL, boardUrl, parseAtsTarget } from "@/lib/scan/sources/ats";
 import { timeAgo } from "@/lib/labels";
@@ -256,7 +257,6 @@ function shortLink(link: string): string {
 const CONTRACTS = [
   ["alternance", "Alternance"],
   ["stage", "Stage"],
-  ["cdi", "CDI"],
   ["cdd", "CDD"],
 ] as const;
 
@@ -276,6 +276,36 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
   const [auto, setAuto] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [counts, setCounts] = useState<{ total: number; byCategory: Record<string, number> } | null>(null);
+  const [countsError, setCountsError] = useState("");
+
+  // Offers already in the catalogue for each category, around the place being edited.
+  useEffect(() => {
+    if (!loaded) return;
+    const params = new URLSearchParams({
+      city: prefs.city,
+      departments: split(departments).join(","),
+      contracts: prefs.contracts.join(","),
+      days: String(prefs.maxAgeDays),
+    });
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/catalogue/counts?${params}`, { signal: controller.signal })
+        .then(async (r) => {
+          const body = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+          setCounts(body);
+          setCountsError("");
+        })
+        .catch((e: unknown) => {
+          if (!controller.signal.aborted) setCountsError(e instanceof Error ? e.message : "erreur");
+        });
+    }, 400);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [loaded, prefs.city, prefs.contracts, prefs.maxAgeDays, departments]);
 
   useEffect(() => {
     let cancelled = false;
@@ -356,6 +386,11 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
     notify(`${item.company} ne sera plus suivie.`, "good");
   }
 
+  const toggleCategory = (id: string) => {
+    const current = prefs.categories ?? [];
+    setPrefs({ ...prefs, categories: current.includes(id) ? current.filter((c) => c !== id) : [...current, id] });
+  };
+
   const toggle = (value: string) =>
     setPrefs({
       ...prefs,
@@ -388,10 +423,32 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
             ))}
           </div>
         </fieldset>
+        <fieldset className="wide">
+          <legend>Métiers</legend>
+          <small className="muted">
+            Coche les métiers qui t’intéressent. Le nombre indique les offres déjà connues autour de toi
+            {counts ? ` (${counts.total} au total)` : ""}, ajoutées tout de suite à ta liste.
+          </small>
+          <div className="categories">
+            {CATEGORIES.map((c) => {
+              const on = (prefs.categories ?? []).includes(c.id);
+              const n = counts?.byCategory[c.id];
+              return (
+                <label key={c.id} className={on ? "category active" : "category"} title={c.examples}>
+                  <input type="checkbox" className="sr" checked={on} onChange={() => toggleCategory(c.id)} />
+                  <span className="category-name">{c.label}</span>
+                  <span className="category-count">{counts ? `${n ?? 0} offre${(n ?? 0) > 1 ? "s" : ""}` : "…"}</span>
+                  <small className="muted">{c.examples}</small>
+                </label>
+              );
+            })}
+          </div>
+          {countsError && <small className="warn-text">Nombre d’offres indisponible : {countsError}</small>}
+        </fieldset>
         <label className="wide">
-          Métiers ou mots-clés
-          <input value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="développeur, intelligence artificielle, data" />
-          <small className="muted">Sépare-les par des virgules (8 maximum).</small>
+          Autre métier ou mots-clés (facultatif)
+          <input value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="ex. technicien fibre, intégrateur web" />
+          <small className="muted">Pour un métier qui n’est dans aucune case. Sépare-les par des virgules (8 maximum).</small>
         </label>
         <label>
           Ville

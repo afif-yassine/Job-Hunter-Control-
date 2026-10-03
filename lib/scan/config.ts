@@ -1,3 +1,4 @@
+import { CATEGORY_IDS, SCOPE_CONTRACTS, categorize, category, contractKind } from "./categories";
 import { parseAtsTarget, targetKey, type AtsTarget } from "./sources/ats";
 
 export type SearchQuery = {
@@ -13,11 +14,17 @@ export type ScanConfig = {
   maxAgeDays: number;
   /** Company careers pages read directly (Greenhouse, Lever, Ashby…). */
   targets: AtsTarget[];
+  /** Job categories ticked by the account (lib/scan/categories.ts). */
+  categories?: string[];
+  /** Contracts wanted: alternance, stage, cdd. */
+  contracts?: string[];
 };
 
 /** What the user edits in Réglages > Recherche. */
 export type ScanPrefs = {
   contracts: string[];
+  /** Job categories ticked instead of (or on top of) typed keywords. */
+  categories: string[];
   keywords: string[];
   city: string;
   departments: string[];
@@ -28,6 +35,7 @@ export type ScanPrefs = {
 
 export const DEFAULT_PREFS: ScanPrefs = {
   contracts: ["alternance", "stage"],
+  categories: [],
   keywords: ["développeur", "intelligence artificielle", "data"],
   city: "Paris",
   departments: ["75", "92", "93", "94", "91"],
@@ -52,8 +60,16 @@ export function normalizePrefs(value: unknown): ScanPrefs {
     .map((d) => d.padStart(2, "0"))
     .filter((d) => d.length <= 3 && d !== "00");
   return {
-    contracts: list(v.contracts, 4).length ? list(v.contracts, 4) : DEFAULT_PREFS.contracts,
-    keywords: list(v.keywords, 8).length ? list(v.keywords, 8) : DEFAULT_PREFS.keywords,
+    contracts: list(v.contracts, 4).filter((c) => SCOPE_CONTRACTS.includes(c as never)).length
+      ? list(v.contracts, 4).filter((c) => SCOPE_CONTRACTS.includes(c as never))
+      : DEFAULT_PREFS.contracts,
+    categories: list(v.categories, CATEGORY_IDS.length).filter((c) => CATEGORY_IDS.includes(c as never)),
+    // With categories ticked, typed keywords are optional.
+    keywords: list(v.keywords, 8).length
+      ? list(v.keywords, 8)
+      : list(v.categories, 1).length
+        ? []
+        : DEFAULT_PREFS.keywords,
     city: typeof v.city === "string" && v.city.trim() ? v.city.trim().slice(0, 60) : DEFAULT_PREFS.city,
     departments: departments.length ? departments : DEFAULT_PREFS.departments,
     maxAgeDays: Number.isFinite(days) && days >= 1 && days <= 60 ? Math.round(days) : DEFAULT_PREFS.maxAgeDays,
@@ -69,8 +85,14 @@ export function normalizePrefs(value: unknown): ScanPrefs {
 }
 
 /** contracts × keywords → search queries (capped to keep API quotas safe). */
-export function configFromPrefs(prefs: ScanPrefs, maxQueries = 8): ScanConfig {
+export function configFromPrefs(prefs: ScanPrefs, maxQueries = 10): ScanConfig {
   const queries: SearchQuery[] = [];
+  // Ticked categories first: the same words for everybody → shared cache.
+  for (const id of prefs.categories ?? [])
+    for (const contract of prefs.contracts) {
+      const c = category(id);
+      if (c && queries.length < maxQueries) queries.push({ keywords: `${contract} ${c.search}` });
+    }
   for (const keyword of prefs.keywords)
     for (const contract of prefs.contracts)
       if (queries.length < maxQueries) queries.push({ keywords: `${contract} ${keyword}` });
@@ -80,6 +102,8 @@ export function configFromPrefs(prefs: ScanPrefs, maxQueries = 8): ScanConfig {
     city: prefs.city,
     maxAgeDays: prefs.maxAgeDays,
     targets: prefs.targets.map(parseAtsTarget).filter((t): t is AtsTarget => Boolean(t)),
+    categories: prefs.categories ?? [],
+    contracts: prefs.contracts,
   };
 }
 
@@ -134,10 +158,12 @@ export function isRelevant(offer: {
   contract_type?: string | null;
   description?: string | null;
 }): boolean {
-  const head = `${offer.title} ${offer.contract_type ?? ""}`;
-  if (SENIOR.test(offer.title) && !CONTRACT.test(head)) return false;
-  const contractOk =
-    CONTRACT.test(head) || CONTRACT.test((offer.description ?? "").slice(0, 600));
-  const techOk = TECH.test(offer.title) || TECH.test((offer.description ?? "").slice(0, 600));
-  return contractOk && techOk;
+  // Scope: stage, alternance or CDD, in IT, digital or office jobs.
+  const kind = contractKind(offer);
+  const inScopeContract = SCOPE_CONTRACTS.includes(kind);
+  if (SENIOR.test(offer.title) && !inScopeContract) return false;
+  const start = (offer.description ?? "").slice(0, 600);
+  const contractOk = inScopeContract || (kind === "autre" && CONTRACT.test(start));
+  const jobOk = TECH.test(offer.title) || categorize(offer).length > 0 || TECH.test(start);
+  return contractOk && jobOk;
 }

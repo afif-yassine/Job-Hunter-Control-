@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normalizeText } from "@/lib/questions";
+import { searchWords } from "./words";
 import type { ScanConfig, SearchQuery } from "./config";
 import { inArea } from "./area";
+import { categorize, contractKind } from "./categories";
 import { canonicalUrl, fingerprintOf } from "./ingest";
 import type { ScannedOffer } from "./types";
 
@@ -35,36 +36,6 @@ export function dayBucket(days: number): number {
   return days <= 7 ? 7 : days <= 14 ? 14 : 31;
 }
 
-/** Words that do not change what a search finds. */
-const QUERY_NOISE = new Set("de d du des la le les l en et a au aux pour h f x hf fh".split(" "));
-
-/** Different words, same job: they share one cached search. */
-const QUERY_SYNONYMS: Record<string, string> = {
-  dev: "developpeur",
-  developer: "developpeur",
-  developpeuse: "developpeur",
-  engineer: "ingenieur",
-  ingenieure: "ingenieur",
-  alternant: "alternance",
-  alternante: "alternance",
-  apprentissage: "alternance",
-  apprenti: "alternance",
-  apprentie: "alternance",
-  apprenticeship: "alternance",
-  apprentice: "alternance",
-  trainee: "stage",
-  software: "developpeur",
-  stagiaire: "stage",
-  internship: "stage",
-  intern: "stage",
-  professionnalisation: "alternance",
-  ai: "intelligence artificielle",
-  ia: "intelligence artificielle",
-  fullstack: "full stack",
-  frontend: "front end",
-  backend: "back end",
-};
-
 /**
  * Identity of a query for the shared cache: case, accents, punctuation, word
  * order, filler words and common synonyms do not matter —
@@ -73,16 +44,6 @@ const QUERY_SYNONYMS: Record<string, string> = {
  */
 export function normalizeQuery(q: SearchQuery): string {
   return [...new Set(searchWords(q.keywords))].sort().join(" ");
-}
-
-/** Normalised, canonical words of a text (same rules as the cache identity). */
-export function searchWords(text: string): string[] {
-  return normalizeText(text)
-    .split(" ")
-    // Plural → singular ("développeurs", "analysts"), same rule on both sides.
-    .map((w) => (w.length > 4 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w))
-    .flatMap((w) => (QUERY_SYNONYMS[w] ?? w).split(" "))
-    .filter((w) => w && !QUERY_NOISE.has(w));
 }
 
 /** What makes two single-query searches identical for a source. */
@@ -128,6 +89,8 @@ export async function harvestOffers(
     published_at: o.publishedAt,
     rome_code: o.romeCode ?? null,
     board: o.board ?? null,
+    categories: categorize(o),
+    contract_kind: contractKind(o),
   }));
   for (let i = 0; i < rows.length; i += 200) {
     const { data, error } = await db.rpc("upsert_offers", { p_rows: rows.slice(i, i + 200) });
@@ -178,6 +141,7 @@ export function matchesQuery(
 }
 
 export { inArea } from "./area";
+export { searchWords } from "./words";
 
 type CatalogueRow = {
   id: string;
@@ -192,7 +156,23 @@ type CatalogueRow = {
   published_at: string | null;
   rome_code: string | null;
   board: string | null;
+  categories?: string[] | null;
+  contract_kind?: string | null;
 };
+
+/** Is the offer in one of the ticked categories, with a wanted contract? */
+export function matchesCategories(
+  offer: Pick<CatalogueRow, "title" | "contract_type" | "source" | "rome_code" | "categories" | "contract_kind">,
+  config: Pick<ScanConfig, "categories" | "contracts">,
+): boolean {
+  const wanted = config.categories ?? [];
+  if (!wanted.length) return false;
+  const cats = offer.categories?.length ? offer.categories : categorize({ title: offer.title, romeCode: offer.rome_code });
+  if (!cats.some((c) => wanted.includes(c))) return false;
+  const kinds = config.contracts ?? [];
+  const kind = offer.contract_kind || contractKind(offer);
+  return !kinds.length || kinds.includes(kind);
+}
 
 const IMPORT_SCAN = 3000;
 const IMPORT_MAX = 300;
@@ -208,11 +188,11 @@ export async function importFromCatalogue(
   now = Date.now(),
 ): Promise<{ offers: ScannedOffer[]; entries: Map<string, CatalogueEntry>; boards: string[]; error?: string }> {
   const empty = { offers: [], entries: new Map<string, CatalogueEntry>(), boards: [] };
-  if (!config.queries.length) return empty;
+  if (!config.queries.length && !(config.categories ?? []).length) return empty;
   const seenSince = new Date(now - (EXPIRE_DAYS + 1) * 86_400_000).toISOString();
   const { data, error } = await db
     .from("offers")
-    .select("id,fingerprint,title,company,location,contract_type,source,url,apply_url,published_at,rome_code,board")
+    .select("id,fingerprint,title,company,location,contract_type,source,url,apply_url,published_at,rome_code,board,categories,contract_kind")
     .eq("status", "open")
     .gte("last_seen_at", seenSince)
     .order("last_seen_at", { ascending: false })
@@ -222,7 +202,7 @@ export async function importFromCatalogue(
   const rows = ((data ?? []) as CatalogueRow[])
     .filter((o) => !o.published_at || Date.parse(o.published_at) >= cutoff)
     .filter((o) => inArea(o.location, config))
-    .filter((o) => config.queries.some((q) => matchesQuery(o, q)))
+    .filter((o) => matchesCategories(o, config) || config.queries.some((q) => matchesQuery(o, q)))
     .slice(0, IMPORT_MAX);
   if (!rows.length) return empty;
 
@@ -258,4 +238,38 @@ export async function importFromCatalogue(
     return offer;
   });
   return { offers, entries, boards: [...boards] };
+}
+
+/**
+ * How many open offers of each category the catalogue holds around the
+ * account (for the category picker). Computed from the offers' own fields:
+ * never calls a job site.
+ */
+export async function categoryCounts(
+  db: SupabaseClient,
+  area: Pick<ScanConfig, "city" | "departments" | "maxAgeDays" | "contracts">,
+  now = Date.now(),
+): Promise<{ total: number; byCategory: Record<string, number>; error?: string }> {
+  const { data, error } = await db
+    .from("offers")
+    .select("title,location,contract_type,source,rome_code,published_at,categories,contract_kind")
+    .eq("status", "open")
+    .order("last_seen_at", { ascending: false })
+    .limit(IMPORT_SCAN * 3);
+  if (error) return { total: 0, byCategory: {}, error: error.message };
+  const cutoff = now - area.maxAgeDays * 86_400_000;
+  const kinds = area.contracts ?? [];
+  const byCategory: Record<string, number> = {};
+  let total = 0;
+  for (const o of (data ?? []) as CatalogueRow[]) {
+    if (o.published_at && Date.parse(o.published_at) < cutoff) continue;
+    if (!inArea(o.location, area)) continue;
+    const kind = o.contract_kind || contractKind(o);
+    if (kinds.length && !kinds.includes(kind)) continue;
+    const cats = o.categories?.length ? o.categories : categorize({ title: o.title, romeCode: o.rome_code });
+    if (!cats.length) continue;
+    total += 1;
+    for (const c of cats) byCategory[c] = (byCategory[c] ?? 0) + 1;
+  }
+  return { total, byCategory };
 }

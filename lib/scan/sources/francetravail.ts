@@ -81,3 +81,62 @@ export async function scanFranceTravail(
   }
   return offers;
 }
+
+/** France Travail returns at most 150 offers per call and 3 150 per search. */
+export const FT_PAGE = 150;
+export const FT_MAX_INDEX = 3149;
+
+export type FtHarvestQuery = {
+  /** Whole "Informatique / Télécommunication" domain ("M18")… */
+  grandDomaine?: string;
+  /** …or a list of ROME codes (up to 200). */
+  codeROME?: string[];
+  /** E2 = apprentissage, FS = professionnalisation. */
+  natureContrat?: string;
+  typeContrat?: string;
+  region?: string;
+  departement?: string;
+};
+
+/** "offres 0-149/1234" → 1234. */
+export function ftTotal(contentRange: string | null): number | null {
+  const m = /\/(\d+)\s*$/.exec(contentRange ?? "");
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * One page of a national harvest search (offers of the last 31 days).
+ * `total` lets the caller split a search that exceeds 3 150 offers.
+ */
+export async function fetchFranceTravailPage(
+  query: FtHarvestQuery,
+  start: number,
+  token: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ offers: ScannedOffer[]; total: number | null; last: boolean }> {
+  const end = Math.min(start + FT_PAGE - 1, FT_MAX_INDEX);
+  const params = new URLSearchParams({ range: `${start}-${end}`, sort: "1", publieeDepuis: "31" });
+  if (query.grandDomaine) params.set("grandDomaine", query.grandDomaine);
+  if (query.codeROME?.length) params.set("codeROME", query.codeROME.slice(0, 200).join(","));
+  if (query.natureContrat) params.set("natureContrat", query.natureContrat);
+  if (query.typeContrat) params.set("typeContrat", query.typeContrat);
+  if (query.region) params.set("region", query.region);
+  if (query.departement) params.set("departement", query.departement);
+  const response = await fetchImpl(`${SEARCH_URL}?${params}`, {
+    headers: { authorization: `Bearer ${token}`, accept: "application/json" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (response.status === 204) return { offers: [], total: 0, last: true };
+  if (response.status === 429) throw new Error("France Travail : trop de requêtes (429), reprise à la prochaine tranche.");
+  if (response.status !== 200 && response.status !== 206) {
+    const detail = (await response.text().catch(() => "")).slice(0, 200);
+    throw new Error(`France Travail : HTTP ${response.status}${detail ? ` — ${detail}` : ""}`);
+  }
+  const total = ftTotal(response.headers.get("content-range"));
+  const body = (await response.json()) as { resultats?: FtOffer[] };
+  const offers = (body.resultats ?? []).map(mapFranceTravailOffer).filter((o): o is ScannedOffer => Boolean(o));
+  const last = response.status === 200 || end >= FT_MAX_INDEX || (total !== null && end + 1 >= total) || offers.length < FT_PAGE;
+  return { offers, total, last };
+}
+
+export { SCOPE as FT_OFFERS_SCOPE };
