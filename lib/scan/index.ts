@@ -22,7 +22,8 @@ import {
   queryCacheParts,
   withinDays,
 } from "./catalogue";
-import type { ScanConfig } from "./config";
+import type { ScanConfig, SearchQuery } from "./config";
+import { categorize, contractKind } from "./categories";
 import {
   BudgetReached,
   budgetedFetch,
@@ -70,6 +71,9 @@ async function userRomes(supabase: SupabaseClient, userId: string): Promise<stri
   const top = [...count.entries()].sort((a, b) => b[1] - a[1]).map(([code]) => code).slice(0, 10);
   return top.length ? top : DEFAULT_TECH_ROMES;
 }
+
+/** A category × contract with this many catalogue offers is not searched again per account. */
+const COVERED = 20;
 
 /** Companies' boards learnt from the catalogue, read on top of the account's own. */
 const SHARED_BOARDS = 15;
@@ -124,6 +128,13 @@ export async function runScan(ctx: {
   // no call to any job site. Their companies' boards are read too, so they
   // stay fresh and withdrawn offers are noticed.
   const fromCatalogue = await importFromCatalogue(ctx.supabase, config);
+  // Offers the catalogue gave for each ticked category × contract.
+  const coverage = new Map<string, number>();
+  for (const o of fromCatalogue.offers) {
+    const kind = contractKind(o);
+    for (const c of categorize(o)) coverage.set(`${c}|${kind}`, (coverage.get(`${c}|${kind}`) ?? 0) + 1);
+  }
+  const covered = (q: SearchQuery) => Boolean(q.category && q.contract && (coverage.get(`${q.category}|${q.contract}`) ?? 0) >= COVERED);
   const ignored = new Set(discovered?.ignored ?? []);
   const reading = new Set(config.targets.map(targetKey));
   for (const board of fromCatalogue.boards.slice(0, SHARED_BOARDS)) {
@@ -228,9 +239,16 @@ export async function runScan(ctx: {
     const budget = shared ? budgetFor(source.id, env) : null;
     const fetchImpl = budget ? budgetedFetch(platformDb, source.id, budget) : fetch;
 
+    // Category queries the platform harvest already covers well are not
+    // searched again for this account: its offers come from the catalogue.
+    const queries = config.queries.filter((q) => !covered(q));
+    if (source.perQuery && !queries.length) {
+      reports.push({ source: source.name, status: "ok", found: 0, message: "Déjà couvert par la collecte plateforme (catalogue commun)" });
+      return;
+    }
     // One unit = one call to the source (one query, or the whole search).
     const units: { key: string | null; config: ScanConfig }[] = source.perQuery
-      ? config.queries.slice(0, source.perQuery).map((q) => ({
+      ? queries.slice(0, source.perQuery).map((q) => ({
           key: useCache ? cacheKey(queryCacheParts(source.id, q, config)) : null,
           // Standard window so that accounts at 10 or 14 days share the call.
           config: { ...config, queries: [q], maxAgeDays: dayBucket(config.maxAgeDays) },

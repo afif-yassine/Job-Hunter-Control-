@@ -4,6 +4,7 @@ import { QUOTA_CODE } from "@/lib/quota";
 import { runScan } from "@/lib/scan";
 import type { ScanSummary } from "@/lib/scan/types";
 import { analyzeJob } from "./analyze";
+import { stillOnline } from "./availability";
 import { generateForJob } from "./generate";
 
 /**
@@ -178,7 +179,16 @@ export async function runServerTick(options: TickOptions): Promise<TickReport> {
       }
       if (generationBlocked.has(job.user_id)) continue;
       const t = tally(job.user_id);
-      const result = await generateForJob({ supabase, userId: job.user_id, jobId: job.id, env, ai: options.ai });
+      const result = await generateForJob({
+        supabase,
+        userId: job.user_id,
+        jobId: job.id,
+        env,
+        ai: options.ai,
+        // Real runs check the offer is still online; injected test runs do not.
+        checkOnline: options.ai ? undefined : (j) => stillOnline(j, env),
+        service: supabase,
+      });
       const error = String(result.body.error ?? "");
       if (result.status === 200) t.generated += 1;
       else if (result.body.code === QUOTA_CODE) {

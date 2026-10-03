@@ -3,6 +3,10 @@ import { parseAtsTarget, targetKey, type AtsTarget } from "./sources/ats";
 
 export type SearchQuery = {
   keywords: string;
+  /** Set when the query comes from a ticked category (the platform harvests those). */
+  category?: string;
+  /** Contract of a category query (alternance, stage, cdd). */
+  contract?: string;
 };
 
 export type ScanConfig = {
@@ -91,7 +95,7 @@ export function configFromPrefs(prefs: ScanPrefs, maxQueries = 10): ScanConfig {
   for (const id of prefs.categories ?? [])
     for (const contract of prefs.contracts) {
       const c = category(id);
-      if (c && queries.length < maxQueries) queries.push({ keywords: `${contract} ${c.search}` });
+      if (c && queries.length < maxQueries) queries.push({ keywords: `${contract} ${c.search}`, category: c.id, contract });
     }
   for (const keyword of prefs.keywords)
     for (const contract of prefs.contracts)

@@ -1,0 +1,60 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getFranceTravailToken } from "@/lib/france-travail/client";
+import { FT_OFFERS_SCOPE } from "@/lib/scan/sources/francetravail";
+
+/**
+ * Is the offer still online? Checked just before writing a CV and a letter
+ * (the expensive step). Only a clear "gone" counts: a site refusing robots
+ * (403), a timeout or a network error never removes an offer.
+ */
+
+type Env = Record<string, string | undefined>;
+export type OnlineCheck = { online: boolean | null; reason?: string };
+export type OnlineJob = { source_platform?: string | null; source_url?: string | null; official_url?: string | null };
+
+const FT_DETAIL = /francetravail\.fr\/offres\/recherche\/detail\/([A-Za-z0-9]+)/;
+const FT_API = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/";
+
+export async function stillOnline(job: OnlineJob, env: Env = process.env, fetchImpl: typeof fetch = fetch): Promise<OnlineCheck> {
+  try {
+    // France Travail: ask its API for the offer itself (its public page stays up).
+    const ft = FT_DETAIL.exec(job.source_url ?? "");
+    if (ft && env.FRANCE_TRAVAIL_CLIENT_ID && env.FRANCE_TRAVAIL_CLIENT_SECRET) {
+      const token = await getFranceTravailToken(FT_OFFERS_SCOPE, env, fetchImpl);
+      const r = await fetchImpl(`${FT_API}${ft[1]}`, {
+        headers: { authorization: `Bearer ${token}`, accept: "application/json" },
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (r.status === 204 || r.status === 404 || r.status === 410)
+        return { online: false, reason: "France Travail ne publie plus cette offre." };
+      return { online: r.ok ? true : null };
+    }
+    const url = job.official_url || job.source_url;
+    if (!url || !/^https:\/\//.test(url)) return { online: null };
+    const r = await fetchImpl(url, {
+      redirect: "follow",
+      headers: { "user-agent": "Mozilla/5.0 (compatible; JobHunterControl/1.0; personal job assistant)", accept: "text/html" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (r.status === 404 || r.status === 410) return { online: false, reason: `La page de l’offre n’existe plus (HTTP ${r.status}).` };
+    return { online: r.ok ? true : null };
+  } catch {
+    return { online: null };
+  }
+}
+
+/** The account's copy leaves its lists; the shared offer is closed for everybody (service client). */
+export async function markGone(
+  supabase: SupabaseClient,
+  service: SupabaseClient | null,
+  job: { id: string; offer_id?: string | null },
+  userId: string,
+  reason: string,
+): Promise<void> {
+  await supabase
+    .from("jobs")
+    .update({ gone_reason: `${reason} Vérifié juste avant de créer le CV.`, gone_at: new Date().toISOString() })
+    .eq("id", job.id)
+    .eq("user_id", userId);
+  if (service && job.offer_id) await service.rpc("close_offer", { p_offer: job.offer_id, p_reason: reason });
+}

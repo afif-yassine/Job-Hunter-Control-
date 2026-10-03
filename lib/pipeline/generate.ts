@@ -5,6 +5,7 @@ import { normaliseGenerated, parseJson, type Generated } from "@/lib/generated";
 import { queueQuestions, type QueueResult } from "@/lib/question-store";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
 import type { StepResult } from "./analyze";
+import { markGone, type OnlineCheck, type OnlineJob } from "./availability";
 
 type Ctx = {
   supabase: SupabaseClient;
@@ -12,6 +13,10 @@ type Ctx = {
   jobId: string;
   env?: Record<string, string | undefined>;
   ai?: AiCall;
+  /** Checks the offer is still online before spending anything (none = no check). */
+  checkOnline?: (job: OnlineJob) => Promise<OnlineCheck>;
+  /** Service client, to close the shared offer when it is gone. */
+  service?: SupabaseClient | null;
 };
 
 /** Same rule as lib/api safeFilename (kept here: no server-only import). */
@@ -49,6 +54,18 @@ export async function generateForJob(ctx: Ctx): Promise<StepResult> {
       status: 409,
       body: { error: "Cette offre est dans « À vérifier » : confirme-la d’abord.", code: "TO_REVIEW" },
     };
+
+  // An offer taken down since it was found: nothing is written, nothing is spent.
+  if (ctx.checkOnline) {
+    const check = await ctx.checkOnline(job);
+    if (check.online === false) {
+      await markGone(supabase, ctx.service ?? null, job, userId, check.reason ?? "Offre retirée.");
+      return {
+        status: 410,
+        body: { error: `Cette offre n’est plus en ligne (${check.reason ?? "retirée"}) : rien n’a été dépensé.`, code: "GONE" },
+      };
+    }
+  }
 
   const quota = await consumeQuota(supabase, userId, "generation", env);
   if (!quota.ok) return quotaRefusal("generation", quota.limit);

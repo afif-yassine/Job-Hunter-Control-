@@ -237,3 +237,47 @@ test("a new account with no key at all gets the offers others already found, and
   const { seedFromCatalogue } = await import("../lib/scan");
   assert.equal(await seedFromCatalogue(account.db, "new"), 0); // already in the list
 });
+
+test("a ticked category the harvest covers well is not searched again for the account", async () => {
+  const now = new Date().toISOString();
+  const offers = Array.from({ length: 25 }, (_, i) => ({
+    id: `o${i}`,
+    fingerprint: `fp${i}`,
+    title: `Alternance Ingénieur DevOps ${i}`,
+    company: `C${i}`,
+    location: "Paris",
+    contract_type: "Contrat apprentissage",
+    source: "francetravail",
+    url: `https://x.test/${i}`,
+    apply_url: null,
+    published_at: now.slice(0, 10),
+    rome_code: "M1827",
+    board: null,
+    categories: ["devops"],
+    contract_kind: "alternance",
+    status: "open",
+    last_seen_at: now,
+    description: "Mise en place de pipelines CI/CD et d’infrastructure cloud en alternance.",
+  }));
+  const asked: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    asked.push(new URL(String(input)).searchParams.get("query") ?? "");
+    return new Response(JSON.stringify({ data: [] }), { status: 200 });
+  }) as typeof fetch;
+  const account = fakeSupabase(
+    {
+      offers,
+      jobs: [],
+      job_sources: [],
+      applications: [],
+      user_settings: [{ user_id: "u1", scan_config: { contracts: ["alternance", "stage"], categories: ["devops"], keywords: [], city: "Paris", departments: ["75"] } }],
+      agent_runs: [],
+      notifications: [],
+    },
+    { rpc: { record_source_run: () => null, consume_source_budget: () => true } },
+  );
+  const summary = await runScan({ supabase: account.db, userId: "u1", env: { JSEARCH_API_KEY: "k" }, cacheDb: null });
+  // "alternance devops" came from the catalogue (25 offers); only "stage devops" was searched.
+  assert.deepEqual(asked, ["stage devops"]);
+  assert.equal(summary.inserted, 25);
+});

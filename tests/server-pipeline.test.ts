@@ -252,3 +252,43 @@ test("server run: stops before the time budget, and a full quota only pauses tha
   const timed = await runServerTick({ supabase: slow.db, env: {}, ai, now: () => (t += 20_000), fetchPage: async () => null });
   assert.equal(timed.stoppedBy, "time");
 });
+
+test("generation: an offer taken down since it was found is closed, nothing is written or spent", async () => {
+  const { db, tables } = world([job("j1", { status: "ANALYZED", match_score: 90, offer_id: "o1" })]);
+  const { ai, calls } = aiReturning(DOCS);
+  const closed: Record<string, unknown>[] = [];
+  const service = fakeSupabase({}, { rpc: { close_offer: (a) => (closed.push(a), 1) } }).db;
+  const r = await generateForJob({
+    supabase: db,
+    userId: "u1",
+    jobId: "j1",
+    ai,
+    service,
+    checkOnline: async () => ({ online: false, reason: "La page de l’offre n’existe plus (HTTP 404)." }),
+  });
+  assert.equal(r.status, 410);
+  assert.equal(calls.length, 0);
+  assert.equal(tables.documents.length, 0);
+  assert.match(String(tables.jobs[0].gone_reason), /n’existe plus/);
+  assert.deepEqual(closed.map((a) => a.p_offer), ["o1"]);
+  // Unsure (robots refused, timeout): generation goes on.
+  const ok = world([job("j2", { status: "ANALYZED", match_score: 90 })]);
+  const r2 = await generateForJob({ supabase: ok.db, userId: "u1", jobId: "j2", ai, checkOnline: async () => ({ online: null }) });
+  assert.equal(r2.status, 200);
+});
+
+test("still online? France Travail asked through its API; only 404 / 410 / 204 mean gone", async () => {
+  const { stillOnline } = await import("../lib/pipeline/availability");
+  const env = { FRANCE_TRAVAIL_CLIENT_ID: "i", FRANCE_TRAVAIL_CLIENT_SECRET: "s" };
+  const reply = (status: number) =>
+    (async (input: RequestInfo | URL) =>
+      String(input).includes("access_token") ? new Response(JSON.stringify({ access_token: "t" })) : new Response(null, { status })) as typeof fetch;
+  const ft = { source_url: "https://candidat.francetravail.fr/offres/recherche/detail/203ABCD" };
+  assert.equal((await stillOnline(ft, env, reply(204))).online, false);
+  assert.equal((await stillOnline(ft, env, reply(200))).online, true);
+  const page = { official_url: "https://jobs.lever.co/acme/1" };
+  assert.equal((await stillOnline(page, {}, reply(404))).online, false);
+  assert.equal((await stillOnline(page, {}, reply(410))).online, false);
+  assert.equal((await stillOnline(page, {}, reply(403))).online, null);
+  assert.equal((await stillOnline(page, {}, (async () => { throw new Error("timeout"); }) as typeof fetch)).online, null);
+});
