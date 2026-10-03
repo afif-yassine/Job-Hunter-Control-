@@ -151,3 +151,89 @@ test("an offer no longer available is never sent to the AI", async () => {
   assert.equal(result.status, 410);
   assert.equal(aiCalls, 0);
 });
+
+test("catalogue match: the job words in the title, the contract in title or contract type, in the account's area", async () => {
+  const { matchesQuery, inArea } = await import("../lib/scan/catalogue");
+  const q = { keywords: "alternance développeur web" };
+  assert.ok(matchesQuery({ title: "Développeur Web (H/F)", contract_type: "Contrat d'apprentissage" }, q));
+  assert.ok(matchesQuery({ title: "Web developer — alternant" }, q));
+  assert.ok(matchesQuery({ title: "Développeur web", source: "lba:francetravail" }, q));
+  assert.ok(!matchesQuery({ title: "Développeur web", contract_type: "CDI" }, q));
+  assert.ok(!matchesQuery({ title: "Développeur mobile", contract_type: "Alternance" }, q));
+  assert.ok(matchesQuery({ title: "Stage IA générative" }, { keywords: "stage intelligence artificielle" }));
+  const area = { city: "Paris", departments: ["75", "92"] };
+  assert.ok(inArea("75 - PARIS 08", area));
+  assert.ok(inArea("Nanterre (92)", area));
+  assert.ok(inArea("92100 Boulogne-Billancourt", area));
+  assert.ok(!inArea("Lyon 69003", area));
+  assert.ok(!inArea("Paris-l'Hôpital 71150".replace("Paris-l'Hôpital", "Chagny"), area));
+  assert.ok(!inArea(null, area));
+  // Communes and département names written without any number.
+  assert.ok(inArea("Puteaux, Hauts-de-Seine", area));
+  assert.ok(inArea("La Défense, Courbevoie", area));
+  assert.ok(inArea("Issy-les-Moulineaux", area));
+  assert.ok(!inArea("Montreuil", area)); // 93, not chosen
+  assert.ok(inArea("Montreuil", { city: "Paris", departments: ["93"] }));
+  assert.ok(!inArea("Versailles - 78", area));
+  assert.ok(inArea("Ile-de-France", area));
+  assert.ok(!inArea("Yvelines, Ile-de-France", area));
+  // Plurals and English titles.
+  assert.ok(matchesQuery({ title: "Software Engineer Intern" }, { keywords: "stage développeur" }));
+  assert.ok(matchesQuery({ title: "Développeurs web", contract_type: "Apprentice" }, q));
+});
+
+test("a new account with no key at all gets the offers others already found, and nothing is harvested again", async () => {
+  const now = new Date().toISOString();
+  const row = (id: string, over: Record<string, unknown>) => ({
+    id,
+    fingerprint: `fp-${id}`,
+    title: "Alternance Développeur Web",
+    company: `Company ${id}`,
+    location: "Paris 11e",
+    contract_type: "Alternance",
+    description: "Développement web front et back en alternance, React et Node.",
+    source: "francetravail",
+    url: `https://x.test/${id}`,
+    apply_url: null,
+    published_at: now.slice(0, 10),
+    rome_code: "M1805",
+    board: null,
+    status: "open",
+    last_seen_at: now,
+    ...over,
+  });
+  const account = fakeSupabase(
+    {
+      offers: [
+        row("1", {}),
+        row("2", { title: "Web developer apprenticeship", board: "lever:acme" }),
+        row("3", { location: "Lyon" }), // elsewhere
+        row("4", { status: "closed" }), // withdrawn
+        row("5", { title: "Comptable" }), // another job
+      ],
+      jobs: [],
+      job_sources: [],
+      applications: [],
+      user_settings: [{ user_id: "new", scan_config: { contracts: ["alternance"], keywords: ["développeur web"], city: "Paris", departments: ["75"] } }],
+      agent_runs: [],
+      notifications: [],
+    },
+    { rpc: { record_source_run: () => null, consume_source_budget: () => true } },
+  );
+  globalThis.fetch = (async () => new Response("[]")) as typeof fetch; // the shared Lever board: empty page
+  let harvested: unknown[] = [];
+  const cache = fakeSupabase({ source_cache: [] }, {
+    rpc: { upsert_offers: (a) => ((harvested = a.p_rows as unknown[]), []), close_board_offers: () => 0, expire_offers: () => 0 },
+  });
+  const summary = await runScan({ supabase: account.db, userId: "new", env: {}, cacheDb: cache.db });
+  assert.equal(summary.configured, true);
+  assert.equal(summary.inserted, 2);
+  assert.deepEqual(account.tables.jobs.map((j) => j.offer_id).sort(), ["1", "2"]);
+  assert.equal(summary.reports.find((r) => r.source === "Catalogue commun")!.found, 2);
+  assert.equal(harvested.length, 0);
+  // The company behind a catalogue offer is read too (here: Lever "acme").
+  assert.ok(summary.reports.some((r) => r.source.startsWith("Pages carrière") && r.status === "ok"));
+
+  const { seedFromCatalogue } = await import("../lib/scan");
+  assert.equal(await seedFromCatalogue(account.db, "new"), 0); // already in the list
+});

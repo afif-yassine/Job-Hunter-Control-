@@ -5,14 +5,23 @@ import { configFromPrefs, isRelevant } from "./config";
 import { ingestOffers } from "./ingest";
 import { scanAdzuna } from "./sources/adzuna";
 import { discoveredTargets, loadDiscovered, mergeDiscovered, saveDiscovered } from "./discover";
-import { scanAts, targetKey } from "./sources/ats";
+import { parseAtsTarget, scanAts, targetKey } from "./sources/ats";
 import { scanFranceTravail } from "./sources/francetravail";
 import { scanGmailAlerts } from "./sources/gmail";
 import { scanJooble } from "./sources/jooble";
 import { scanJSearch } from "./sources/jsearch";
 import { DEFAULT_TECH_ROMES, scanLba } from "./sources/lba";
 import { serviceClient } from "@/lib/supabase/admin";
-import { closeBoardOffers, dayBucket, expireOffers, harvestOffers, queryCacheParts, withinDays } from "./catalogue";
+import {
+  closeBoardOffers,
+  dayBucket,
+  expireOffers,
+  harvestOffers,
+  importFromCatalogue,
+  offerFingerprint,
+  queryCacheParts,
+  withinDays,
+} from "./catalogue";
 import type { ScanConfig } from "./config";
 import {
   BudgetReached,
@@ -62,6 +71,9 @@ async function userRomes(supabase: SupabaseClient, userId: string): Promise<stri
   return top.length ? top : DEFAULT_TECH_ROMES;
 }
 
+/** Companies' boards learnt from the catalogue, read on top of the account's own. */
+const SHARED_BOARDS = 15;
+
 type SourceDef = {
   id: SourceId;
   name: string;
@@ -108,6 +120,19 @@ export async function runScan(ctx: {
   const manualKeys = new Set(config.targets.map(targetKey));
   if (discovered)
     for (const t of discoveredTargets(discovered)) if (!manualKeys.has(targetKey(t))) config.targets.push(t);
+  // Offers other accounts already found (any wording) that answer this search:
+  // no call to any job site. Their companies' boards are read too, so they
+  // stay fresh and withdrawn offers are noticed.
+  const fromCatalogue = await importFromCatalogue(ctx.supabase, config);
+  const ignored = new Set(discovered?.ignored ?? []);
+  const reading = new Set(config.targets.map(targetKey));
+  for (const board of fromCatalogue.boards.slice(0, SHARED_BOARDS)) {
+    const t = parseAtsTarget(board);
+    if (t && !reading.has(board) && !ignored.has(board)) {
+      config.targets.push(t);
+      reading.add(board);
+    }
+  }
   const reports: SourceReport[] = [];
   const collected: ScannedOffer[] = [];
   // Careers boards read in full this scan → every link they list.
@@ -320,8 +345,8 @@ export async function runScan(ctx: {
     if (JSON.stringify(next) !== JSON.stringify(discovered)) await saveDiscovered(ctx.supabase, ctx.userId, next);
   }
 
-  // Company careers pages alone do not need any key.
-  const configured = sources.some((s) => s.enabled) || config.targets.length > 0;
+  // Company careers pages and the catalogue alone do not need any key.
+  const configured = sources.some((s) => s.enabled) || config.targets.length > 0 || fromCatalogue.offers.length > 0;
   const relevant = collected.filter(isRelevant);
   // Shared catalogue: store / refresh what was seen, close what left its board,
   // expire what nobody has seen for 3 weeks. Never blocks the scan.
@@ -330,7 +355,18 @@ export async function runScan(ctx: {
     for (const [board, urls] of Object.entries(listedBoards)) await closeBoardOffers(cacheDb, board, urls);
     await expireOffers(cacheDb);
   }
-  const ingest = await ingestOffers(ctx.supabase, ctx.userId, relevant, harvest.error ? undefined : harvest.entries);
+  // Catalogue offers are not harvested again (that would keep them alive forever).
+  const fresh = new Set(relevant.map(offerFingerprint));
+  const imported = fromCatalogue.offers.filter((o) => isRelevant(o) && !fresh.has(offerFingerprint(o)));
+  if (fromCatalogue.offers.length)
+    reports.push({
+      source: "Catalogue commun",
+      status: "ok",
+      found: imported.length,
+      message: "Offres déjà trouvées par d’autres recherches : aucun appel aux sites d’emploi.",
+    });
+  const entries = harvest.error ? new Map(fromCatalogue.entries) : new Map([...fromCatalogue.entries, ...harvest.entries]);
+  const ingest = await ingestOffers(ctx.supabase, ctx.userId, [...relevant, ...imported], entries.size ? entries : undefined);
   if (ingest.error)
     reports.push({
       source: "Base de données",
@@ -341,8 +377,8 @@ export async function runScan(ctx: {
 
   const summary: ScanSummary = {
     reports,
-    found: collected.length,
-    relevant: relevant.length,
+    found: collected.length + imported.length,
+    relevant: relevant.length + imported.length,
     inserted: ingest.inserted,
     duplicates: ingest.duplicates,
     alreadyApplied: ingest.alreadyApplied,
@@ -407,4 +443,19 @@ export function scanMessage(s: ScanSummary): string {
     ? ` Erreur : ${errors.map((e) => `${e.source} — ${e.message}`).join(" ; ")}`
     : "";
   return head + learned + extra + problems;
+}
+
+/**
+ * Fill the account's list from the shared catalogue only (no job site
+ * called): right after sign-up or a change of search. Returns how many
+ * offers were added.
+ */
+export async function seedFromCatalogue(supabase: SupabaseClient, userId: string): Promise<number> {
+  const settings = await loadUserSettings(supabase, userId);
+  const config = configFromPrefs(settings.prefs);
+  const found = await importFromCatalogue(supabase, config);
+  const offers = found.offers.filter(isRelevant);
+  if (!offers.length) return 0;
+  const result = await ingestOffers(supabase, userId, offers, found.entries);
+  return result.inserted;
 }

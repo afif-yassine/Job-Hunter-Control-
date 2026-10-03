@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeText } from "@/lib/questions";
 import type { ScanConfig, SearchQuery } from "./config";
+import { inArea } from "./area";
 import { canonicalUrl, fingerprintOf } from "./ingest";
 import type { ScannedOffer } from "./types";
 
@@ -50,10 +51,15 @@ const QUERY_SYNONYMS: Record<string, string> = {
   apprenti: "alternance",
   apprentie: "alternance",
   apprenticeship: "alternance",
+  apprentice: "alternance",
+  trainee: "stage",
+  software: "developpeur",
   stagiaire: "stage",
   internship: "stage",
   intern: "stage",
-  ai: "ia",
+  professionnalisation: "alternance",
+  ai: "intelligence artificielle",
+  ia: "intelligence artificielle",
   fullstack: "full stack",
   frontend: "front end",
   backend: "back end",
@@ -66,11 +72,17 @@ const QUERY_SYNONYMS: Record<string, string> = {
  * "web developer alternant" are the same search.
  */
 export function normalizeQuery(q: SearchQuery): string {
-  const words = normalizeText(q.keywords)
+  return [...new Set(searchWords(q.keywords))].sort().join(" ");
+}
+
+/** Normalised, canonical words of a text (same rules as the cache identity). */
+export function searchWords(text: string): string[] {
+  return normalizeText(text)
     .split(" ")
+    // Plural → singular ("développeurs", "analysts"), same rule on both sides.
+    .map((w) => (w.length > 4 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w))
     .flatMap((w) => (QUERY_SYNONYMS[w] ?? w).split(" "))
     .filter((w) => w && !QUERY_NOISE.has(w));
-  return [...new Set(words)].sort().join(" ");
 }
 
 /** What makes two single-query searches identical for a source. */
@@ -138,4 +150,112 @@ export async function expireOffers(db: SupabaseClient | null, days = EXPIRE_DAYS
   if (!db) return 0;
   const { data, error } = await db.rpc("expire_offers", { p_days: days });
   return error ? 0 : Number(data) || 0;
+}
+
+// Import from the catalogue ----------------------------------------------------
+
+const CONTRACT_WORDS = new Set(["alternance", "stage", "cdi", "cdd", "interim", "freelance"]);
+
+/**
+ * Does this offer answer this query? Every job word of the query must be in
+ * the title (after normalisation and synonyms); a contract word (alternance,
+ * stage…) must be in the title or the contract type.
+ */
+export function matchesQuery(
+  offer: { title: string; contract_type?: string | null; source?: string | null },
+  query: SearchQuery,
+): boolean {
+  const words = searchWords(query.keywords);
+  const contracts = words.filter((w) => CONTRACT_WORDS.has(w));
+  const job = words.filter((w) => !CONTRACT_WORDS.has(w));
+  if (!job.length) return false;
+  const has = new Set(searchWords(`${offer.title} ${offer.contract_type ?? ""}`));
+  if (!job.every((w) => has.has(w))) return false;
+  if (!contracts.length) return true;
+  // La bonne alternance only lists apprenticeships.
+  const apprenticeshipSite = /^lba\b|labonnealternance/.test(offer.source ?? "");
+  return contracts.some((c) => has.has(c) || (c === "alternance" && apprenticeshipSite));
+}
+
+export { inArea } from "./area";
+
+type CatalogueRow = {
+  id: string;
+  fingerprint: string;
+  title: string;
+  company: string;
+  location: string | null;
+  contract_type: string | null;
+  source: string;
+  url: string;
+  apply_url: string | null;
+  published_at: string | null;
+  rome_code: string | null;
+  board: string | null;
+};
+
+const IMPORT_SCAN = 3000;
+const IMPORT_MAX = 300;
+
+/**
+ * Offers already in the catalogue (found by any account, any wording) that
+ * answer this account's search: no call to any job site. Read with the
+ * account's own client (offers are readable by every signed-in user).
+ */
+export async function importFromCatalogue(
+  db: SupabaseClient,
+  config: ScanConfig,
+  now = Date.now(),
+): Promise<{ offers: ScannedOffer[]; entries: Map<string, CatalogueEntry>; boards: string[]; error?: string }> {
+  const empty = { offers: [], entries: new Map<string, CatalogueEntry>(), boards: [] };
+  if (!config.queries.length) return empty;
+  const seenSince = new Date(now - (EXPIRE_DAYS + 1) * 86_400_000).toISOString();
+  const { data, error } = await db
+    .from("offers")
+    .select("id,fingerprint,title,company,location,contract_type,source,url,apply_url,published_at,rome_code,board")
+    .eq("status", "open")
+    .gte("last_seen_at", seenSince)
+    .order("last_seen_at", { ascending: false })
+    .limit(IMPORT_SCAN);
+  if (error) return { ...empty, error: error.message };
+  const cutoff = now - config.maxAgeDays * 86_400_000;
+  const rows = ((data ?? []) as CatalogueRow[])
+    .filter((o) => !o.published_at || Date.parse(o.published_at) >= cutoff)
+    .filter((o) => inArea(o.location, config))
+    .filter((o) => config.queries.some((q) => matchesQuery(o, q)))
+    .slice(0, IMPORT_MAX);
+  if (!rows.length) return empty;
+
+  // Full texts only for the offers kept (the catalogue can be large).
+  const texts = new Map<string, string | null>();
+  for (let i = 0; i < rows.length; i += 100) {
+    const { data: part } = await db
+      .from("offers")
+      .select("id,description")
+      .in("id", rows.slice(i, i + 100).map((r) => r.id));
+    for (const r of (part ?? []) as { id: string; description: string | null }[]) texts.set(r.id, r.description);
+  }
+  const entries = new Map<string, CatalogueEntry>();
+  const boards = new Set<string>();
+  const offers = rows.map((r): ScannedOffer => {
+    if (r.board) boards.add(r.board);
+    const offer: ScannedOffer = {
+      source: r.source,
+      company: r.company,
+      title: r.title,
+      location: r.location,
+      contract_type: r.contract_type,
+      description: texts.get(r.id) ?? null,
+      url: r.url,
+      applyUrl: r.apply_url,
+      publishedAt: r.published_at,
+      romeCode: r.rome_code,
+      board: r.board ?? undefined,
+    };
+    // Keyed like ingestOffers computes it (and as stored, should the rules change).
+    entries.set(offerFingerprint(offer), { id: r.id, status: "open" });
+    entries.set(r.fingerprint, { id: r.id, status: "open" });
+    return offer;
+  });
+  return { offers, entries, boards: [...boards] };
 }

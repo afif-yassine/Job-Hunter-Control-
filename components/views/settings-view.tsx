@@ -267,7 +267,7 @@ const split = (text: string) =>
     .filter(Boolean);
 
 function SearchSection({ ctx }: { ctx: Ctx }) {
-  const { notify, status, refreshStatus } = ctx;
+  const { notify, status, refreshStatus, reload } = ctx;
   const [prefs, setPrefs] = useState<ScanPrefs>(DEFAULT_PREFS);
   const [keywords, setKeywords] = useState(DEFAULT_PREFS.keywords.join(", "));
   const [departments, setDepartments] = useState(DEFAULT_PREFS.departments.join(", "));
@@ -326,7 +326,14 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
       setDepartments(body.prefs.departments.join(", "));
       setTargets((body.prefs.targets ?? []).join("\n"));
       await refreshStatus();
-      notify("Recherche enregistrée. Elle sera utilisée au prochain lancement.", "good");
+      const imported = Number(body.imported) || 0;
+      if (imported) await reload();
+      notify(
+        imported
+          ? `Recherche enregistrée : ${imported} offre(s) déjà connue(s) ajoutée(s) tout de suite, sans attendre la prochaine recherche.`
+          : "Recherche enregistrée. Elle sera utilisée au prochain lancement.",
+        "good",
+      );
     } catch (error) {
       notify(error instanceof Error ? error.message : "Erreur", "bad");
     } finally {

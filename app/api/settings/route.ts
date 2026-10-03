@@ -2,6 +2,7 @@ import { z } from "zod";
 import { authenticatedClient } from "@/lib/api";
 import { normalizePrefs } from "@/lib/scan/config";
 import { loadDiscovered } from "@/lib/scan/discover";
+import { seedFromCatalogue } from "@/lib/scan";
 import { loadUserSettings, saveUserSettings } from "@/lib/settings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -43,5 +44,9 @@ export async function PUT(req: Request) {
       },
       { status: 400 },
     );
-  return Response.json(await settingsWithDiscovered(auth.supabase, auth.userId));
+  // New search → the offers other accounts already found for it, right away
+  // and without calling any job site. Best effort: the save stands anyway.
+  const imported =
+    parsed.data.prefs === undefined ? 0 : await seedFromCatalogue(auth.supabase, auth.userId).catch(() => 0);
+  return Response.json({ ...(await settingsWithDiscovered(auth.supabase, auth.userId)), imported });
 }
