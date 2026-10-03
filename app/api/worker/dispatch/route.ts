@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { authenticatedClient } from "@/lib/api";
 import { applicationMode, isSafeMode } from "@/lib/config";
 import { queueQuestions } from "@/lib/question-store";
 import type { IncomingQuestion } from "@/lib/questions";
@@ -10,15 +10,10 @@ const payload = z.object({
   action: z.enum(["inspect", "prepare"]),
 });
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  if (!supabase)
-    return Response.json(
-      { error: "Supabase is not configured" },
-      { status: 503 },
-    );
-  const { data } = await supabase.auth.getClaims();
-  if (!data?.claims?.sub)
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  // Opening a page in the worker's browser is costly: a tight per-account limit.
+  const auth = await authenticatedClient("probe");
+  if ("error" in auth) return auth.error;
+  const { supabase } = auth;
   // A missing APPLICATION_MODE means PREPARE_ONLY (the only mode that exists).
   // Only an explicit, different value is refused.
   if (!isSafeMode())
@@ -39,7 +34,7 @@ export async function POST(req: Request) {
   const parsed = payload.safeParse(await req.json());
   if (!parsed.success)
     return Response.json({ error: "Invalid payload" }, { status: 400 });
-  const userId = String(data.claims.sub);
+  const { userId } = auth;
   const { data: application } = await supabase
     .from("applications")
     .select("id,job_id,jobs(official_url,source_url)")

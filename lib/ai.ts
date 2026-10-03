@@ -13,7 +13,12 @@ import { GoogleGenAI } from "@google/genai";
 export const DEFAULT_MODEL = "gemini-3.6-flash";
 
 export type AiTask = "analysis" | "writing";
-export type AiResult = { text: string; model: string };
+export type AiResult = {
+  text: string;
+  model: string;
+  /** Tokens billed by the provider (absent in tests or if not reported). */
+  usage?: { input: number; output: number };
+};
 /** Injected in tests; defaults to the configured provider. */
 export type AiCall = (prompt: string, task: AiTask) => Promise<AiResult>;
 
@@ -42,7 +47,30 @@ export async function generateJson(prompt: string, task: AiTask, env: Env = proc
     contents: prompt,
     config: { responseMimeType: "application/json" },
   });
-  return { text: result.text || "", model };
+  const meta = result.usageMetadata;
+  const usage = meta
+    ? {
+        input: meta.promptTokenCount ?? 0,
+        // Thinking tokens are billed as output.
+        output: (meta.candidatesTokenCount ?? 0) + (meta.thoughtsTokenCount ?? 0),
+      }
+    : undefined;
+  return { text: result.text || "", model, usage };
+}
+
+/**
+ * Approximate price in US dollars per million tokens, to estimate the cost
+ * per account in Admin. Defaults are those of a "flash" model; set
+ * AI_PRICE_INPUT_PER_M / AI_PRICE_OUTPUT_PER_M to your model's real prices.
+ */
+export function aiPrices(env: Env = process.env): { input: number; output: number } {
+  const num = (v: string | undefined, d: number) => (v && Number.isFinite(Number(v)) ? Number(v) : d);
+  return { input: num(env.AI_PRICE_INPUT_PER_M, 0.3), output: num(env.AI_PRICE_OUTPUT_PER_M, 2.5) };
+}
+
+export function aiCost(tokens: { input: number; output: number }, env: Env = process.env): number {
+  const p = aiPrices(env);
+  return (tokens.input * p.input + tokens.output * p.output) / 1_000_000;
 }
 
 export const defaultAi: AiCall = (prompt, task) => generateJson(prompt, task);

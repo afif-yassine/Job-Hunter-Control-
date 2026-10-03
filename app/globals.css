@@ -452,3 +452,9 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .category-count { font-size: 13px; color: var(--brand); font-weight: 700; white-space: nowrap; }
 .category small { grid-column: 1 / -1; }
 .category:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* Admin: AI cost per account */
+.costs { width: 100%; border-collapse: collapse; font-size: 14px; }
+.costs th, .costs td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.costs th { color: var(--muted); font-weight: 600; }
+.costs td:not(:first-child), .costs th:not(:first-child) { text-align: right; white-space: nowrap; }

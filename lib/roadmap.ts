@@ -22,7 +22,7 @@ export const FEATURES: Feature[] = [
   { id: "catalogue", label: "Catalogue d’offres commun : une recherche ne coûte plus par compte", state: "done", sprint: 1, detail: "Chaque recherche est mise en cache par requête et partagée entre les comptes." },
   { id: "lba", label: "La bonne alternance", state: "soon", sprint: 1, detail: "Branchée, mais leur licence interdit l’usage commercial : reste éteinte sans accord écrit." },
   { id: "availability", label: "Offres expirées détectées et retirées", state: "done", sprint: 1, detail: "Retirée de la page carrière, plus vue depuis 21 jours, ou signalée « plus disponible »." },
-  { id: "security", label: "Sécurité renforcée et coût IA suivi par compte", state: "soon", sprint: 1 },
+  { id: "security", label: "Sécurité renforcée et coût IA suivi par compte", state: "done", sprint: 1, detail: "En-têtes et CSP, limites par compte, fonctions plateforme réservées au serveur, coût IA par compte dans Admin." },
   // Sprint 2
   { id: "harvest", label: "Collecte plateforme 2 fois par jour (France Travail toute la France, Adzuna, pages carrière)", state: "doing", sprint: 2 },
   { id: "categories", label: "Choix des métiers par catégories, avec le nombre d’offres près de chez toi", state: "doing", sprint: 2 },

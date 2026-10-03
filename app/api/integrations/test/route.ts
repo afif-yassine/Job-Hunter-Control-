@@ -16,7 +16,7 @@ const body = z.object({ provider: z.string().min(1).max(40) });
 
 /** One tiny search to check that a saved key really works. */
 export async function POST(req: Request) {
-  const auth = await authenticatedClient();
+  const auth = await authenticatedClient("probe");
   if ("error" in auth) return auth.error;
   const parsed = body.safeParse(await req.json().catch(() => null));
   const provider = parsed.success ? providerById(parsed.data.provider) : undefined;

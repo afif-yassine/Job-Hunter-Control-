@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { AI_NOT_CONFIGURED, aiConfigured, defaultAi, type AiCall } from "@/lib/ai";
+import { recordAiUsage } from "@/lib/ai-usage";
 import { fetchMarketInsight, marketApiReady } from "@/lib/france-travail/market";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
 import { fetchJobText } from "@/lib/scan/enrich";
@@ -188,6 +189,7 @@ export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
   })}${hints}`;
   try {
     const result = await (ctx.ai ?? defaultAi)(prompt, "analysis");
+    await recordAiUsage(ctx.supabase, ctx.userId, "analysis", result);
     const parsed = output.safeParse(JSON.parse(result.text || "{}"));
     if (!parsed.success) return { status: 502, body: { error: "Réponse Gemini invalide ou vide" } };
     const { suspicion, ...analysis } = parsed.data;

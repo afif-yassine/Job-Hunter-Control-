@@ -1,4 +1,5 @@
 import { generateJson } from "@/lib/ai";
+import { recordAiUsage } from "@/lib/ai-usage";
 import { z } from "zod";
 import { authenticatedClient } from "@/lib/api";
 import {
@@ -19,7 +20,7 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await authenticatedClient();
+  const auth = await authenticatedClient("ai");
   if ("error" in auth) return auth.error;
   if (!process.env.GEMINI_API_KEY)
     return Response.json({ error: "GEMINI_API_KEY is not configured" }, { status: 503 });
@@ -83,6 +84,7 @@ OFFRE=${JSON.stringify(job)}`;
   let root: Record<string, unknown>;
   try {
     const result = await generateJson(prompt, "writing");
+    await recordAiUsage(auth.supabase, auth.userId, "writing", result);
     root = asRecord(parseJson(result.text || ""));
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Erreur inconnue Gemini";

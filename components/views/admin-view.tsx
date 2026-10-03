@@ -178,6 +178,8 @@ export function AdminView({ ctx }: { ctx: Ctx }) {
         </div>
       </section>
 
+      <AiCostSection ctx={ctx} />
+
       {/* 3. Smart search (planned) -------------------------------------------------- */}
       <section className="admin-section">
         <h2 className="section-title">
@@ -521,6 +523,93 @@ select cron.schedule('job-hunter-harvest', '*/10 * * * *', $$
     timeout_milliseconds := 60000);
 $$);`}</pre>
         </details>
+      </div>
+    </section>
+  );
+}
+
+type AiCostsState = {
+  days: number;
+  prices: { input: number; output: number };
+  total: { calls: number; input: number; output: number; usd: number };
+  accounts: { userId: string; email: string | null; calls: number; input: number; output: number; usd: number }[];
+};
+
+const usd = (n: number) => (n < 0.01 && n > 0 ? "< 0,01 $" : `${n.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} $`);
+const tokens = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M` : n >= 1000 ? `${Math.round(n / 1000)} k` : String(n));
+
+/** What each account costs in AI (tokens counted at every call). */
+function AiCostSection({ ctx }: { ctx: Ctx }) {
+  const [state, setState] = useState<AiCostsState | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (ctx.adminDemo) return;
+    let cancelled = false;
+    void fetch("/api/admin/ai-costs")
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+        if (!cancelled) setState(body as AiCostsState);
+      })
+      .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : "Erreur"));
+    return () => {
+      cancelled = true;
+    };
+  }, [ctx.adminDemo]);
+
+  return (
+    <section className="admin-section">
+      <h2 className="section-title">
+        <Bot size={18} aria-hidden /> Coût IA par compte (30 jours)
+      </h2>
+      <div className="card kv">
+        {ctx.adminDemo && <p className="muted small-text">Démo : pas de données réelles.</p>}
+        {error && (
+          <Callout tone="bad" title="Coûts IA indisponibles">
+            {error}
+          </Callout>
+        )}
+        {state && (
+          <>
+            <div>
+              <span>Total</span>
+              <strong>
+                {usd(state.total.usd)} · {state.total.calls} appels · {tokens(state.total.input)} jetons lus,{" "}
+                {tokens(state.total.output)} écrits
+              </strong>
+            </div>
+            {state.accounts.length === 0 ? (
+              <p className="muted">Aucun appel IA enregistré depuis la mise en place du comptage.</p>
+            ) : (
+              <table className="costs">
+                <thead>
+                  <tr>
+                    <th>Compte</th>
+                    <th>Appels</th>
+                    <th>Jetons lus</th>
+                    <th>Jetons écrits</th>
+                    <th>Coût estimé</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.accounts.map((a) => (
+                    <tr key={a.userId}>
+                      <td>{a.email ?? a.userId.slice(0, 8)}</td>
+                      <td>{a.calls}</td>
+                      <td>{tokens(a.input)}</td>
+                      <td>{tokens(a.output)}</td>
+                      <td>{usd(a.usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <p className="muted small-text">
+              Estimation à {state.prices.input} $ / million de jetons lus et {state.prices.output} $ / million écrits. Mets les
+              prix réels de ton modèle dans Vercel : AI_PRICE_INPUT_PER_M et AI_PRICE_OUTPUT_PER_M.
+            </p>
+          </>
+        )}
       </div>
     </section>
   );

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AI_NOT_CONFIGURED, aiConfigured, defaultAi, type AiCall } from "@/lib/ai";
+import { recordAiUsage } from "@/lib/ai-usage";
 import { normaliseGenerated, parseJson, type Generated } from "@/lib/generated";
 import { queueQuestions, type QueueResult } from "@/lib/question-store";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
@@ -64,6 +65,7 @@ export async function generateForJob(ctx: Ctx): Promise<StepResult> {
       analysis: job.score_breakdown,
     })}`;
     const result = await (ctx.ai ?? defaultAi)(prompt, "writing");
+    await recordAiUsage(supabase, userId, "writing", result);
     model = result.model;
     parsed = normaliseGenerated(parseJson(result.text || ""));
   } catch (error) {

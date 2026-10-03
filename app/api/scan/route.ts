@@ -11,7 +11,7 @@ export const maxDuration = 60;
  * DISCOVERED so the smart pipeline can score them.
  */
 export async function POST(req: Request) {
-  const auth = await authenticatedClient();
+  const auth = await authenticatedClient("scan");
   if ("error" in auth) return auth.error;
   const body = (await req.json().catch(() => ({}))) as { log?: boolean };
   // Scheduled server scans are free; scans started from the dashboard are counted.
