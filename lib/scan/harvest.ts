@@ -137,6 +137,30 @@ function ftQuery(params: Record<string, unknown>): FtHarvestQuery | null {
   };
 }
 
+/**
+ * Offers stored before categories existed get them (contract_kind null =
+ * never classified). Small batches, so it fits in any slice.
+ */
+export async function recategorize(db: SupabaseClient, limit = 1000): Promise<number> {
+  const { data, error } = await db
+    .from("offers")
+    .select("id,title,rome_code,contract_type,source")
+    .is("contract_kind", null)
+    .limit(limit);
+  if (error || !data?.length) return 0;
+  const rows = (data as { id: string; title: string; rome_code: string | null; contract_type: string | null; source: string }[]).map((o) => ({
+    id: o.id,
+    categories: categorize({ title: o.title, romeCode: o.rome_code }),
+    contract_kind: contractKind(o),
+  }));
+  let updated = 0;
+  for (let i = 0; i < rows.length; i += 250) {
+    const { data: n } = await db.rpc("set_offer_categories", { p_rows: rows.slice(i, i + 250) });
+    updated += Number(n) || 0;
+  }
+  return updated;
+}
+
 export type HarvestReport = {
   run: string;
   created: boolean;
@@ -146,6 +170,7 @@ export type HarvestReport = {
   finished: boolean;
   closed?: number;
   expired?: number;
+  recategorized?: number;
   errors: string[];
 };
 
@@ -182,6 +207,8 @@ export async function runHarvestSlice(
     report.created = true;
     startedAt = new Date().toISOString();
   } else if (existing.status !== "running") {
+    // Nothing to collect until the next run: tidy the catalogue meanwhile.
+    report.recategorized = await recategorize(db);
     report.finished = true;
     return report;
   }
@@ -312,6 +339,7 @@ export async function runHarvestSlice(
       report.closed = Number(data) || 0;
     }
     report.expired = await expireOffers(db);
+    report.recategorized = await recategorize(db);
     const errors = tasks.filter((t) => t.status === "error");
     const counters: Record<string, number> = { tasks: tasks.length, errors: errors.length, closed: report.closed ?? 0, expired: report.expired };
     for (const source of ["francetravail", "adzuna", "ats"] as const) {

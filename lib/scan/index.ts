@@ -138,6 +138,9 @@ export async function runScan(ctx: {
   // Careers boards read in full this scan → every link they list.
   const listedBoards: Record<string, string[]> = {};
   const cacheDb = ctx.cacheDb !== undefined ? ctx.cacheDb : serviceClient();
+  // Budgets and source health are platform data: written with the service
+  // client only (accounts cannot call these functions themselves).
+  const platformDb = cacheDb ?? ctx.supabase;
   const ttl = cacheHours(env);
   // La bonne alternance searches by métier (ROME), learnt once per scan.
   let romes: Promise<string[]> | null = null;
@@ -223,7 +226,7 @@ export async function runScan(ctx: {
     const shared = platformKey(source.keys);
     const useCache = source.cacheable && shared;
     const budget = shared ? budgetFor(source.id, env) : null;
-    const fetchImpl = budget ? budgetedFetch(ctx.supabase, source.id, budget) : fetch;
+    const fetchImpl = budget ? budgetedFetch(platformDb, source.id, budget) : fetch;
 
     // One unit = one call to the source (one query, or the whole search).
     const units: { key: string | null; config: ScanConfig }[] = source.perQuery
@@ -268,13 +271,13 @@ export async function runScan(ctx: {
     if (failed) {
       const message = [...new Set(errors)].join(" ; ");
       reports.push({ source: source.name, status: "error", found: 0, message });
-      await recordSourceRun(ctx.supabase, source.id, classifyError(message), 0, message);
+      await recordSourceRun(platformDb, source.id, classifyError(message), 0, message);
       return;
     }
     if (budgetMessage) {
       // Not the user's problem: the other sources keep going, the admin is told.
       reports.push({ source: source.name, status: got.length ? "ok" : "skipped", found: offers.length, message: budgetMessage });
-      await recordSourceRun(ctx.supabase, source.id, "budget", offers.length, budgetMessage);
+      await recordSourceRun(platformDb, source.id, "budget", offers.length, budgetMessage);
       return;
     }
     const notes: string[] = [];
@@ -282,7 +285,7 @@ export async function runScan(ctx: {
     else if (fromCache) notes.push(`${fromCache} recherche(s) sur ${tried} reprise(s) du cache commun`);
     if (errors.length) notes.push([...new Set(errors)].join(" ; "));
     reports.push({ source: source.name, status: "ok", found: offers.length, message: notes.join(" · ") || undefined });
-    await recordSourceRun(ctx.supabase, source.id, "ok", offers.length, errors.length ? errors.join(" ; ") : null, fromCache === tried);
+    await recordSourceRun(platformDb, source.id, "ok", offers.length, errors.length ? errors.join(" ; ") : null, fromCache === tried);
   };
 
   // Company careers pages: read per company, each one cached for everybody.
@@ -327,7 +330,7 @@ export async function runScan(ctx: {
     await Promise.all(Array.from({ length: Math.min(5, config.targets.length) }, lane));
     for (const [id, t] of perAts) {
       const allFailed = t.errors.length > 0 && t.found === 0;
-      await recordSourceRun(ctx.supabase, id, allFailed ? classifyError(t.errors.join(" ")) : "ok", t.found, t.errors.slice(0, 3).join(" ; ") || null);
+      await recordSourceRun(platformDb, id, allFailed ? classifyError(t.errors.join(" ")) : "ok", t.found, t.errors.slice(0, 3).join(" ; ") || null);
     }
     if (errors.length && !found && errors.length >= config.targets.length)
       reports.push({ source: name, status: "error", found: 0, message: errors.slice(0, 3).join(" ; ") });

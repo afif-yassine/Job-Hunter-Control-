@@ -46,7 +46,7 @@ export const CATEGORIES: Category[] = [
     words: [
       "developpeur", "developpement", "programmeur", "full stack", "front end", "back end", "integrateur web", "logiciel",
       "java", "python", "php", "javascript", "typescript", "react", "angular", "node", "symfony", "laravel",
-      "golang", "ingenieur logiciel", "ingenieur etude", "concepteur developpeur", "analyste programmeur",
+      "golang", "webmaster", "web master", "ingenieur logiciel", "ingenieur etude", "concepteur developpeur", "analyste programmeur",
     ],
     not: ["business", "commercial", "affaire"],
     search: "développeur",
@@ -89,7 +89,7 @@ export const CATEGORIES: Category[] = [
     examples: "Data analyst, data engineer, data scientist, IA",
     romes: ["M1811", "M1824", "M1851", "M1872", "M1894", "M1868", "M1889", "M1873", "M1419", "M1405", "M1423"],
     words: [
-      "data", "donnee", "bi", "business intelligence", "decisionnel", "machine learning", "deep learning", "ml",
+      "data", "donnee", "bi", "business intelligence", "decisionnel", "machine learning", "deep learning", "ml", "data engineering",
       "intelligence artificielle", "llm", "statisticien", "statistique", "analytic", "big data", "base de donnee",
     ],
     search: "data",
@@ -119,7 +119,7 @@ export const CATEGORIES: Category[] = [
       "M1867", "M1870", "M1871", "M1875", "M1881", "M1886",
     ],
     words: [
-      "chef de projet", "product owner", "product manager", "product management", "website manager", "project manager", "scrum", "amoa", "moa", "pmo", "business analyst",
+      "chef de projet", "product owner", "product manager", "product management", "website manager", "project manager", "scrum", "amoa", "moa", "pmo", "business analyst", "analyste fonctionnel", "directeur de projet", "gestion de projet", "chef de produit",
       "consultant si", "consultant fonctionnel", "erp", "sap", "salesforce", "projet digital", "projet informatique", "projet web",
     ],
     search: "chef de projet digital",
@@ -129,7 +129,7 @@ export const CATEGORIES: Category[] = [
     label: "Design numérique",
     examples: "UX/UI designer, webdesigner",
     romes: ["E1205", "E1206", "E1207", "E1210"],
-    words: ["ux", "ui", "webdesign", "webdesigner", "web designer", "designer", "graphiste", "motion design", "figma"],
+    words: ["ux", "ui", "webdesign", "webdesigner", "web designer", "designer", "graphiste", "infographiste", "motion design", "figma"],
     search: "UX UI designer",
   },
   {

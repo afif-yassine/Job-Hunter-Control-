@@ -87,7 +87,16 @@ test("shared cache: the same search for another account does not call the source
   process.env.JSEARCH_API_KEY = "platform-key";
   let requests = 0;
   globalThis.fetch = (async () => (requests++, new Response(JSON.stringify({ data: [JOB] }), { status: 200 }))) as typeof fetch;
-  const cache = fakeSupabase({ source_cache: [] });
+  const cacheCalls: { fn: string; args: Record<string, unknown> }[] = [];
+  const cache = fakeSupabase(
+    { source_cache: [] },
+    {
+      rpc: {
+        consume_source_budget: () => true,
+        record_source_run: (args) => (cacheCalls.push({ fn: "record_source_run", args }), null),
+      },
+    },
+  );
   const a = world();
   await runScan({ supabase: a.db, userId: "u1", env: { JSEARCH_API_KEY: "platform-key" }, cacheDb: cache.db });
   const afterFirst = requests;
@@ -99,7 +108,9 @@ test("shared cache: the same search for another account does not call the source
   assert.equal(requests, afterFirst);
   assert.match(second.reports.find((r) => r.source.startsWith("JSearch"))!.message ?? "", /cache/);
   assert.equal(second.inserted, 1);
-  assert.ok(b.calls.some((c) => c.fn === "record_source_run" && c.args.p_cached === true));
+  // Health and budgets go through the service client, never the account's.
+  assert.ok(cacheCalls.some((c) => c.fn === "record_source_run" && c.args.p_cached === true));
+  assert.equal(b.calls.filter((c) => c.fn === "record_source_run").length, 0);
 });
 
 test("a refused key is recorded as 'auth' so the admin gets an alert", async () => {

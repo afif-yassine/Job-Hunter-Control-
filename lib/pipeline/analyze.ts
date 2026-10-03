@@ -4,6 +4,7 @@ import { AI_NOT_CONFIGURED, aiConfigured, defaultAi, type AiCall } from "@/lib/a
 import { fetchMarketInsight, marketApiReady } from "@/lib/france-travail/market";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
 import { fetchJobText } from "@/lib/scan/enrich";
+import { serviceClient } from "@/lib/supabase/admin";
 import { recordSourceRun } from "@/lib/scan/health";
 import { detectSuspicion } from "@/lib/scan/suspicion";
 
@@ -109,11 +110,11 @@ async function enrichWithFranceTravail(
   if (marketApiReady(env)) {
     try {
       const market = await fetchMarketInsight({ romeCode, department }, env);
-      await recordSourceRun(ctx.supabase, "ft:marche", "ok", market ? 1 : 0);
+      await recordSourceRun(serviceClient() ?? ctx.supabase, "ft:marche", "ok", market ? 1 : 0);
       if (market?.jobseekerCount != null)
         patch.market_note = `${market.jobseekerCount} demandeur(s) d’emploi inscrit(s) sur ce métier dans le département${department ? ` ${department}` : ""}${market.period ? ` (${market.period})` : ""}`;
     } catch (e) {
-      await recordSourceRun(ctx.supabase, "ft:marche", "error", 0, e instanceof Error ? e.message : "Erreur inconnue");
+      await recordSourceRun(serviceClient() ?? ctx.supabase, "ft:marche", "error", 0, e instanceof Error ? e.message : "Erreur inconnue");
     }
   }
 

@@ -115,3 +115,20 @@ end;
 $$;
 revoke all on function public.close_unseen_offers(text, timestamptz, text[], text) from public, anon, authenticated;
 grant execute on function public.close_unseen_offers(text, timestamptz, text[], text) to service_role;
+
+-- Offers stored before the categories existed (or by an older version of the
+-- rules) get them on the next harvest slice: see recategorize() in harvest.ts.
+create function public.set_offer_categories(p_rows jsonb)
+returns integer language sql security definer set search_path = public as $$
+  with done as (
+    update public.offers o
+    set categories = coalesce(array(select jsonb_array_elements_text(r -> 'categories')), '{}'),
+        contract_kind = r ->> 'contract_kind'
+    from jsonb_array_elements(p_rows) r
+    where o.id = (r ->> 'id')::uuid
+    returning 1
+  )
+  select count(*)::int from done;
+$$;
+revoke all on function public.set_offer_categories(jsonb) from public, anon, authenticated;
+grant execute on function public.set_offer_categories(jsonb) to service_role;
