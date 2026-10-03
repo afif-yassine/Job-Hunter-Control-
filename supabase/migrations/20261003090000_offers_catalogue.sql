@@ -8,7 +8,7 @@
 -- Availability, in three layers:
 --   1. not seen by any search for 21 days      → expired (reopens if seen again)
 --   2. gone from the company's careers board   → closed  (reopens if relisted)
---   3. reported "plus disponible" by 2 accounts → closed  (stays closed)
+--   3. reported "plus disponible" by 10 accounts → closed (stays closed; threshold raised in 20261003120000)
 -- Accounts holding a gone offer (not applied yet) see it under
 -- "Plus disponibles" (jobs.gone_reason set), and nothing more is spent on it.
 -- Applied to production in three parts (tables, link, functions).

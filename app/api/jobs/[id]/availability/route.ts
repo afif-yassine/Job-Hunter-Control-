@@ -5,7 +5,7 @@ const input = z.object({ available: z.boolean() });
 
 /**
  * "Offre plus disponible" (available: false): the offer leaves the account's
- * lists and is reported to the shared catalogue — two reports from different
+ * lists and is reported to the shared catalogue — ten reports from different
  * accounts close it for everybody. available: true puts it back.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -27,7 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return Response.json({
       message:
         data === "closed"
-          ? "Merci : d’autres candidats l’avaient aussi signalée, elle est retirée pour tout le monde."
+          ? "Merci : 10 candidats l’ont signalée, elle est retirée pour tout le monde."
           : "Merci : l’offre est rangée dans « Plus disponibles ». Rien ne sera plus dépensé dessus.",
     });
   }

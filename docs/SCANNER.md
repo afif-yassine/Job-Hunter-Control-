@@ -147,7 +147,7 @@ score, statut, documents).
   2. *Plus vue depuis 21 jours* par aucune recherche : expirée (elle revient
      si une source la remontre).
   3. *Signalée* par le bouton « Offre plus disponible ? » : rangée pour ce
-     compte ; signalée par 2 comptes, elle est fermée pour tout le monde.
+     compte ; signalée par 10 comptes différents, elle est fermée pour tout le monde.
 - Les offres fermées passent dans le filtre **Plus disponibles** des comptes
   qui n'ont pas encore postulé ; l'analyse IA et la génération de documents
   refusent de dépenser quoi que ce soit dessus.
