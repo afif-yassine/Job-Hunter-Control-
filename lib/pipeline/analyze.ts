@@ -132,6 +132,11 @@ export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
     ctx.supabase.from("candidate_profiles").select("profile,truth_ledger").eq("user_id", ctx.userId).maybeSingle(),
   ]);
   if (error || !job) return { status: 404, body: { error: "Offer not found" } };
+  if (job.gone_reason)
+    return {
+      status: 410,
+      body: { error: "Cette offre n’est plus disponible : rien n’a été dépensé dessus.", code: "GONE" },
+    };
   if (job.review_flag)
     return {
       status: 409,

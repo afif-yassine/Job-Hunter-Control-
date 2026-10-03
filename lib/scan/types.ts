@@ -16,6 +16,8 @@ export type ScannedOffer = {
   romeCode?: string | null;
   /** Other application links (JSearch lists the same offer on several sites). */
   links?: string[];
+  /** Careers board it was read from ("lever:acme"): closure detection. */
+  board?: string;
 };
 
 export type SourceReport = {

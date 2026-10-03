@@ -194,6 +194,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRep
       .select(select)
       .eq("status", "DISCOVERED")
       .is("review_flag", null)
+      .is("gone_reason", null)
       .order("created_at", { ascending: false })
       .limit(60);
     let rows = first.data;

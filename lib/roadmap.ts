@@ -19,9 +19,9 @@ export const FEATURES: Feature[] = [
   { id: "documents", label: "CV et lettre adaptés (PDF, LaTeX, modification par une phrase)", state: "done" },
   { id: "server-run", label: "Recherche automatique sur le serveur", state: "done" },
   // Sprint 1
-  { id: "catalogue", label: "Catalogue d’offres commun : une recherche ne coûte plus par compte", state: "doing", sprint: 1 },
+  { id: "catalogue", label: "Catalogue d’offres commun : une recherche ne coûte plus par compte", state: "done", sprint: 1, detail: "Chaque recherche est mise en cache par requête et partagée entre les comptes." },
   { id: "lba", label: "La bonne alternance", state: "doing", sprint: 1, detail: "Branchée, active après l’accord d’usage commercial." },
-  { id: "availability", label: "Offres expirées détectées et retirées", state: "doing", sprint: 1 },
+  { id: "availability", label: "Offres expirées détectées et retirées", state: "done", sprint: 1, detail: "Retirée de la page carrière, plus vue depuis 21 jours, ou signalée « plus disponible »." },
   { id: "security", label: "Sécurité renforcée et coût IA suivi par compte", state: "soon", sprint: 1 },
   // Sprint 2
   { id: "cv-import", label: "Import du CV en PDF, une seule fois", state: "soon", sprint: 2 },

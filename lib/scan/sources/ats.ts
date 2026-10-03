@@ -1,6 +1,7 @@
 import type { ScanConfig } from "../config";
 import { clip } from "../text";
 import type { ScannedOffer } from "../types";
+import { canonicalUrl } from "../ingest";
 
 /**
  * Careers pages hosted on a recruitment platform (ATS) publish their offers as
@@ -248,6 +249,12 @@ export type AtsScan = {
   errors: string[];
   /** Per platform, for the health page. */
   stats: Partial<Record<AtsId, { found: number; errors: string[] }>>;
+  /**
+   * Boards read without error → canonical links of every offer they list
+   * (before the date / France filters): the ones missing from the catalogue
+   * were taken down by the company.
+   */
+  listed: Record<string, string[]>;
 };
 
 /** Reads every target (5 at a time); one broken page never stops the others. */
@@ -260,6 +267,7 @@ export async function scanAts(
   const errors: string[] = [];
   const stats: AtsScan["stats"] = {};
   const stat = (ats: AtsId) => (stats[ats] ??= { found: 0, errors: [] });
+  const listed: Record<string, string[]> = {};
   const cutoff = Date.now() - Math.max(config.maxAgeDays, 30) * 86_400_000;
   let next = 0;
   const lane = async () => {
@@ -283,7 +291,11 @@ export async function scanAts(
           stat(t.ats).errors.push(e);
           continue;
         }
-        for (const offer of mapAtsJobs(t, await response.json())) {
+        const all = mapAtsJobs(t, await response.json());
+        const board = targetKey(t);
+        listed[board] = all.map((o) => canonicalUrl(o.url));
+        for (const offer of all) {
+          offer.board = board;
           // Company boards keep old offers online: drop the stale ones.
           if (offer.publishedAt && Date.parse(offer.publishedAt) < cutoff) continue;
           if (inFrance(offer.location, config)) {
@@ -300,5 +312,5 @@ export async function scanAts(
     }
   };
   await Promise.all(Array.from({ length: Math.min(5, targets.length) }, lane));
-  return { offers, errors, stats };
+  return { offers, errors, stats, listed };
 }

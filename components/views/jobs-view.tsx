@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { CheckCheck, ExternalLink, LoaderCircle, Plus, Search, ShieldAlert } from "lucide-react";
+import { CheckCheck, CircleOff, ExternalLink, LoaderCircle, Plus, Search, ShieldAlert } from "lucide-react";
 import { Chip, Empty, PageHead, ScoreBadge, Soon } from "@/components/ui";
 import { REVIEW, jobStatus, platformsOf, timeAgo } from "@/lib/labels";
 import type { Job } from "@/lib/types";
@@ -14,13 +14,16 @@ const FILTERS: { id: JobFilter; label: string }[] = [
   { id: "missing", label: "À compléter" },
   { id: "ready", label: "Dossier prêt" },
   { id: "applied", label: "Déjà postulé" },
+  { id: "gone", label: "Plus disponibles" },
 ];
 
 const APPLIED = new Set(["SUBMITTED", "CONFIRMED", "INTERVIEW", "REJECTED", "APPLYING"]);
 const isHidden = (j: Job) => j.status === "SKIPPED";
-const toReview = (j: Job) => Boolean(j.review_flag) && !isHidden(j);
 const isApplied = (j: Job) => APPLIED.has(j.status);
-const active = (j: Job) => !toReview(j) && !isHidden(j) && !isApplied(j);
+/** Withdrawn, not seen for 3 weeks, or reported: nothing more is spent on it. */
+const isGone = (j: Job) => Boolean(j.gone_reason) && !isHidden(j) && !isApplied(j);
+const toReview = (j: Job) => Boolean(j.review_flag) && !isHidden(j) && !isGone(j);
+const active = (j: Job) => !toReview(j) && !isHidden(j) && !isApplied(j) && !isGone(j);
 const isMissing = (j: Job) => active(j) && j.status === "DISCOVERED" && !j.description;
 const isReady = (j: Job) => active(j) && (j.status === "WAITING_APPROVAL" || j.status === "PREPARED");
 const isTodo = (j: Job) => active(j) && ((j.status === "DISCOVERED" && Boolean(j.description)) || j.status === "ANALYZED");
@@ -33,6 +36,7 @@ const MATCH: Record<JobFilter, (j: Job) => boolean> = {
   missing: isMissing,
   ready: isReady,
   applied: isApplied,
+  gone: isGone,
 };
 
 function hostOf(url: string) {
@@ -125,6 +129,11 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
               </button>
             }
           />
+        ) : jobFilter === "gone" ? (
+          <Empty
+            title="Aucune offre retirée"
+            text="Les offres retirées par l’entreprise, plus vues depuis 3 semaines ou signalées apparaîtront ici. Rien n’est dépensé dessus."
+          />
         ) : jobFilter === "review" ? (
           <Empty title="Rien à vérifier" text="Les offres suspectes ou en double probable apparaîtront ici avant qu’on dépense quoi que ce soit dessus." />
         ) : (
@@ -149,7 +158,7 @@ function JobCard({ job, ctx, working }: { job: Job; ctx: Ctx; working: boolean }
   const disabled = Boolean(busy);
 
   let primary: React.ReactNode = null;
-  if (toReview(job) || isApplied(job) || isHidden(job)) primary = null;
+  if (toReview(job) || isApplied(job) || isHidden(job) || isGone(job)) primary = null;
   else if (isMissing(job))
     primary = (
       <button className="btn" disabled={disabled} onClick={() => act.pasteDescription(job)}>
@@ -192,7 +201,13 @@ function JobCard({ job, ctx, working }: { job: Job; ctx: Ctx; working: boolean }
         <ScoreBadge score={job.match_score} />
       </div>
       <div className="chips">
-        {review ? <Chip tone={review.tone}>{review.label}</Chip> : <Chip tone={status.tone}>{status.label}</Chip>}
+        {isGone(job) ? (
+          <Chip tone="bad">Plus disponible</Chip>
+        ) : review ? (
+          <Chip tone={review.tone}>{review.label}</Chip>
+        ) : (
+          <Chip tone={status.tone}>{status.label}</Chip>
+        )}
         {job.contract_type && <Chip>{job.contract_type}</Chip>}
         <Chip>{platforms.length > 1 ? `Vu sur ${platforms.length} sites` : platforms[0]}</Chip>
         {age && <span className="muted small-text">{age}</span>}
@@ -210,7 +225,22 @@ function JobCard({ job, ctx, working }: { job: Job; ctx: Ctx; working: boolean }
           </button>
         )}
       </div>
-      {review && (
+      {isGone(job) && (
+        <div className="reviewbox bad">
+          <p>
+            <CircleOff size={15} aria-hidden /> {job.gone_reason}
+          </p>
+          <div className="jobactions">
+            <button className="btn secondary small" disabled={disabled} onClick={() => void act.availability(job, true)}>
+              Elle est toujours en ligne
+            </button>
+            <button className="btn ghost small" disabled={disabled} onClick={() => void act.review(job, "dismiss")}>
+              Écarter
+            </button>
+          </div>
+        </div>
+      )}
+      {review && !isGone(job) && (
         <div className={`reviewbox ${job.review_flag === "SUSPECTED" ? "bad" : "warn"}`}>
           <p>
             <ShieldAlert size={15} aria-hidden /> {job.review_reason || review.label}
@@ -240,7 +270,14 @@ function JobCard({ job, ctx, working }: { job: Job; ctx: Ctx; working: boolean }
           </div>
         </div>
       )}
-      {active(job) && <AppliedElsewhere job={job} ctx={ctx} disabled={disabled} />}
+      {active(job) && (
+        <div className="cardlinks">
+          <AppliedElsewhere job={job} ctx={ctx} disabled={disabled} />
+          <button className="linkbtn small-text" disabled={disabled} onClick={() => void act.availability(job, false)}>
+            <CircleOff size={13} aria-hidden /> Offre plus disponible ?
+          </button>
+        </div>
+      )}
       {platforms.length > 1 && (
         <details className="why">
           <summary>Vu sur {platforms.join(", ")}</summary>

@@ -66,7 +66,9 @@ test("platform key: every request spends the shared budget; when it runs out the
   const summary = await runScan({ supabase: db, userId: "u1", env: { JSEARCH_API_KEY: "platform-key" }, cacheDb: null });
   assert.equal(requests, 1);
   const report = summary.reports.find((r) => r.source.startsWith("JSearch"))!;
-  assert.equal(report.status, "skipped");
+  // The first query got its offers, the next ones stopped at the budget.
+  assert.equal(report.status, "ok");
+  assert.equal(report.found, 1);
   assert.match(report.message ?? "", /Budget gratuit atteint/);
   const recorded = calls.find((c) => c.fn === "record_source_run" && c.args.p_source === "jsearch")!;
   assert.equal(recorded.args.p_status, "budget");
@@ -90,7 +92,8 @@ test("shared cache: the same search for another account does not call the source
   await runScan({ supabase: a.db, userId: "u1", env: { JSEARCH_API_KEY: "platform-key" }, cacheDb: cache.db });
   const afterFirst = requests;
   assert.ok(afterFirst > 0);
-  assert.equal(cache.tables.source_cache.length, 1);
+  // One cache entry per query (JSearch: one page per query).
+  assert.equal(cache.tables.source_cache.length, afterFirst);
   const b = world();
   const second = await runScan({ supabase: b.db, userId: "u2", env: { JSEARCH_API_KEY: "platform-key" }, cacheDb: cache.db });
   assert.equal(requests, afterFirst);
@@ -207,4 +210,33 @@ test("admin page: Marché du travail and Accès à l'emploi are 'à terminer' un
   });
   assert.ok(ready.enrichment.every((e) => e.ready || e.unused));
   assert.ok(!ready.actions.some((a) => /API France Travail secondaires/.test(a.text)));
+});
+
+test("shared cache is per query: an account whose search overlaps another's only pays for its new query", async () => {
+  process.env.JSEARCH_API_KEY = "platform-key";
+  const asked: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    asked.push(new URL(String(input)).searchParams.get("query") ?? "");
+    return new Response(JSON.stringify({ data: [JOB] }), { status: 200 });
+  }) as typeof fetch;
+  const cache = fakeSupabase({ source_cache: [] });
+  const prefs = (user_id: string, keywords: string[], maxAgeDays: number) => [
+    { user_id, scan_config: { contracts: ["alternance"], keywords, city: "Paris", departments: ["75"], maxAgeDays, targets: [] } },
+  ];
+  const a = fakeSupabase(
+    { jobs: [], job_sources: [], applications: [], user_settings: prefs("u1", ["développeur", "data"], 10), agent_runs: [], notifications: [] },
+    { rpc: { consume_source_budget: () => true, record_source_run: () => null } },
+  );
+  await runScan({ supabase: a.db, userId: "u1", env: { JSEARCH_API_KEY: "platform-key" }, cacheDb: cache.db });
+  const first = asked.length;
+  assert.equal(first, 2);
+  const b = fakeSupabase(
+    { jobs: [], job_sources: [], applications: [], user_settings: prefs("u2", ["Développeur", "cybersécurité"], 14), agent_runs: [], notifications: [] },
+    { rpc: { consume_source_budget: () => true, record_source_run: () => null } },
+  );
+  const second = await runScan({ supabase: b.db, userId: "u2", env: { JSEARCH_API_KEY: "platform-key" }, cacheDb: cache.db });
+  // "alternance développeur" came from the cache (10 and 14 days share the 14-day window).
+  assert.equal(asked.length, first + 1);
+  assert.match(asked.at(-1)!, /cybersécurité/);
+  assert.match(second.reports.find((r) => r.source.startsWith("JSearch"))!.message ?? "", /1 recherche\(s\) sur 2/);
 });

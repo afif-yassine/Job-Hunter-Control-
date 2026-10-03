@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { fingerprintOf, fuzzyMatch, type Candidate } from "./dedupe";
 import { detectSuspicion } from "./suspicion";
 import type { ScannedOffer } from "./types";
+import type { CatalogueEntry } from "./catalogue";
 
 export { fingerprintOf } from "./dedupe";
 
@@ -36,6 +37,8 @@ export type IngestResult = {
   /** New offers put in "À vérifier" as possible scams. */
   suspected: number;
   needsDescription: number;
+  /** Offers the catalogue already knows are no longer available: not added. */
+  gone?: number;
   error?: string;
 };
 
@@ -48,12 +51,14 @@ type Pending = {
   dupRef: string | null;
 };
 
-const OPTIONAL_COLUMNS = ["review_flag", "review_reason", "duplicate_of", "source_platform", "publication_date", "rome_code"];
+const OPTIONAL_COLUMNS = ["review_flag", "review_reason", "duplicate_of", "source_platform", "publication_date", "rome_code", "offer_id"];
 
 export async function ingestOffers(
   supabase: SupabaseClient,
   userId: string,
   offers: ScannedOffer[],
+  /** fingerprint → shared catalogue entry (see catalogue.ts); absent = no catalogue. */
+  catalogue?: Map<string, CatalogueEntry>,
 ): Promise<IngestResult> {
   const result: IngestResult = {
     inserted: 0,
@@ -118,6 +123,13 @@ export async function ingestOffers(
       continue;
     }
 
+    const entry = catalogue?.get(fingerprint);
+    if (entry && entry.status !== "open") {
+      // Reported or taken down: never proposed again, even if a site still lists it.
+      result.gone = (result.gone ?? 0) + 1;
+      continue;
+    }
+
     let flag: string | null = null;
     let reason: string | null = null;
     const probable = fuzzy?.kind === "probable" ? fuzzy : null;
@@ -156,6 +168,7 @@ export async function ingestOffers(
         publication_date: offer.publishedAt ? offer.publishedAt.slice(0, 10) : null,
         rome_code: offer.romeCode ?? null,
         fingerprint,
+        offer_id: entry?.id ?? null,
         status: "DISCOVERED",
         review_flag: flag,
         review_reason: reason,

@@ -208,6 +208,7 @@ pre { white-space: pre-wrap; word-break: break-word; margin: 8px 0 0; font-size:
 .reviewbox .jobactions { margin-top: 4px; }
 .linkbtn { background: none; border: 0; padding: 4px 0; color: var(--muted); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; justify-self: start; min-height: 32px; }
 .linkbtn:hover:not(:disabled) { color: var(--text); text-decoration: underline; }
+.cardlinks { display: flex; flex-wrap: wrap; gap: 0 18px; align-items: center; }
 .inlineform { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .inlineform select { background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; min-height: 36px; }
 .why ul.links { list-style: none; padding-left: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }

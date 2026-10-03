@@ -18,7 +18,7 @@ export type View =
   | "admin"
   | "roadmap";
 
-export type JobFilter = "all" | "best" | "todo" | "missing" | "ready" | "review" | "applied";
+export type JobFilter = "all" | "best" | "todo" | "missing" | "ready" | "review" | "applied" | "gone";
 
 export type ReviewAction = "keep" | "merge" | "dismiss" | "applied_elsewhere";
 
@@ -45,6 +45,8 @@ export type Ctx = {
     analyze: (job: Job) => Promise<void>;
     generate: (job: Job) => Promise<void>;
     review: (job: Job, action: ReviewAction, platform?: string) => Promise<void>;
+    /** "Offre plus disponible" (false) or "Toujours en ligne" (true). */
+    availability: (job: Job, available: boolean) => Promise<void>;
     approve: (doc: DocumentRecord) => Promise<void>;
     upload: (doc: DocumentRecord) => Promise<void>;
     prepare: (applicationId: string) => Promise<void>;

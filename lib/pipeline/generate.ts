@@ -38,6 +38,11 @@ export async function generateForJob(ctx: Ctx): Promise<StepResult> {
   if (!job || !profile) return { status: 404, body: { error: "Offre ou profil vérifié introuvable" } };
   if (job.status !== "ANALYZED")
     return { status: 409, body: { error: "Analysez l’offre avant de générer les documents." } };
+  if (job.gone_reason)
+    return {
+      status: 410,
+      body: { error: "Cette offre n’est plus disponible : pas de CV ni de lettre à créer.", code: "GONE" },
+    };
   if (job.review_flag)
     return {
       status: 409,

@@ -12,6 +12,8 @@ import { scanJooble } from "./sources/jooble";
 import { scanJSearch } from "./sources/jsearch";
 import { DEFAULT_TECH_ROMES, scanLba } from "./sources/lba";
 import { serviceClient } from "@/lib/supabase/admin";
+import { closeBoardOffers, dayBucket, expireOffers, harvestOffers, queryCacheParts, withinDays } from "./catalogue";
+import type { ScanConfig } from "./config";
 import {
   BudgetReached,
   budgetedFetch,
@@ -69,7 +71,14 @@ type SourceDef = {
   keys: string[];
   /** Same results for every account with the same search → shared cache. */
   cacheable: boolean;
-  run: (fetchImpl: typeof fetch) => Promise<ScannedOffer[]>;
+  /**
+   * Searched one query at a time (at most this many queries), each query
+   * cached on its own: accounts whose searches overlap share the calls.
+   */
+  perQuery?: number;
+  /** Cache identity when the source is not searched by query. */
+  cacheParts?: () => Promise<unknown>;
+  run: (fetchImpl: typeof fetch, config: ScanConfig) => Promise<ScannedOffer[]>;
 };
 
 export async function runScan(ctx: {
@@ -101,9 +110,13 @@ export async function runScan(ctx: {
     for (const t of discoveredTargets(discovered)) if (!manualKeys.has(targetKey(t))) config.targets.push(t);
   const reports: SourceReport[] = [];
   const collected: ScannedOffer[] = [];
+  // Careers boards read in full this scan → every link they list.
+  const listedBoards: Record<string, string[]> = {};
   const cacheDb = ctx.cacheDb !== undefined ? ctx.cacheDb : serviceClient();
   const ttl = cacheHours(env);
-  const searchKey = { q: config.queries, city: config.city, dep: config.departments, days: config.maxAgeDays };
+  // La bonne alternance searches by métier (ROME), learnt once per scan.
+  let romes: Promise<string[]> | null = null;
+  const lbaRomes = () => (romes ??= userRomes(ctx.supabase, ctx.userId));
 
   const sources: SourceDef[] = [
     {
@@ -113,7 +126,8 @@ export async function runScan(ctx: {
       missing: "FRANCE_TRAVAIL_CLIENT_ID / FRANCE_TRAVAIL_CLIENT_SECRET",
       keys: ["FRANCE_TRAVAIL_CLIENT_ID", "FRANCE_TRAVAIL_CLIENT_SECRET"],
       cacheable: true,
-      run: (f) => scanFranceTravail(config, env, f),
+      perQuery: 10,
+      run: (f, c) => scanFranceTravail(c, env, f),
     },
     {
       id: "jsearch",
@@ -122,7 +136,9 @@ export async function runScan(ctx: {
       missing: "JSEARCH_API_KEY",
       keys: ["JSEARCH_API_KEY"],
       cacheable: true,
-      run: (f) => scanJSearch(config, env, f),
+      // Free plan ~200 requests / month: the first 3 queries only.
+      perQuery: 3,
+      run: (f, c) => scanJSearch(c, env, f),
     },
     {
       id: "adzuna",
@@ -131,7 +147,8 @@ export async function runScan(ctx: {
       missing: "ADZUNA_APP_ID / ADZUNA_APP_KEY",
       keys: ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"],
       cacheable: true,
-      run: (f) => scanAdzuna(config, env, f),
+      perQuery: 10,
+      run: (f, c) => scanAdzuna(c, env, f),
     },
     {
       id: "jooble",
@@ -140,7 +157,8 @@ export async function runScan(ctx: {
       missing: "JOOBLE_API_KEY",
       keys: ["JOOBLE_API_KEY"],
       cacheable: true,
-      run: (f) => scanJooble(config, env, f),
+      perQuery: 10,
+      run: (f, c) => scanJooble(c, env, f),
     },
     {
       id: "lba",
@@ -149,7 +167,8 @@ export async function runScan(ctx: {
       missing: "LBA_API_KEY (et l’accord d’usage commercial de La bonne alternance)",
       keys: ["LBA_API_KEY"],
       cacheable: true,
-      run: async (f) => scanLba(config, env, f, await userRomes(ctx.supabase, ctx.userId)),
+      cacheParts: async () => ({ source: "lba", romes: await lbaRomes(), city: config.city.toLowerCase().trim() }),
+      run: async (f, c) => scanLba(c, env, f, await lbaRomes()),
     },
     {
       id: "gmail",
@@ -177,33 +196,68 @@ export async function runScan(ctx: {
       return;
     }
     const shared = platformKey(source.keys);
-    const key = cacheKey({ source: source.id, ...searchKey });
-    const cached = source.cacheable && shared ? await readCache(cacheDb, source.id, key, ttl) : null;
-    if (cached) {
-      collected.push(...cached);
-      reports.push({ source: source.name, status: "ok", found: cached.length, message: "Résultat récent réutilisé (cache)" });
-      await recordSourceRun(ctx.supabase, source.id, "ok", cached.length, null, true);
-      return;
-    }
+    const useCache = source.cacheable && shared;
     const budget = shared ? budgetFor(source.id, env) : null;
     const fetchImpl = budget ? budgetedFetch(ctx.supabase, source.id, budget) : fetch;
-    try {
-      const offers = await source.run(fetchImpl);
-      collected.push(...offers);
-      reports.push({ source: source.name, status: "ok", found: offers.length });
-      await recordSourceRun(ctx.supabase, source.id, "ok", offers.length);
-      if (source.cacheable && shared) await writeCache(cacheDb, source.id, key, offers);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      if (error instanceof BudgetReached) {
-        // Not the user's problem: the other sources keep going, the admin is told.
-        reports.push({ source: source.name, status: "skipped", found: 0, message });
-        await recordSourceRun(ctx.supabase, source.id, "budget", 0, message);
-        return;
+
+    // One unit = one call to the source (one query, or the whole search).
+    const units: { key: string | null; config: ScanConfig }[] = source.perQuery
+      ? config.queries.slice(0, source.perQuery).map((q) => ({
+          key: useCache ? cacheKey(queryCacheParts(source.id, q, config)) : null,
+          // Standard window so that accounts at 10 or 14 days share the call.
+          config: { ...config, queries: [q], maxAgeDays: dayBucket(config.maxAgeDays) },
+        }))
+      : [{ key: useCache ? cacheKey(source.cacheParts ? await source.cacheParts() : { source: source.id }) : null, config }];
+
+    const got: ScannedOffer[] = [];
+    const errors: string[] = [];
+    let fromCache = 0;
+    let budgetMessage: string | null = null;
+    for (const unit of units) {
+      const cached = unit.key ? await readCache(cacheDb, source.id, unit.key, ttl) : null;
+      if (cached) {
+        got.push(...cached);
+        fromCache += 1;
+        continue;
       }
+      try {
+        const offers = await source.run(fetchImpl, unit.config);
+        got.push(...offers);
+        if (unit.key) await writeCache(cacheDb, source.id, unit.key, offers);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Erreur inconnue";
+        if (error instanceof BudgetReached) {
+          budgetMessage = message;
+          break;
+        }
+        errors.push(message);
+        // A refused key or an exhausted quota will not work for the next query either.
+        if (classifyError(message) !== "error") break;
+      }
+    }
+    const offers = source.perQuery ? withinDays(got, config.maxAgeDays) : got;
+    collected.push(...offers);
+
+    const tried = units.length;
+    const failed = errors.length > 0 && got.length === 0 && fromCache === 0;
+    if (failed) {
+      const message = [...new Set(errors)].join(" ; ");
       reports.push({ source: source.name, status: "error", found: 0, message });
       await recordSourceRun(ctx.supabase, source.id, classifyError(message), 0, message);
+      return;
     }
+    if (budgetMessage) {
+      // Not the user's problem: the other sources keep going, the admin is told.
+      reports.push({ source: source.name, status: got.length ? "ok" : "skipped", found: offers.length, message: budgetMessage });
+      await recordSourceRun(ctx.supabase, source.id, "budget", offers.length, budgetMessage);
+      return;
+    }
+    const notes: string[] = [];
+    if (fromCache === tried) notes.push("Résultat récent réutilisé (cache commun)");
+    else if (fromCache) notes.push(`${fromCache} recherche(s) sur ${tried} reprise(s) du cache commun`);
+    if (errors.length) notes.push([...new Set(errors)].join(" ; "));
+    reports.push({ source: source.name, status: "ok", found: offers.length, message: notes.join(" · ") || undefined });
+    await recordSourceRun(ctx.supabase, source.id, "ok", offers.length, errors.length ? errors.join(" ; ") : null, fromCache === tried);
   };
 
   // Company careers pages: read per company, each one cached for everybody.
@@ -235,6 +289,7 @@ export async function runScan(ctx: {
           continue;
         }
         const result = await scanAts([target], config);
+        Object.assign(listedBoards, result.listed);
         collected.push(...result.offers);
         found += result.offers.length;
         tally(target.ats).found += result.offers.length;
@@ -268,7 +323,14 @@ export async function runScan(ctx: {
   // Company careers pages alone do not need any key.
   const configured = sources.some((s) => s.enabled) || config.targets.length > 0;
   const relevant = collected.filter(isRelevant);
-  const ingest = await ingestOffers(ctx.supabase, ctx.userId, relevant);
+  // Shared catalogue: store / refresh what was seen, close what left its board,
+  // expire what nobody has seen for 3 weeks. Never blocks the scan.
+  const harvest = await harvestOffers(cacheDb, relevant);
+  if (!harvest.error) {
+    for (const [board, urls] of Object.entries(listedBoards)) await closeBoardOffers(cacheDb, board, urls);
+    await expireOffers(cacheDb);
+  }
+  const ingest = await ingestOffers(ctx.supabase, ctx.userId, relevant, harvest.error ? undefined : harvest.entries);
   if (ingest.error)
     reports.push({
       source: "Base de données",

@@ -113,6 +113,7 @@ export async function runServerTick(options: TickOptions): Promise<TickReport> {
       .select("id,user_id,description,official_url,source_url,last_checked_at")
       .eq("status", "DISCOVERED")
       .is("review_flag", null)
+      .is("gone_reason", null)
       .order("created_at", { ascending: true })
       .limit(40);
     const readable = ((waiting ?? []) as {

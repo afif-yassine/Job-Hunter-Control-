@@ -129,6 +129,31 @@ candidature déjà faite (y compris « Déjà postulé ailleurs ») est rangée 
 Les offres suspectes (paiement demandé, colis, WhatsApp + e-mail personnel…) vont aussi dans « À vérifier » :
 rien n'est dépensé dessus (ni IA, ni quota) tant que tu n'as pas décidé.
 
+## 6b. Catalogue d'offres commun et offres plus disponibles
+
+Chaque offre trouvée est enregistrée **une seule fois** pour toute la plateforme
+(table `offers`) ; chaque compte garde son propre état dessus (`jobs.offer_id` :
+score, statut, documents).
+
+- **Récolte partagée** : France Travail, JSearch, Adzuna et Jooble sont
+  interrogés *requête par requête* (« alternance développeur » à Paris), et
+  chaque requête est mise en cache (12 h par défaut, `SOURCE_CACHE_HOURS`).
+  Deux comptes dont les recherches se recoupent ne paient que les requêtes
+  nouvelles. Les fenêtres de date sont arrondies (7, 14 ou 31 jours) pour que
+  10 et 14 jours partagent le même appel, puis recoupées pour chaque compte.
+- **Offres plus disponibles**, trois signaux :
+  1. *Page carrière* : quand la page d'une entreprise (Greenhouse, Lever…) est
+     lue en entier, ses offres qui n'y sont plus sont fermées.
+  2. *Plus vue depuis 21 jours* par aucune recherche : expirée (elle revient
+     si une source la remontre).
+  3. *Signalée* par le bouton « Offre plus disponible ? » : rangée pour ce
+     compte ; signalée par 2 comptes, elle est fermée pour tout le monde.
+- Les offres fermées passent dans le filtre **Plus disponibles** des comptes
+  qui n'ont pas encore postulé ; l'analyse IA et la génération de documents
+  refusent de dépenser quoi que ce soit dessus.
+- Tout passe par la clé `SUPABASE_SERVICE_ROLE_KEY` (déjà requise pour le
+  cache). Sans elle, la recherche marche comme avant, sans catalogue.
+
 ## 7. Santé des sources, budgets et alertes (page Admin)
 
 Chaque passage de chaque source est enregistré (`source_runs`). Quand une source n'a plus de quota, que sa clé
