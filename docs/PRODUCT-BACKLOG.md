@@ -11,10 +11,10 @@ Le propriétaire demande désormais de construire **uniquement la page d’accue
 - [x] Première implémentation de l’accueil : symbole animé « Le Déclic », offre de démonstration stage/alternance, explication du parcours, CV, futur suivi et FAQ.
 - [x] Révision après retour sur l’aperçu : palette de l’ancien site (ivoire, bordeaux, or), ouverture en deux volets évoquant un nouveau chapitre, logo plus expressif, révélations au défilement et bouton pour revoir l’introduction.
 - [x] Thème clair par défaut et thème sombre mémorisé ; alias public `/accueil` pour consulter la vitrine même connecté.
-- [ ] Vérification finale à l’écran et publication GitHub/Vercel de cette version.
+- [x] Vérification finale à l’écran et publication GitHub/Vercel de cette version : code `a9827338`, CI verte, production prête et contrôles navigateur réussis sur lebontaf.com aux cinq largeurs de 320 à 1440 px.
 - [ ] Retour du propriétaire sur l’identité proposée, avant extension à toute la plateforme.
 
-Les cases d’implémentation ci-dessus décrivent le travail local ; la livraison reste ouverte jusqu’à publication vérifiée. Voir le [brief de l’accueil](HOME-DESIGN-BRIEF.md). Les lots globaux ci-dessous restent ouverts car cette livraison ne couvre pas tout le produit.
+Cette première livraison est publiée et vérifiée. Voir le [brief de l’accueil](HOME-DESIGN-BRIEF.md), le [rapport de vérification](HOME-VERIFICATION-2026-10-05.md) et `DESIGN.md` pour la direction implémentée. Les lots globaux ci-dessous restent ouverts car cette livraison ne couvre pas tout le produit.
 
 - Repenser l’ensemble du style autour de LeBonTaf, de la recherche de stages et d’alternances, de l’aide IA, des CV adaptés et du suivi des candidatures.
 - Viser une identité premium et singulière, avec des animations utiles et mesurées.

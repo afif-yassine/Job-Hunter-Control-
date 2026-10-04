@@ -1,0 +1,585 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-04T23:49:44Z",
+  "title": "Design System: LeBonTaf — accueil, identité candidate",
+  "extensions": {
+    "scope": {
+      "status": "candidate-homepage-only",
+      "approval": "Awaiting owner evaluation before platform-wide extension.",
+      "routes": [
+        "/ (unauthenticated, Supabase configured)",
+        "/accueil (public, including authenticated users)"
+      ],
+      "excludes": [
+        "login",
+        "authenticated dashboard",
+        "other application screens"
+      ],
+      "sourceFiles": [
+        "components/jinnjob/landing.tsx",
+        "components/jinnjob/landing.module.css",
+        "app/fonts.ts",
+        "app/page.tsx",
+        "app/accueil/page.tsx"
+      ],
+      "contextFiles": [
+        "PRODUCT.md",
+        "docs/HOME-DESIGN-BRIEF.md"
+      ],
+      "reviewDisposition": "ship",
+      "reviewAttribution": "Final review supplied by coordinating agent; no material findings.",
+      "screenshots": [
+        "test-results/homepage/light-1440.png",
+        "test-results/homepage/dark-1440.png",
+        "test-results/homepage/light-390.png",
+        "test-results/homepage/dark-390.png",
+        "test-results/homepage/light-320.png",
+        "test-results/homepage/opening-start.png",
+        "test-results/homepage/opening-turn.png"
+      ]
+    },
+    "colorMeta": {
+      "brand-bordeaux": {
+        "role": "primary",
+        "displayName": "brand bordeaux",
+        "tonalRamp": [
+          "oklch(15% 0.1104 28.02)",
+          "oklch(26% 0.1104 28.02)",
+          "oklch(38% 0.1104 28.02)",
+          "oklch(49% 0.1104 28.02)",
+          "oklch(61% 0.1104 28.02)",
+          "oklch(72% 0.1104 28.02)",
+          "oklch(84% 0.1104 28.02)",
+          "oklch(95% 0.1104 28.02)"
+        ]
+      },
+      "brand-peach-dark": {
+        "role": "primary",
+        "displayName": "brand peach dark",
+        "tonalRamp": [
+          "oklch(15% 0.0717 48.69)",
+          "oklch(26% 0.0717 48.69)",
+          "oklch(38% 0.0717 48.69)",
+          "oklch(49% 0.0717 48.69)",
+          "oklch(61% 0.0717 48.69)",
+          "oklch(72% 0.0717 48.69)",
+          "oklch(84% 0.0717 48.69)",
+          "oklch(95% 0.0717 48.69)"
+        ]
+      },
+      "chapter-bordeaux": {
+        "role": "primary",
+        "displayName": "chapter bordeaux",
+        "tonalRamp": [
+          "oklch(15% 0.0851 26.70)",
+          "oklch(26% 0.0851 26.70)",
+          "oklch(38% 0.0851 26.70)",
+          "oklch(49% 0.0851 26.70)",
+          "oklch(61% 0.0851 26.70)",
+          "oklch(72% 0.0851 26.70)",
+          "oklch(84% 0.0851 26.70)",
+          "oklch(95% 0.0851 26.70)"
+        ]
+      },
+      "cover-bordeaux": {
+        "role": "primary",
+        "displayName": "cover bordeaux",
+        "tonalRamp": [
+          "oklch(15% 0.1010 28.37)",
+          "oklch(26% 0.1010 28.37)",
+          "oklch(38% 0.1010 28.37)",
+          "oklch(49% 0.1010 28.37)",
+          "oklch(61% 0.1010 28.37)",
+          "oklch(72% 0.1010 28.37)",
+          "oklch(84% 0.1010 28.37)",
+          "oklch(95% 0.1010 28.37)"
+        ]
+      },
+      "accent-gold": {
+        "role": "secondary",
+        "displayName": "accent gold",
+        "tonalRamp": [
+          "oklch(15% 0.1045 87.08)",
+          "oklch(26% 0.1045 87.08)",
+          "oklch(38% 0.1045 87.08)",
+          "oklch(49% 0.1045 87.08)",
+          "oklch(61% 0.1045 87.08)",
+          "oklch(72% 0.1045 87.08)",
+          "oklch(84% 0.1045 87.08)",
+          "oklch(95% 0.1045 87.08)"
+        ]
+      },
+      "ground-parchment": {
+        "role": "neutral",
+        "displayName": "ground parchment",
+        "tonalRamp": [
+          "oklch(15% 0.0225 87.15)",
+          "oklch(26% 0.0225 87.15)",
+          "oklch(38% 0.0225 87.15)",
+          "oklch(49% 0.0225 87.15)",
+          "oklch(61% 0.0225 87.15)",
+          "oklch(72% 0.0225 87.15)",
+          "oklch(84% 0.0225 87.15)",
+          "oklch(95% 0.0225 87.15)"
+        ]
+      },
+      "ink-brown": {
+        "role": "neutral",
+        "displayName": "ink brown",
+        "tonalRamp": [
+          "oklch(15% 0.0175 55.53)",
+          "oklch(26% 0.0175 55.53)",
+          "oklch(38% 0.0175 55.53)",
+          "oklch(49% 0.0175 55.53)",
+          "oklch(61% 0.0175 55.53)",
+          "oklch(72% 0.0175 55.53)",
+          "oklch(84% 0.0175 55.53)",
+          "oklch(95% 0.0175 55.53)"
+        ]
+      },
+      "muted-brown": {
+        "role": "neutral",
+        "displayName": "muted brown",
+        "tonalRamp": [
+          "oklch(15% 0.0343 63.48)",
+          "oklch(26% 0.0343 63.48)",
+          "oklch(38% 0.0343 63.48)",
+          "oklch(49% 0.0343 63.48)",
+          "oklch(61% 0.0343 63.48)",
+          "oklch(72% 0.0343 63.48)",
+          "oklch(84% 0.0343 63.48)",
+          "oklch(95% 0.0343 63.48)"
+        ]
+      },
+      "line-parchment": {
+        "role": "neutral",
+        "displayName": "line parchment",
+        "tonalRamp": [
+          "oklch(15% 0.0349 80.28)",
+          "oklch(26% 0.0349 80.28)",
+          "oklch(38% 0.0349 80.28)",
+          "oklch(49% 0.0349 80.28)",
+          "oklch(61% 0.0349 80.28)",
+          "oklch(72% 0.0349 80.28)",
+          "oklch(84% 0.0349 80.28)",
+          "oklch(95% 0.0349 80.28)"
+        ]
+      },
+      "paper-ivory": {
+        "role": "neutral",
+        "displayName": "paper ivory",
+        "tonalRamp": [
+          "oklch(15% 0.0110 89.72)",
+          "oklch(26% 0.0110 89.72)",
+          "oklch(38% 0.0110 89.72)",
+          "oklch(49% 0.0110 89.72)",
+          "oklch(61% 0.0110 89.72)",
+          "oklch(72% 0.0110 89.72)",
+          "oklch(84% 0.0110 89.72)",
+          "oklch(95% 0.0110 89.72)"
+        ]
+      },
+      "wash-parchment": {
+        "role": "neutral",
+        "displayName": "wash parchment",
+        "tonalRamp": [
+          "oklch(15% 0.0350 88.78)",
+          "oklch(26% 0.0350 88.78)",
+          "oklch(38% 0.0350 88.78)",
+          "oklch(49% 0.0350 88.78)",
+          "oklch(61% 0.0350 88.78)",
+          "oklch(72% 0.0350 88.78)",
+          "oklch(84% 0.0350 88.78)",
+          "oklch(95% 0.0350 88.78)"
+        ]
+      },
+      "button-ivory": {
+        "role": "neutral",
+        "displayName": "button ivory",
+        "tonalRamp": [
+          "oklch(15% 0.0244 83.42)",
+          "oklch(26% 0.0244 83.42)",
+          "oklch(38% 0.0244 83.42)",
+          "oklch(49% 0.0244 83.42)",
+          "oklch(61% 0.0244 83.42)",
+          "oklch(72% 0.0244 83.42)",
+          "oklch(84% 0.0244 83.42)",
+          "oklch(95% 0.0244 83.42)"
+        ]
+      },
+      "ground-dark": {
+        "role": "neutral",
+        "displayName": "ground dark",
+        "tonalRamp": [
+          "oklch(15% 0.0136 51.46)",
+          "oklch(26% 0.0136 51.46)",
+          "oklch(38% 0.0136 51.46)",
+          "oklch(49% 0.0136 51.46)",
+          "oklch(61% 0.0136 51.46)",
+          "oklch(72% 0.0136 51.46)",
+          "oklch(84% 0.0136 51.46)",
+          "oklch(95% 0.0136 51.46)"
+        ]
+      },
+      "muted-dark": {
+        "role": "neutral",
+        "displayName": "muted dark",
+        "tonalRamp": [
+          "oklch(15% 0.0350 77.52)",
+          "oklch(26% 0.0350 77.52)",
+          "oklch(38% 0.0350 77.52)",
+          "oklch(49% 0.0350 77.52)",
+          "oklch(61% 0.0350 77.52)",
+          "oklch(72% 0.0350 77.52)",
+          "oklch(84% 0.0350 77.52)",
+          "oklch(95% 0.0350 77.52)"
+        ]
+      },
+      "line-dark": {
+        "role": "neutral",
+        "displayName": "line dark",
+        "tonalRamp": [
+          "oklch(15% 0.0296 66.81)",
+          "oklch(26% 0.0296 66.81)",
+          "oklch(38% 0.0296 66.81)",
+          "oklch(49% 0.0296 66.81)",
+          "oklch(61% 0.0296 66.81)",
+          "oklch(72% 0.0296 66.81)",
+          "oklch(84% 0.0296 66.81)",
+          "oklch(95% 0.0296 66.81)"
+        ]
+      },
+      "paper-dark": {
+        "role": "neutral",
+        "displayName": "paper dark",
+        "tonalRamp": [
+          "oklch(15% 0.0186 52.67)",
+          "oklch(26% 0.0186 52.67)",
+          "oklch(38% 0.0186 52.67)",
+          "oklch(49% 0.0186 52.67)",
+          "oklch(61% 0.0186 52.67)",
+          "oklch(72% 0.0186 52.67)",
+          "oklch(84% 0.0186 52.67)",
+          "oklch(95% 0.0186 52.67)"
+        ]
+      },
+      "wash-dark": {
+        "role": "neutral",
+        "displayName": "wash dark",
+        "tonalRamp": [
+          "oklch(15% 0.0236 58.58)",
+          "oklch(26% 0.0236 58.58)",
+          "oklch(38% 0.0236 58.58)",
+          "oklch(49% 0.0236 58.58)",
+          "oklch(61% 0.0236 58.58)",
+          "oklch(72% 0.0236 58.58)",
+          "oklch(84% 0.0236 58.58)",
+          "oklch(95% 0.0236 58.58)"
+        ]
+      },
+      "button-ink-dark": {
+        "role": "neutral",
+        "displayName": "button ink dark",
+        "tonalRamp": [
+          "oklch(15% 0.0285 41.36)",
+          "oklch(26% 0.0285 41.36)",
+          "oklch(38% 0.0285 41.36)",
+          "oklch(49% 0.0285 41.36)",
+          "oklch(61% 0.0285 41.36)",
+          "oklch(72% 0.0285 41.36)",
+          "oklch(84% 0.0285 41.36)",
+          "oklch(95% 0.0285 41.36)"
+        ]
+      }
+    },
+    "tonalRampPolicy": "Eight-step OKLCH ramps are synthesized for panel exploration only. They are not implemented CSS tokens; original hex primitives in DESIGN.md remain authoritative.",
+    "typographyMeta": {
+      "display": {
+        "displayName": "Titre de départ",
+        "purpose": "Hero serif, three lines; italic final phrase."
+      },
+      "headline": {
+        "displayName": "Titre de section",
+        "purpose": "Section narration and final invitation."
+      },
+      "offer-title": {
+        "displayName": "Titre d’offre",
+        "purpose": "Readable sans for practical job information."
+      },
+      "step-title": {
+        "displayName": "Titre d’étape",
+        "purpose": "Numbered process actions."
+      },
+      "lead": {
+        "displayName": "Introduction",
+        "purpose": "Hero supporting copy."
+      },
+      "body": {
+        "displayName": "Texte courant",
+        "purpose": "Method and FAQ prose."
+      },
+      "button": {
+        "displayName": "Action",
+        "purpose": "Primary CTA label."
+      },
+      "navigation": {
+        "displayName": "Navigation",
+        "purpose": "Header anchor links."
+      },
+      "tag": {
+        "displayName": "Compétence",
+        "purpose": "Illustrative skill tags, not general body text."
+      }
+    },
+    "shadows": [
+      {
+        "name": "offer",
+        "value": "0 12px 34px #41261910",
+        "purpose": "Offer sheet."
+      },
+      {
+        "name": "paper",
+        "value": "0 18px 45px #41261914",
+        "purpose": "CV sheet."
+      },
+      {
+        "name": "seal",
+        "value": "0 10px 24px #41261920",
+        "purpose": "CV seal."
+      },
+      {
+        "name": "cover-inset",
+        "value": "inset 0 0 75px #36100e45",
+        "purpose": "Opening cover material."
+      }
+    ],
+    "motion": [
+      {
+        "name": "expressive-ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Main reveal and assembly curve."
+      },
+      {
+        "name": "chapter-cover",
+        "value": "1150ms cubic-bezier(0.65, 0, 0.2, 1) 700ms",
+        "purpose": "Left and right covers rotate to -110deg and 110deg."
+      },
+      {
+        "name": "opening-lifetime",
+        "value": "2100ms CSS visibility; 2200ms JS removal",
+        "purpose": "Non-blocking, skippable first-visit introduction."
+      },
+      {
+        "name": "opening-title",
+        "value": "600ms ease-in 750ms",
+        "purpose": "Title fades and moves up."
+      },
+      {
+        "name": "chapter-line",
+        "value": "850ms; offsets 0ms, 100ms, 220ms; initial intro delay 1100ms",
+        "purpose": "Hero reveal."
+      },
+      {
+        "name": "underline",
+        "value": "1000ms; entrance delay + 450ms",
+        "purpose": "Hero SVG underline draw."
+      },
+      {
+        "name": "scene",
+        "value": "1100ms; entrance delay + 180ms",
+        "purpose": "Perspective scene arrival."
+      },
+      {
+        "name": "offer-settle",
+        "value": "900ms; entrance delay + 250ms",
+        "purpose": "Offer settles within scene."
+      },
+      {
+        "name": "offer-switch",
+        "value": "380ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Keyed illustrative content enters on switch."
+      },
+      {
+        "name": "logo-pulse",
+        "value": "7000ms infinite; rest 0–77%",
+        "purpose": "Header/footer brand and scene mark ribbons separate briefly then reconnect."
+      },
+      {
+        "name": "method-reveal",
+        "value": "700ms; offsets 0ms, 120ms, 240ms",
+        "purpose": "Steps enter once at IntersectionObserver threshold 0.12."
+      },
+      {
+        "name": "cv-reveal",
+        "value": "950ms",
+        "purpose": "CV moves from translateY(38px) rotate(-9deg) to rotate(-3deg)."
+      },
+      {
+        "name": "seal-reveal",
+        "value": "transform 650ms, opacity 450ms; delay 250ms",
+        "purpose": "Seal lands at rotate(3deg)."
+      },
+      {
+        "name": "tracking-reveal",
+        "value": "transform 700ms, opacity 600ms; offsets 0ms, 100ms, 200ms",
+        "purpose": "Preview rows enter once."
+      },
+      {
+        "name": "final-mark",
+        "value": "1000ms",
+        "purpose": "Final mark settles once."
+      },
+      {
+        "name": "control-feedback",
+        "value": "180ms ease-out",
+        "purpose": "CTA hover lift, link arrow and FAQ chevron."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide-min",
+        "value": "1500px"
+      },
+      {
+        "name": "compact-max",
+        "value": "1100px"
+      },
+      {
+        "name": "single-column-max",
+        "value": "760px"
+      },
+      {
+        "name": "small-phone-max",
+        "value": "370px"
+      }
+    ],
+    "behavior": {
+      "theme": {
+        "default": "light",
+        "scope": ".page[data-theme]",
+        "cookie": "lbt-home-theme",
+        "maxAgeSeconds": 31536000,
+        "serverSeeded": true
+      },
+      "intro": {
+        "cookie": "lbt-home-intro",
+        "cookieLifetime": "session",
+        "replay": true,
+        "skippable": true,
+        "pointerEvents": "none except skip button",
+        "focusTrap": false
+      },
+      "reveal": {
+        "threshold": 0.12,
+        "once": true,
+        "fallback": "Visible when IntersectionObserver unavailable."
+      },
+      "reducedMotion": "Hide opening/replay; disable animations/transitions; show reveal contents; retain static -3deg CV angle.",
+      "demo": "Local state, aria-pressed buttons and aria-live polite content; no network search, AI generation or application submission.",
+      "focus": "3px solid local ink, offset 5px; gold on final bordeaux section.",
+      "fonts": "Locally hosted WOFF2 with display:swap. Homepage uses IM Fell English and Instrument Sans; shared small-caps and mono families are not assigned here."
+    },
+    "notCanonized": [
+      "Opening uppercase signature is a local decorative detail, not a new eyebrow/title style.",
+      "Very small illustrative captions are not a general reading-size recommendation."
+    ],
+    "snippetPolicy": "Static component previews copied from the homepage, with literal scoped color values because page-local custom properties do not inherit into the panel. Font custom properties retain fallbacks. No full app behavior is implied."
+  },
+  "components": [
+    {
+      "name": "Action principale",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Action vers la connexion, ici présentée comme lien local de démonstration.",
+      "html": "<a class=\"ds-primary\" href=\"#connexion\">Trouver mon bon taf <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a>",
+      "css": ".ds-primary{display:inline-flex;align-items:center;justify-content:center;gap:28px;min-height:56px;padding:14px 23px;background:#7b2d26;color:#fff6e5;border-radius:8px;font-size:15px;font-weight:600;text-decoration:none;font-family:var(--font-sans,'Instrument Sans'),sans-serif;transition:transform 180ms ease-out,background 180ms ease-out}.ds-primary:focus-visible{outline:3px solid #2d241e;outline-offset:5px}@media(hover:hover){.ds-primary:hover{transform:translateY(-3px)}}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}.ds-primary:hover{transform:none}}"
+    },
+    {
+      "name": "Action finale",
+      "kind": "button",
+      "refersTo": "button-final",
+      "description": "Action vers la connexion, ici présentée comme lien local de démonstration.",
+      "html": "<a class=\"ds-final\" href=\"#connexion\">Trouver mon bon taf <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a>",
+      "css": ".ds-final{display:inline-flex;align-items:center;justify-content:center;gap:28px;min-height:56px;padding:14px 23px;background:#d9b86a;color:#2d241e;border-radius:8px;font-size:15px;font-weight:600;text-decoration:none;font-family:var(--font-sans,'Instrument Sans'),sans-serif;transition:transform 180ms ease-out,background 180ms ease-out}.ds-final:focus-visible{outline:3px solid #2d241e;outline-offset:5px}@media(hover:hover){.ds-final:hover{transform:translateY(-3px)}}@media(prefers-reduced-motion:reduce){.ds-final{transition:none}.ds-final:hover{transform:none}}"
+    },
+    {
+      "name": "Lien secondaire",
+      "kind": "button",
+      "description": "Lien souligné avec cible tactile minimale.",
+      "html": "<a class=\"ds-link\" href=\"#comment\">Je découvre <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></a>",
+      "css": ".ds-link{display:inline-flex;align-items:center;gap:13px;min-height:44px;color:#2d241e;font-size:14px;font-weight:600;text-decoration:underline;text-underline-offset:6px;text-decoration-thickness:1px;font-family:var(--font-sans,'Instrument Sans'),sans-serif;}.ds-link:focus-visible{outline:3px solid #2d241e;outline-offset:5px}@media(hover:hover){.ds-link:hover svg{transform:translateX(3px);transition:transform 180ms ease-out}}@media(prefers-reduced-motion:reduce){.ds-link:hover svg{transform:none;transition:none}}"
+    },
+    {
+      "name": "Navigation de marque",
+      "kind": "nav",
+      "description": "Le Déclic et mot-symbole mixte de l’accueil.",
+      "html": "<a class=\"ds-brand\" href=\"#accueil\" aria-label=\"LeBonTaf, accueil\"><svg class=\"ds-declic\" viewBox=\"0 0 64 64\" fill=\"none\" aria-hidden=\"true\"><path d=\"M8 10h14v25a7 7 0 0 0 7 7h25v14H29A21 21 0 0 1 8 35V10Z\" fill=\"currentColor\"/><path d=\"M29 8h27v27H42V22H29V8Z\" fill=\"currentColor\"/><path d=\"m28 35 12-12\" stroke=\"currentColor\" stroke-width=\"8\"/></svg><span>lebon<span class=\"ds-italic\">taf</span><span class=\"ds-dot\">.</span></span></a>",
+      "css": ".ds-brand{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;color:#2d241e;text-decoration:none;font-family:var(--font-sans,'Instrument Sans'),sans-serif;}.ds-brand>span{font-size:33px;font-weight:600;letter-spacing:-.04em;line-height:1}.ds-italic{font-family:var(--font-fell,'IM Fell English'),Georgia,serif;font-style:italic;font-weight:400;font-size:1.12em}.ds-dot{color:#695747}.ds-declic{width:42px;height:42px;color:#7b2d26;overflow:visible}.ds-brand:focus-visible{outline:3px solid #2d241e;outline-offset:5px}@media(hover:hover){.ds-brand:hover path:nth-child(1){transform:translate(-1px,1px);transition:transform 220ms ease-out}.ds-brand:hover path:nth-child(2){transform:translate(2px,-2px);transition:transform 220ms ease-out}}@media(prefers-reduced-motion:reduce){.ds-brand:hover path{transform:none;transition:none}}"
+    },
+    {
+      "name": "Type d’offre",
+      "kind": "button",
+      "description": "États visuels des deux commandes de démonstration ; sélection dynamique dans l’application.",
+      "html": "<div class=\"ds-switch\" role=\"group\" aria-label=\"Type d’offre de démonstration\"><button aria-pressed=\"true\" type=\"button\">Une alternance</button><button aria-pressed=\"false\" type=\"button\">Un stage</button></div>",
+      "css": ".ds-switch{display:flex;gap:6px}.ds-switch button{border:1px solid #d4c6af;border-radius:30px;padding:10px 17px;background:transparent;color:#2d241e;font-size:12px;min-height:44px;font-family:var(--font-sans,'Instrument Sans'),sans-serif;}.ds-switch button[aria-pressed=true]{background:#2d241e;color:#f3ecdc;border-color:#2d241e}.ds-switch button:focus-visible{outline:3px solid #2d241e;outline-offset:5px}"
+    },
+    {
+      "name": "Compétences",
+      "kind": "chip",
+      "refersTo": "skill-tag",
+      "description": "Étiquettes informatives non interactives.",
+      "html": "<div class=\"ds-tags\"><span>React</span><span>TypeScript</span><span>UI / UX</span></div>",
+      "css": ".ds-tags{display:flex;flex-wrap:wrap;gap:6px;color:#2d241e;font-family:var(--font-sans,'Instrument Sans'),sans-serif;}.ds-tags span{font-size:10px;border:1px solid #d4c6af;padding:4px 9px;border-radius:4px}"
+    },
+    {
+      "name": "Carte d’offre",
+      "kind": "card",
+      "refersTo": "offer-card",
+      "description": "Feuille de démonstration, données fictives.",
+      "html": "<article class=\"ds-offer\"><div class=\"ds-offer-top\"><span class=\"ds-company\">an<span>.</span></span><span>Alternance · 12 mois</span></div><h2>Développeur·se front-end</h2><p>Atelier numérique</p><div class=\"ds-offer-match\">Des compétences en commun.<strong>Une piste à explorer.</strong></div></article>",
+      "css": ".ds-offer{background:#fffcf4;color:#2d241e;padding:23px 25px 0;border-radius:12px;box-shadow:0 12px 34px #41261910;font-family:var(--font-sans,'Instrument Sans'),sans-serif;}.ds-offer-top{display:flex;align-items:center;gap:12px;margin-bottom:19px;font-size:11px;font-weight:500}.ds-offer-top>span:last-child{margin-left:auto}.ds-company{width:39px;height:39px;background:#e9dfc6;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;letter-spacing:-.04em;border-radius:9px}.ds-company span{color:#695747}.ds-offer h2{font-size:23px;line-height:1.2;letter-spacing:-.03em;font-weight:600;margin:0}.ds-offer p{font-size:12px;margin-top:6px;color:#695747}.ds-offer-match{border-top:1px solid #d4c6af;padding-block:15px;font-size:11px;color:#695747}.ds-offer-match strong{display:block;font-size:12px;color:#2d241e;margin-top:1px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Un nouveau chapitre",
+    "overview": "Identité candidate « Un nouveau chapitre », appliquée uniquement à l’accueil public LeBonTaf. Le propriétaire apprécie le symbole Le Déclic et demande les couleurs chaudes de l’ancien site, une ouverture de livre et davantage d’animation. Cette implémentation reste une proposition à évaluer avant toute extension à la connexion, à l’espace étudiant ou aux autres écrans.\n\nLe parchemin, l’encre brune, le bordeaux et l’or donnent une matière de livre ancien à une interface de recherche professionnelle. Le serif raconte le départ ; le sans rend les offres, les actions et les explications immédiatement lisibles. L’animation ouvre le chapitre puis laisse une longue place au repos.",
+    "keyCharacteristics": [
+      "Palette chaude en clair et brun encre en sombre ; clair par défaut.",
+      "Le Déclic : deux rubans complémentaires reliés en diagonale.",
+      "Titres IM Fell English, contenu et commandes Instrument Sans.",
+      "Surfaces tonales, traits fins et ombres diffuses sur les objets de papier.",
+      "Mouvements CSS/SVG, introduction passable et réduction des animations respectée."
+    ],
+    "rules": [
+      {
+        "name": "Home Scope",
+        "body": "Ces règles décrivent la proposition de l’accueil. Leur présence à la racine du dépôt n’autorise pas leur généralisation aux autres écrans.",
+        "section": "colors"
+      },
+      {
+        "name": "Story and Action",
+        "body": "Le serif donne le ton aux grands titres et aux accents ; les informations d’offre, les étapes et les commandes restent en sans.",
+        "section": "typography"
+      },
+      {
+        "name": "Paper Depth",
+        "body": "Les ombres douces appartiennent aux objets de démonstration et au sceau ; la structure de la page repose sur les surfaces et les séparateurs.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do conserver l’association du parchemin, du bordeaux et de l’or, avec les substitutions prévues pour le thème sombre.",
+      "Do garder Le Déclic reconnaissable dans ses deux rubans et sa liaison diagonale.",
+      "Do utiliser les titres serif pour le récit et le sans pour les actions et les informations pratiques.",
+      "Do garder l’introduction passable, les contenus utilisables et le mode de réduction des animations immédiat.",
+      "Do préserver les repères de focus et la version mobile jusqu’à 320 px."
+    ],
+    "donts": [
+      "Don't traiter cette documentation comme une approbation de l’identité pour toute la plateforme.",
+      "Don't transformer la métaphore du livre en bibliothèque qui masque les offres et la candidature.",
+      "Don't ajouter de vidéo, de moteur 3D ou d’images lourdes pour reproduire les effets actuels.",
+      "Don't présenter les exemples fictifs ou le futur suivi comme des résultats ou des fonctionnalités déjà validés.",
+      "Don't promouvoir les petites mentions décoratives en capitales en nouveau style de titre ou de surtitre."
+    ]
+  }
+}

@@ -24,4 +24,9 @@ Ces choix limitent le travail ajouté au navigateur ; aucun score Lighthouse ni 
 
 ## Publication
 
-La publication GitHub/Vercel et la vérification de production sont suivies séparément dans le backlog. Ce rapport décrit les vérifications locales réalisées avant l’envoi du code.
+- Code publié sur `main` : `a9827338171bdaad46c35079aa2874edfed7ad10`.
+- [CI GitHub](https://github.com/afif-yassine/Job-Hunter-Control-/actions/runs/37245233454) : terminée avec succès.
+- Déploiement Vercel `dpl_5Y4zY3zbctCBd4yFmzbpzufvt3LN` : `READY`, cible production, domaines `lebontaf.com` et `www.lebontaf.com` assignés sans erreur.
+- Accueil public `/` : HTTP 200, nouveau contenu présent, en-tête CSP présent.
+- Contrôle navigateur rejoué sur [l’accueil en production](https://lebontaf.com/accueil) aux cinq largeurs : aucune erreur console/JavaScript ni débordement, interactions et thèmes réussis, introduction passable/rejouable, réduction des animations respectée.
+- Cette vérification porte sur l’accueil, pas sur une généralisation du design à l’espace étudiant.
