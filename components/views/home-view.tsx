@@ -13,7 +13,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { openQuestionCount } from "@/components/questions-panel";
-import { Callout, Chip, PageHead, Progress, ScoreBadge, Soon } from "@/components/ui";
+import { Callout, Chip, PageHead, Progress, ScoreBadge } from "@/components/ui";
 import { summarize } from "@/lib/pipeline-client";
 import { sourceLabel, timeAgo } from "@/lib/labels";
 import type { Ctx } from "./types";
@@ -119,7 +119,15 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
   return (
     <>
       <PageHead title="Accueil" subtitle="Cherche, choisis, postule : l’assistant prépare tout, tu valides." />
-      <Soon id="cv-import" />
+      <div className="card cv-cta">
+        <div>
+          <strong>Ton CV</strong>
+          <p className="muted small-text">Importé une fois en PDF : tous tes CV et lettres partent de lui, rien n’est inventé.</p>
+        </div>
+        <button className="btn secondary" onClick={() => go("settings")}>
+          Importer ou mettre à jour
+        </button>
+      </div>
 
       <section className="hero card">
         {running ? (

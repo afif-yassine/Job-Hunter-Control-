@@ -74,3 +74,34 @@ export function aiCost(tokens: { input: number; output: number }, env: Env = pro
 }
 
 export const defaultAi: AiCall = (prompt, task) => generateJson(prompt, task);
+
+/** Reads a PDF (a CV) and answers in JSON. The file is sent inline, never stored by us. */
+export async function generateJsonFromPdf(
+  prompt: string,
+  pdf: Uint8Array,
+  task: AiTask,
+  env: Env = process.env,
+): Promise<AiResult> {
+  if (!aiConfigured(env)) throw new Error(AI_NOT_CONFIGURED);
+  const model = modelFor(task, env);
+  const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+  const result = await ai.models.generateContent({
+    model,
+    contents: [
+      {
+        role: "user",
+        parts: [{ inlineData: { mimeType: "application/pdf", data: Buffer.from(pdf).toString("base64") } }, { text: prompt }],
+      },
+    ],
+    config: { responseMimeType: "application/json" },
+  });
+  const meta = result.usageMetadata;
+  return {
+    text: result.text || "",
+    model,
+    usage: meta ? { input: meta.promptTokenCount ?? 0, output: (meta.candidatesTokenCount ?? 0) + (meta.thoughtsTokenCount ?? 0) } : undefined,
+  };
+}
+
+/** Injected in tests: (prompt, pdf) → JSON text. */
+export type PdfAiCall = (prompt: string, pdf: Uint8Array) => Promise<AiResult>;

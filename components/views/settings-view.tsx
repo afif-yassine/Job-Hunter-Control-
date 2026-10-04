@@ -5,7 +5,9 @@ import { Callout, Chip, PageHead } from "@/components/ui";
 import { PROVIDERS, type ProviderDef } from "@/lib/providers";
 import type { ProviderStatus } from "@/lib/integrations";
 import { DEFAULT_PREFS, MAX_TARGETS, type ScanPrefs } from "@/lib/scan/config";
-import { CATEGORIES } from "@/lib/scan/categories";
+import { CATEGORIES, category } from "@/lib/scan/categories";
+import type { ImportedProfile } from "@/lib/profile-import";
+import type { ProfileSummary } from "@/lib/profile-store";
 import type { DiscoveredTarget } from "@/lib/scan/discover";
 import { ATS_LABEL, boardUrl, parseAtsTarget } from "@/lib/scan/sources/ats";
 import { timeAgo } from "@/lib/labels";
@@ -14,6 +16,8 @@ import type { Ctx } from "./types";
 
 export function SettingsView({ ctx }: { ctx: Ctx }) {
   const { status, statusFailed } = ctx;
+  // Bumped when the CV import ticks job categories: the search form reloads.
+  const [searchVersion, setSearchVersion] = useState(0);
   return (
     <>
       <PageHead title="Réglages" subtitle="Connecte tes sources d’offres et choisis ce que l’assistant cherche." />
@@ -22,8 +26,9 @@ export function SettingsView({ ctx }: { ctx: Ctx }) {
           Recharge la page. Si ça continue, vérifie que tu es bien connecté.
         </Callout>
       )}
+      <ProfileSection ctx={ctx} onCategories={() => setSearchVersion((v) => v + 1)} />
       <SourcesSection ctx={ctx} />
-      <SearchSection ctx={ctx} />
+      <SearchSection key={searchVersion} ctx={ctx} />
       <SystemSection status={status} ctx={ctx} />
     </>
   );
@@ -619,6 +624,236 @@ function SystemSection({ status, ctx }: { status: SystemStatus | null; ctx: Ctx 
       <button className="btn ghost small" style={{ marginTop: 10 }} onClick={() => void ctx.refreshStatus()}>
         Revérifier
       </button>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ Profile (CV) */
+
+type ImportAnswer = { draft: ImportedProfile; problems: string[]; suggestions: string[]; filename: string };
+
+const period = (start: string | null, end: string | null) => [start, end ?? (start ? "aujourd’hui" : null)].filter(Boolean).join(" → ");
+
+/** Your CV, read once: every CV and letter is written from it, nothing else. */
+function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => void }) {
+  const { notify, reload } = ctx;
+  const [summary, setSummary] = useState<ProfileSummary | null | undefined>(undefined);
+  const [answer, setAnswer] = useState<ImportAnswer | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [busy, setBusy] = useState<"" | "read" | "save">("");
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/profile")
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+        if (!cancelled) setSummary(body.profile ?? null);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setSummary(null);
+          notify(`Profil illisible : ${e instanceof Error ? e.message : "erreur"}`, "bad");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [notify]);
+
+  async function read(file: File) {
+    setBusy("read");
+    notify("Lecture de ton CV… (jusqu’à 30 secondes)");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const response = await fetch("/api/profile/import", { method: "POST", body: form });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+      setAnswer(body as ImportAnswer);
+      setPicked((body as ImportAnswer).suggestions);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Lecture impossible", "bad");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function save() {
+    if (!answer) return;
+    setBusy("save");
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ draft: answer.draft, filename: answer.filename }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+      setSummary(body.profile);
+      if (picked.length) {
+        // Tick the suggested job categories in the search too.
+        const current = await fetch("/api/settings").then((r) => r.json());
+        const categories = [...new Set([...(current.prefs?.categories ?? []), ...picked])];
+        const put = await fetch("/api/settings", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ prefs: { ...current.prefs, categories } }),
+        });
+        const saved = await put.json().catch(() => ({}));
+        if (!put.ok) throw new Error(saved.error || "Métiers non enregistrés");
+        onCategories();
+        await reload();
+        notify(
+          `Profil enregistré. ${picked.length} métier(s) coché(s)${saved.imported ? `, ${saved.imported} offre(s) ajoutée(s) tout de suite` : ""}.`,
+          "good",
+        );
+      } else notify("Profil enregistré : tes prochains CV et lettres partiront de lui.", "good");
+      setAnswer(null);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Enregistrement impossible", "bad");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  const d = answer?.draft;
+  return (
+    <section className="settings-section">
+      <h2 className="section-title">0 · Ton CV</h2>
+      <div className="card form">
+        <p className="muted wide">
+          Dépose ton CV une seule fois : l’IA en tire ton profil (expériences, formations, projets, compétences) et chaque CV ou
+          lettre adapté part de là. Rien n’est inventé, et tu vérifies avant d’enregistrer. Le PDF n’est pas conservé.
+        </p>
+        {summary === undefined ? (
+          <p className="muted">Chargement…</p>
+        ) : summary ? (
+          <p className="wide">
+            <strong>{summary.full_name}</strong> · {summary.experience} expérience(s), {summary.education} formation(s),{" "}
+            {summary.projects} projet(s), {summary.skills} compétence(s)
+            {summary.updated_at ? <span className="muted"> · mis à jour {timeAgo(summary.updated_at)}</span> : null}
+          </p>
+        ) : (
+          <Callout tone="info" title="Aucun profil encore">
+            Sans profil, l’appli ne peut ni noter les offres ni écrire tes CV.
+          </Callout>
+        )}
+        <label className="wide upload">
+          {summary ? "Remplacer par un nouveau CV (PDF, 5 Mo max)" : "Importer mon CV (PDF, 5 Mo max)"}
+          <input
+            type="file"
+            accept="application/pdf"
+            disabled={Boolean(busy)}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) void read(f);
+            }}
+          />
+        </label>
+        {busy === "read" && (
+          <p className="muted">
+            <LoaderCircle size={14} className="spin" aria-hidden /> Lecture du CV…
+          </p>
+        )}
+        {d && answer && (
+          <div className="wide import-review">
+            <h3>Vérifie ce qui a été lu dans « {answer.filename} »</h3>
+            {answer.problems.map((p) => (
+              <Callout key={p} tone="bad" title="À vérifier">
+                {p}
+              </Callout>
+            ))}
+            <p>
+              <strong>{d.identity.full_name ?? "Nom manquant"}</strong>
+              {[d.identity.location, d.identity.email, d.identity.phone].filter(Boolean).map((x) => ` · ${x}`)}
+            </p>
+            {d.profile.experience.length > 0 && (
+              <>
+                <h4>Expériences</h4>
+                <ul>
+                  {d.profile.experience.map((e, i) => (
+                    <li key={i}>
+                      {e.title} — {e.organization} <span className="muted">{period(e.start, e.end)}</span>
+                      {e.facts.length > 0 && <span className="muted"> · {e.facts.length} réalisation(s)</span>}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {d.profile.education.length > 0 && (
+              <>
+                <h4>Formation</h4>
+                <ul>
+                  {d.profile.education.map((e, i) => (
+                    <li key={i}>
+                      {e.degree} — {e.institution} <span className="muted">{period(e.start, e.end)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {d.profile.projects.length > 0 && (
+              <>
+                <h4>Projets</h4>
+                <ul>
+                  {d.profile.projects.map((p, i) => (
+                    <li key={i}>
+                      {p.name}
+                      {p.technologies.length ? <span className="muted"> · {p.technologies.join(", ")}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {Object.keys(d.profile.skills).length > 0 && (
+              <>
+                <h4>Compétences</h4>
+                <div className="chips">
+                  {Object.values(d.profile.skills)
+                    .flat()
+                    .slice(0, 40)
+                    .map((x) => (
+                      <Chip key={x}>{x}</Chip>
+                    ))}
+                </div>
+              </>
+            )}
+            {answer.suggestions.length > 0 && (
+              <>
+                <h4>Métiers qui correspondent à ton CV</h4>
+                <div className="chips">
+                  {answer.suggestions.map((id) => {
+                    const on = picked.includes(id);
+                    return (
+                      <label key={id} className={on ? "pill active" : "pill"}>
+                        <input
+                          type="checkbox"
+                          className="sr"
+                          checked={on}
+                          onChange={() => setPicked(on ? picked.filter((x) => x !== id) : [...picked, id])}
+                        />
+                        {category(id)?.label ?? id}
+                      </label>
+                    );
+                  })}
+                </div>
+                <small className="muted">Cochés = ajoutés à ta recherche (Réglages &gt; Ce que tu cherches).</small>
+              </>
+            )}
+            <div className="jobactions">
+              <button className="btn" disabled={Boolean(busy) || !d.identity.full_name} onClick={() => void save()}>
+                {busy === "save" ? <LoaderCircle size={16} className="spin" aria-hidden /> : <CircleCheck size={16} aria-hidden />}{" "}
+                Enregistrer ce profil
+              </button>
+              <button className="btn ghost" disabled={Boolean(busy)} onClick={() => setAnswer(null)}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

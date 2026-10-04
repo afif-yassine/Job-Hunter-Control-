@@ -458,3 +458,12 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .costs th, .costs td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
 .costs th { color: var(--muted); font-weight: 600; }
 .costs td:not(:first-child), .costs th:not(:first-child) { text-align: right; white-space: nowrap; }
+
+/* CV import (Réglages > Ton CV, Accueil) */
+.cv-cta { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.cv-cta p { margin: 4px 0 0; }
+.upload input[type="file"] { margin-top: 8px; color: var(--muted); }
+.import-review { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px; }
+.import-review h3 { margin: 0; font-size: 16px; }
+.import-review h4 { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+.import-review ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }

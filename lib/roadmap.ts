@@ -28,7 +28,7 @@ export const FEATURES: Feature[] = [
   { id: "categories", label: "Choix des métiers par catégories, avec le nombre d’offres près de chez toi", state: "doing", sprint: 2 },
   { id: "filters", label: "Filtres et catégories dans la liste des offres", state: "soon", sprint: 2 },
   // Sprint 3
-  { id: "cv-import", label: "Import du CV en PDF, une seule fois", state: "soon", sprint: 3 },
+  { id: "cv-import", label: "Import du CV en PDF, une seule fois", state: "done", sprint: 3, detail: "Réglages > Ton CV : lu par l’IA, vérifié par toi, métiers proposés." },
   { id: "ranking", label: "Toutes les offres classées pour ton profil (embeddings)", state: "soon", sprint: 3 },
   { id: "summary", label: "Résumé court de chaque offre", state: "soon", sprint: 3 },
   // Sprint 4
