@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getFranceTravailToken } from "@/lib/france-travail/client";
+import { embedPendingOffers, geminiEmbedder, type Embedder } from "@/lib/embeddings";
 import { closeBoardOffers, expireOffers, harvestOffers } from "./catalogue";
 import { CATEGORIES, EXTRA_ROMES, SCOPE_CONTRACTS, categorize, contractKind } from "./categories";
 import { BudgetReached, budgetFor, budgetedFetch, classifyError, recordSourceRun } from "./health";
@@ -171,6 +172,8 @@ export type HarvestReport = {
   closed?: number;
   expired?: number;
   recategorized?: number;
+  /** Offers given their embedding during this slice. */
+  embedded?: number;
   errors: string[];
 };
 
@@ -180,7 +183,7 @@ export type HarvestReport = {
  */
 export async function runHarvestSlice(
   db: SupabaseClient,
-  opts: { env?: Env; now?: Date; budgetMs?: number; fetchImpl?: typeof fetch } = {},
+  opts: { env?: Env; now?: Date; budgetMs?: number; fetchImpl?: typeof fetch; embed?: Embedder | null } = {},
 ): Promise<HarvestReport> {
   const env = opts.env ?? process.env;
   const now = opts.now ?? new Date();
@@ -190,6 +193,16 @@ export async function runHarvestSlice(
   const left = () => (throttled ? 0 : budgetMs - (Date.now() - started));
   const fetchImpl = opts.fetchImpl ?? fetch;
   const run = slotOf(now);
+  const embed = opts.embed !== undefined ? opts.embed : geminiEmbedder(env);
+  // Vectors for the offers still without one, with the time left (never fails the slice).
+  const embedSome = async () => {
+    if (!embed || left() < 10_000) return;
+    try {
+      report.embedded = (report.embedded ?? 0) + (await embedPendingOffers(db, embed, { limit: 300, timeLeft: left }));
+    } catch (error) {
+      report.errors.push(`embeddings : ${error instanceof Error ? error.message : "erreur"}`);
+    }
+  };
   const report: HarvestReport = { run, created: false, processed: 0, offers: 0, pending: 0, finished: false, errors: [] };
 
   const { data: existing, error: runError } = await db.from("harvest_runs").select("id,status,started_at").eq("id", run).maybeSingle();
@@ -209,6 +222,7 @@ export async function runHarvestSlice(
   } else if (existing.status !== "running") {
     // Nothing to collect until the next run: tidy the catalogue meanwhile.
     report.recategorized = await recategorize(db);
+    await embedSome();
     report.finished = true;
     return report;
   }
@@ -322,6 +336,8 @@ export async function runHarvestSlice(
       report.processed += 1;
     }
   }
+
+  await embedSome();
 
   const { data: rest } = await db.from("harvest_tasks").select("key,source,status,found,error").eq("run_id", run).limit(5000);
   const tasks = (rest ?? []) as HarvestTask[];

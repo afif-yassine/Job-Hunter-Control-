@@ -175,6 +175,9 @@ export function matchesCategories(
 }
 
 const IMPORT_SCAN = 3000;
+/** Offers added for being close to the profile (embeddings), on top of the words and categories. */
+const SIMILAR_MAX = 40;
+const SIMILAR_MIN = 0.55;
 const IMPORT_MAX = 300;
 
 /**
@@ -188,7 +191,7 @@ export async function importFromCatalogue(
   now = Date.now(),
 ): Promise<{ offers: ScannedOffer[]; entries: Map<string, CatalogueEntry>; boards: string[]; error?: string }> {
   const empty = { offers: [], entries: new Map<string, CatalogueEntry>(), boards: [] };
-  if (!config.queries.length && !(config.categories ?? []).length) return empty;
+  // Nothing asked yet: only the profile can still bring offers (embeddings).
   const seenSince = new Date(now - (EXPIRE_DAYS + 1) * 86_400_000).toISOString();
   const { data, error } = await db
     .from("offers")
@@ -199,11 +202,32 @@ export async function importFromCatalogue(
     .limit(IMPORT_SCAN);
   if (error) return { ...empty, error: error.message };
   const cutoff = now - config.maxAgeDays * 86_400_000;
-  const rows = ((data ?? []) as CatalogueRow[])
-    .filter((o) => !o.published_at || Date.parse(o.published_at) >= cutoff)
-    .filter((o) => inArea(o.location, config))
+  const fits = (o: CatalogueRow) => (!o.published_at || Date.parse(o.published_at) >= cutoff) && inArea(o.location, config);
+  const byWords = ((data ?? []) as CatalogueRow[])
+    .filter(fits)
     .filter((o) => matchesCategories(o, config) || config.queries.some((q) => matchesQuery(o, q)))
     .slice(0, IMPORT_MAX);
+
+  // Closest to the profile (embeddings), whatever their words: same place,
+  // dates and contracts, in the scope of the platform.
+  const similar: CatalogueRow[] = [];
+  const { data: near } = await db.rpc("match_offers_for_me", { p_limit: 200 });
+  const nearIds = ((near ?? []) as { offer_id: string; similarity: number }[])
+    .filter((r) => r.similarity >= SIMILAR_MIN)
+    .map((r) => r.offer_id)
+    .filter((id) => !byWords.some((o) => o.id === id));
+  for (let i = 0; i < nearIds.length && similar.length < SIMILAR_MAX; i += 100) {
+    const { data: part } = await db
+      .from("offers")
+      .select("id,fingerprint,title,company,location,contract_type,source,url,apply_url,published_at,rome_code,board,categories,contract_kind")
+      .in("id", nearIds.slice(i, i + 100));
+    const kinds = config.contracts ?? [];
+    for (const o of (part ?? []) as CatalogueRow[]) {
+      const kind = o.contract_kind || contractKind(o);
+      if (fits(o) && (!kinds.length || kinds.includes(kind)) && similar.length < SIMILAR_MAX) similar.push(o);
+    }
+  }
+  const rows = [...byWords, ...similar];
   if (!rows.length) return empty;
 
   // Full texts only for the offers kept (the catalogue can be large).

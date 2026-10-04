@@ -61,6 +61,10 @@ export function useDashboardData(demo?: Data) {
         .order("created_at", { ascending: false });
       questions = plain.data as Question[] | null;
     }
+    // How close each offer is to the profile (embeddings); missing = not computed yet.
+    const near = await supabase.rpc("my_job_similarity");
+    const similarity = new Map(((near.data ?? []) as { job_id: string; similarity: number }[]).map((x) => [x.job_id, x.similarity]));
+    if (jobs.data) for (const job of jobs.data as Job[]) job.similarity = similarity.get(job.id) ?? null;
     const failure = [jobs, a, d, r, n].find((x) => x.error)?.error;
     setError(failure ? failure.message : "");
     setData({

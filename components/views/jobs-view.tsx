@@ -72,6 +72,7 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
   const [query, setQuery] = useState("");
   const [metier, setMetier] = useState("");
   const [contract, setContract] = useState("");
+  const [sort, setSort] = useState<"recent" | "score" | "profile">("recent");
 
   // Category and contract of every offer, computed once per list.
   const facets = useMemo(
@@ -109,8 +110,24 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
       .filter((j) => (q ? `${j.title} ${j.company} ${j.location || ""}`.toLowerCase().includes(q) : true))
       .filter((j) => !metier || (facets.get(j.id)?.cats ?? []).includes(metier as never))
       .filter((j) => !contract || facets.get(j.id)?.kind === contract);
-    return jobFilter === "best" ? [...list].sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0)) : list;
-  }, [inTab, jobFilter, query, metier, contract, facets]);
+    if (sort === "profile") return [...list].sort((a, b) => (b.similarity ?? -1) - (a.similarity ?? -1));
+    if (sort === "score" || jobFilter === "best") return [...list].sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0));
+    return list;
+  }, [inTab, jobFilter, query, metier, contract, facets, sort]);
+
+  // The closest offers to the profile get a mark (top 10 of the whole list).
+  const closest = useMemo(
+    () =>
+      new Set(
+        [...data.jobs]
+          .filter((j) => typeof j.similarity === "number")
+          .sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0))
+          .slice(0, 10)
+          .map((j) => j.id),
+      ),
+    [data.jobs],
+  );
+  const hasSimilarity = closest.size > 0;
 
   return (
     <>
@@ -163,6 +180,16 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
               ))}
           </select>
         </label>
+        <label>
+          Trier
+          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+            <option value="recent">Les plus récentes</option>
+            <option value="score">Meilleur score</option>
+            <option value="profile" disabled={!hasSimilarity}>
+              Les plus proches de mon CV{hasSimilarity ? "" : " (importe ton CV)"}
+            </option>
+          </select>
+        </label>
         {(metier || contract) && (
           <button className="linkbtn small-text" onClick={() => (setMetier(""), setContract(""))}>
             Effacer les filtres
@@ -205,7 +232,7 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
       ) : (
         <div className="cards">
           {rows.map((job) => (
-            <JobCard key={job.id} job={job} ctx={ctx} working={busy === job.id} />
+            <JobCard key={job.id} job={job} ctx={ctx} working={busy === job.id} closest={closest.has(job.id)} />
           ))}
         </div>
       )}
@@ -242,7 +269,7 @@ function SourceCredits({ job }: { job: Job }) {
   );
 }
 
-function JobCard({ job, ctx, working }: { job: Job; ctx: Ctx; working: boolean }) {
+function JobCard({ job, ctx, working, closest }: { job: Job; ctx: Ctx; working: boolean; closest: boolean }) {
   const { act, busy, go } = ctx;
   const status = jobStatus(job.status);
   const url = job.official_url || job.source_url;
@@ -300,6 +327,7 @@ function JobCard({ job, ctx, working }: { job: Job; ctx: Ctx; working: boolean }
         ) : (
           <Chip tone={status.tone}>{status.label}</Chip>
         )}
+        {closest && <Chip tone="good">Très proche de ton CV</Chip>}
         {job.contract_type && <Chip>{job.contract_type}</Chip>}
         <Chip>{platforms.length > 1 ? `Vu sur ${platforms.length} sites` : platforms[0]}</Chip>
         {age && <span className="muted small-text">{age}</span>}

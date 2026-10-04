@@ -29,7 +29,7 @@ export const FEATURES: Feature[] = [
   { id: "filters", label: "Filtres et catégories dans la liste des offres", state: "done", sprint: 2 },
   // Sprint 3
   { id: "cv-import", label: "Import du CV en PDF, une seule fois", state: "done", sprint: 3, detail: "Réglages > Ton CV : lu par l’IA, vérifié par toi, métiers proposés." },
-  { id: "ranking", label: "Toutes les offres classées pour ton profil (embeddings)", state: "soon", sprint: 3 },
+  { id: "ranking", label: "Toutes les offres classées pour ton profil (embeddings)", state: "done", sprint: 3, detail: "Les offres les plus proches de ton CV, même sans mot commun : tri « proches de mon CV »." },
   { id: "summary", label: "Résumé court de chaque offre", state: "done", sprint: 3, detail: "Écrit à la première analyse de l’offre, partagé avec tous les comptes." },
   // Sprint 4
   { id: "design", label: "Nouveau design, thème clair et sombre, mobile", state: "soon", sprint: 4 },
