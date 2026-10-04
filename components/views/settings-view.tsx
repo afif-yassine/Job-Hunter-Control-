@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CircleCheck, ExternalLink, LoaderCircle, ShieldCheck } from "lucide-react";
+import { CircleCheck, Download, ExternalLink, LoaderCircle, ShieldCheck, Trash2 } from "lucide-react";
 import { Callout, Chip, PageHead } from "@/components/ui";
 import { PROVIDERS, type ProviderDef } from "@/lib/providers";
 import type { ProviderStatus } from "@/lib/integrations";
@@ -13,6 +13,7 @@ import { ATS_LABEL, boardUrl, parseAtsTarget } from "@/lib/scan/sources/ats";
 import { timeAgo } from "@/lib/labels";
 import type { SystemStatus } from "@/components/use-status";
 import type { Ctx } from "./types";
+import { DELETE_CONFIRMATION } from "@/lib/account";
 
 export function SettingsView({ ctx }: { ctx: Ctx }) {
   const { status, statusFailed } = ctx;
@@ -30,6 +31,7 @@ export function SettingsView({ ctx }: { ctx: Ctx }) {
       <SourcesSection ctx={ctx} />
       <SearchSection key={searchVersion} ctx={ctx} />
       <SystemSection status={status} ctx={ctx} />
+      {ctx.supabase && <AccountSection ctx={ctx} />}
     </>
   );
 }
@@ -854,6 +856,122 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
           </div>
         )}
       </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ Account (RGPD) */
+
+type AccountInfo = { email: string; providers: string[]; createdAt: string; lastSignInAt: string | null };
+
+const PROVIDER_LABEL: Record<string, string> = { google: "Google", email: "lien par e-mail" };
+
+/** Your account: how you sign in, download everything, delete everything. */
+function AccountSection({ ctx }: { ctx: Ctx }) {
+  const [info, setInfo] = useState<AccountInfo | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [working, setWorking] = useState(false);
+  const [problem, setProblem] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/account")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: AccountInfo | null) => alive && setInfo(d))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function remove() {
+    setWorking(true);
+    setProblem("");
+    try {
+      const res = await fetch("/api/account", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirm: typed.trim() }),
+      });
+      const out = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(out.error || "La suppression a échoué.");
+      // A full reload on purpose: drops every bit of state of the deleted account.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign("/");
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "La suppression a échoué.");
+      setWorking(false);
+    }
+  }
+
+  const since = info?.createdAt ? new Date(info.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : null;
+  const via = info?.providers.map((p) => PROVIDER_LABEL[p] ?? p).join(" et ");
+
+  return (
+    <section className="settings-section">
+      <h2 className="section-title">4 · Ton compte</h2>
+      <div className="card list">
+        <div className="row static">
+          <span className="row-main">
+            <strong>{info?.email || ctx.userEmail || "Ton compte"}</strong>
+            <span className="muted">
+              {[via ? `Connexion par ${via}` : null, since ? `compte créé le ${since}` : null].filter(Boolean).join(" · ") || "…"}
+            </span>
+          </span>
+        </div>
+        <div className="row static">
+          <span className="row-main">
+            <strong>Télécharger mes données</strong>
+            <span className="muted">Ton profil, tes offres, tes candidatures et tes documents, dans un fichier JSON.</span>
+          </span>
+          <a className="btn secondary small" href="/api/account/export" download>
+            <Download size={15} aria-hidden /> Télécharger
+          </a>
+        </div>
+        <div className="row static">
+          <span className="row-main">
+            <strong>Supprimer mon compte</strong>
+            <span className="muted">Efface immédiatement et définitivement ton compte et tout ce qu’il contient.</span>
+          </span>
+          {!asking && (
+            <button type="button" className="btn ghost small danger-text" onClick={() => setAsking(true)}>
+              <Trash2 size={15} aria-hidden /> Supprimer
+            </button>
+          )}
+        </div>
+        {asking && (
+          <div className="row static" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+            <Callout tone="bad" title="Action définitive">
+              Ton CV, tes offres, tes candidatures et tes documents seront effacés. Pense à télécharger tes données avant. Pour
+              confirmer, écris <strong>{DELETE_CONFIRMATION}</strong>.
+            </Callout>
+            <input
+              className="account-confirm"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              aria-label={`Écris ${DELETE_CONFIRMATION} pour confirmer`}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+            />
+            {problem && <p className="muted" role="alert">{problem}</p>}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" className="btn danger" disabled={typed.trim() !== DELETE_CONFIRMATION || working} onClick={() => void remove()}>
+                {working ? <LoaderCircle size={15} className="spin" aria-hidden /> : <Trash2 size={15} aria-hidden />} Supprimer définitivement
+              </button>
+              <button type="button" className="btn ghost" disabled={working} onClick={() => { setAsking(false); setTyped(""); setProblem(""); }}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      <p className="muted" style={{ marginTop: 10, fontSize: 13.5 }}>
+        <a href="/confidentialite" target="_blank" rel="noreferrer">Confidentialité</a> ·{" "}
+        <a href="/conditions" target="_blank" rel="noreferrer">Conditions</a> ·{" "}
+        <a href="/mentions-legales" target="_blank" rel="noreferrer">Mentions légales</a>
+      </p>
     </section>
   );
 }

@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { CATEGORIES } from "@/lib/scan/categories";
 import { Lamp, Wordmark } from "./lamp";
 import { Magnetic } from "./magnetic";
+import { LEGAL_LINKS } from "./legal";
 
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 const reveal = (i = 0) => ({
@@ -342,7 +343,12 @@ export function Footer() {
       <div className="jj-wrap jj-footer-in">
         <Wordmark size={22} />
         <span>Offres France Travail (<a href="https://francetravail.io/produits-partages/documentation/conditions-dutilisation-api/licence-offres-emploi" target="_blank" rel="noreferrer">licence de réutilisation</a>) · <a href="https://www.adzuna.fr" target="_blank" rel="noreferrer">Jobs by Adzuna</a></span>
-        <Link href="/login">Se connecter</Link>
+        <nav style={{ display: "flex", flexWrap: "wrap", gap: "8px 22px" }} aria-label="Informations légales">
+          {LEGAL_LINKS.map((l) => (
+            <Link key={l.href} href={l.href}>{l.label}</Link>
+          ))}
+          <Link href="/login">Se connecter</Link>
+        </nav>
       </div>
     </footer>
   );

@@ -1,14 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNext } from "@/lib/auth-messages";
 import { createClient } from "@/lib/supabase/server";
 
 /** Google sends the user back here with a one-time code, exchanged for a session. */
 export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get("code");
+  const params = request.nextUrl.searchParams;
+  const fail = (code: string) => NextResponse.redirect(new URL(`/login?error=${code}`, request.url));
+  if (params.get("error") === "access_denied") return fail("google_cancelled");
+  const code = params.get("code");
+  if (!code) return fail("google_failed");
   const supabase = await createClient();
-  if (code && supabase) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(new URL("/", request.url));
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, request.url));
-  }
-  return NextResponse.redirect(new URL("/login?error=Connexion%20Google%20interrompue.", request.url));
+  if (!supabase) return fail("config");
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) return fail("google_failed");
+  return NextResponse.redirect(new URL(safeNext(params.get("next")), request.url));
 }

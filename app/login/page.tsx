@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { login } from "./actions";
 import { createClient } from "@/lib/supabase/server";
 import { Lamp } from "@/components/jinnjob/lamp";
-import { NoAccountYet } from "@/components/jinnjob/no-account";
+import { SignIn } from "@/components/jinnjob/sign-in";
+import { LegalFooter } from "@/components/jinnjob/legal";
+import { authErrorMessage, safeNext } from "@/lib/auth-messages";
 import { googleSignInEnabled } from "@/lib/google-signin";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
   const supabase = await createClient();
   const claims = supabase ? await supabase.auth.getClaims() : null;
-  if (claims?.data?.claims?.sub) redirect("/");
-  const { error } = await searchParams;
+  const { error, next: rawNext } = await searchParams;
+  const next = safeNext(rawNext);
+  if (claims?.data?.claims?.sub) redirect(next);
   const google = googleSignInEnabled();
   return (
     <div className="jj">
@@ -29,29 +31,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </Link>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <h1 className="jj-fell" style={{ fontSize: 56, lineHeight: 1, letterSpacing: "-.01em" }}>Ouvre ton livre.</h1>
-              <p style={{ fontSize: 18, lineHeight: 1.55, color: "#4a4136" }}>Tes pistes, tes CV et tes candidatures t’attendent. Rien n’est envoyé sans toi.</p>
+              <p style={{ fontSize: 18, lineHeight: 1.55, color: "#4a4136" }}>Connexion ou inscription, c’est la même porte : ton compte se crée à la première visite. Gratuit pendant la phase de test.</p>
             </div>
-            {error && <p className="jj-error" role="alert">{error}</p>}
-            {google && (
-              <>
-                <a className="jj-bound" href="/auth/google" style={{ width: "100%" }}>
-                  <span className="jj-gmark" aria-hidden="true">G</span>
-                  Continuer avec Google
-                </a>
-                <div className="jj-or jj-mono" style={{ fontSize: 13, letterSpacing: ".12em" }}>OU PAR E-MAIL</div>
-              </>
-            )}
-            <form action={login} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <label className="jj-field">Adresse e-mail<input className="jj-input" name="email" type="email" autoComplete="email" required /></label>
-              <label className="jj-field">Mot de passe<input className="jj-input" name="password" type="password" autoComplete="current-password" minLength={8} required /></label>
-              <div style={{ marginTop: 6 }}>
-                <button className="jj-ribbon" type="submit">Entrer <span className="arr" aria-hidden="true">→</span></button>
-              </div>
-            </form>
-            <NoAccountYet />
+            <SignIn google={google} next={next} error={authErrorMessage(error)} />
           </div>
         </div>
       </main>
+      <LegalFooter />
     </div>
   );
 }
