@@ -83,7 +83,7 @@ function Cover({ quick }: { quick: boolean }) {
       />
       <motion.div className="jj-cover-mark" initial={{ opacity: 1, scale: 1 }} animate={{ opacity: 0, scale: 1.3 }} transition={{ delay: quick ? 0 : 1.2, duration: 0.45 }}>
         <Lamp size={120} color="#f3ecdc" cut="#7b2d26" accent="#d9b86a" />
-        <span className="jj-fellsc" style={{ fontSize: 20, letterSpacing: ".3em" }}>JinnJob</span>
+        <span className="jj-fellsc" style={{ fontSize: 20, letterSpacing: ".3em" }}>LeBonTaf</span>
       </motion.div>
     </div>
   );
@@ -96,7 +96,7 @@ function Nav() {
   return (
     <header className={`jj-nav${stuck ? " is-stuck" : ""}`}>
       <div className="jj-wrap jj-nav-in">
-        <Link href="/" className="jj-brand" aria-label="JinnJob, accueil">
+        <Link href="/" className="jj-brand" aria-label="LeBonTaf, accueil">
           <Lamp size={46} />
           <Wordmark />
         </Link>
@@ -187,7 +187,7 @@ function Hero({ start }: { start: number }) {
           ))}
         </h1>
         <motion.p className="jj-lead" {...fade(1)}>
-          JinnJob fouille toute la France deux fois par jour, garde les offres qui ressemblent à ton CV, puis écrit ton CV et ta lettre de motivation pour chacune. Toi, tu relis et tu postules.
+          LeBonTaf fouille toute la France deux fois par jour, garde les offres qui ressemblent à ton CV, puis écrit ton CV et ta lettre de motivation pour chacune. Toi, tu relis et tu postules.
         </motion.p>
         <motion.div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 28 }} {...fade(1.15)}>
           <Magnetic>

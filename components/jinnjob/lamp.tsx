@@ -13,7 +13,7 @@ type LampProps = {
   title?: string;
 };
 
-/** The JinnJob mark: a genie lamp whose smoke ends in a wish-star. Animated in CSS (app/jinnjob.css). */
+/** The LeBonTaf mark: a genie lamp whose smoke ends in a wish-star. Animated in CSS (app/jinnjob.css). */
 export function Lamp({ size = 44, color = "#1f1a14", cut = "#f3ecdc", accent = "#7b2d26", busy, className, title }: LampProps) {
   return (
     <svg
@@ -43,11 +43,11 @@ export function Lamp({ size = 44, color = "#1f1a14", cut = "#f3ecdc", accent = "
   );
 }
 
-/** "JinnJob" set in the old printing face, "Job" in italic leather red. */
+/** "LeBonTaf" set in the old printing face, "Taf" in italic leather red. */
 export function Wordmark({ size = 30, dark }: { size?: number; dark?: boolean }) {
   return (
     <span className="jj-word" style={{ fontSize: size, color: dark ? "#f3ecdc" : undefined }}>
-      Jinn<em style={{ color: dark ? "#e4b9a9" : undefined }}>Job</em>
+      LeBon<em style={{ color: dark ? "#e4b9a9" : undefined }}>Taf</em>
     </span>
   );
 }

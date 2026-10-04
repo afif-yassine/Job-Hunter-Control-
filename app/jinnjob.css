@@ -256,7 +256,7 @@ body:has(.jj) { background: #f3ecdc; color-scheme: light; }
 .jj-tome::before { content: ""; position: absolute; inset: 22px; border: 1.5px solid var(--gold); }
 .jj-tome::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 236, 190, 0.18) 50%, transparent 65%); background-size: 250% 100%; animation: jjSheen 5s ease-in-out 1.4s infinite; }
 @keyframes jjSheen { 0% { background-position: 120% 0; } 60%, 100% { background-position: -120% 0; } }
-@media (max-width: 720px) { .jj-login-art { padding: 28px 18px; flex-basis: 100%; } .jj-tome { width: 200px; gap: 10px; } .jj-tome .jj-word { font-size: 40px !important; } .jj-tome .jj-lamp { width: 70px; height: 52px; } .jj-login-form-wrap { padding: 28px 18px 48px !important; } }
+@media (max-width: 720px) { .jj-login-art { padding: 28px 18px; flex-basis: 100%; } .jj-tome { width: 220px; gap: 10px; padding: 0 26px; text-align: center; } .jj-tome .jj-word { font-size: 34px !important; } .jj-tome .jj-fellsc { font-size: 13px !important; } .jj-tome .jj-lamp { width: 70px; height: 52px; } .jj-login-form-wrap { padding: 28px 18px 48px !important; } }
 .jj-login-form-wrap { flex: 1 1 480px; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 56px 24px; }
 .jj-login-form { width: 440px; max-width: 100%; display: flex; flex-direction: column; gap: 24px; }
 .jj-field { display: flex; flex-direction: column; gap: 8px; font-weight: 600; font-size: 15px; }

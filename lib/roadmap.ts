@@ -32,7 +32,7 @@ export const FEATURES: Feature[] = [
   { id: "ranking", label: "Toutes les offres classées pour ton profil (embeddings)", state: "done", sprint: 3, detail: "Les offres les plus proches de ton CV, même sans mot commun : tri « proches de mon CV »." },
   { id: "summary", label: "Résumé court de chaque offre", state: "done", sprint: 3, detail: "Écrit à la première analyse de l’offre, partagé avec tous les comptes." },
   // Sprint 4
-  { id: "design", label: "Nouveau design JinnJob (accueil et connexion faits, espace étudiant à venir)", state: "doing", sprint: 4 },
+  { id: "design", label: "Nouveau design LeBonTaf (accueil et connexion faits, espace étudiant à venir)", state: "doing", sprint: 4 },
   { id: "versions", label: "Historique et comparaison des versions de CV", state: "soon", sprint: 4 },
   { id: "tracking", label: "Suivi des candidatures en colonnes", state: "soon", sprint: 4 },
   { id: "extension", label: "Extension Chrome pour enregistrer une candidature faite ailleurs", state: "soon", sprint: 4 },

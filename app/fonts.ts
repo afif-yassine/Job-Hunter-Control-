@@ -1,6 +1,6 @@
 import localFont from "next/font/local";
 
-/** JinnJob type: an old printing face for stories, a clean sans to read fast, a typewriter for labels. */
+/** LeBonTaf type: an old printing face for stories, a clean sans to read fast, a typewriter for labels. */
 export const fell = localFont({
   src: [
     { path: "./fonts/im-fell-english-latin-400-normal.woff2", weight: "400", style: "normal" },

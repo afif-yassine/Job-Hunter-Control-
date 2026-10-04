@@ -6,7 +6,7 @@ export default async function Home() {
   const supabase = await createClient();
   if (!supabase) return <Dashboard />;
   const { data } = await supabase.auth.getClaims();
-  // Visitors who are not signed in see the public JinnJob home page.
+  // Visitors who are not signed in see the public LeBonTaf home page.
   if (!data?.claims?.sub) return <Landing />;
   return <Dashboard userEmail={String(data.claims.email ?? "")} />;
 }

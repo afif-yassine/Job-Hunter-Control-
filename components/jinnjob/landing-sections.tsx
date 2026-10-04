@@ -301,7 +301,7 @@ export function Ledger() {
           ))}
         </div>
         <div style={{ background: "#1f1a14", color: "#f3ecdc" }}>
-          <div className="jj-fellsc" style={{ fontSize: 22, letterSpacing: ".1em", color: "#e4b9a9" }}>Avec JinnJob</div>
+          <div className="jj-fellsc" style={{ fontSize: 22, letterSpacing: ".1em", color: "#e4b9a9" }}>Avec LeBonTaf</div>
           {AFTER.map((t) => <div key={t} className="jj-ledger-row">{t}</div>)}
         </div>
       </motion.div>

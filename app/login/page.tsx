@@ -20,7 +20,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <div className="jj-login-art" aria-hidden="true">
           <div className="jj-tome">
             <Lamp size={130} color="#d9b86a" cut="#7b2d26" accent="#f3ecdc" />
-            <div className="jj-word" style={{ fontSize: 62, color: "#f3ecdc", position: "relative" }}>Jinn<em style={{ color: "#f3ecdc" }}>Job</em></div>
+            <div className="jj-word" style={{ fontSize: 62, color: "#f3ecdc", position: "relative" }}>LeBon<em style={{ color: "#f3ecdc" }}>Taf</em></div>
             <div className="jj-fellsc" style={{ fontSize: 20, letterSpacing: ".08em", color: "#f0ddd0", position: "relative" }}>Tome I · Ton alternance</div>
           </div>
         </div>

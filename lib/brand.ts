@@ -1,15 +1,15 @@
 /**
  * One place for the product name and the legal identity shown on the public
- * pages. The name is provisional (jinnjob.com belongs to another AI product):
- * renaming the brand is a change here, plus the logo.
+ * pages. Renaming the brand is a change here, plus the wordmark
+ * (components/jinnjob/lamp.tsx).
  */
 export const BRAND = {
-  name: "JinnJob",
+  name: "LeBonTaf",
   /** Publisher of the site (LCEN art. 6): an individual while the product is in its free test phase. */
   publisher: "Yassine Afif",
   publisherStatus: "Particulier, projet en phase de test, sans activité commerciale",
   contactEmail: "yassine.afif.ma@gmail.com",
-  siteUrl: "https://job-hunter-control.vercel.app",
+  siteUrl: "https://lebontaf.com",
   /** Date shown at the top of the legal pages; update it with every change of their content. */
   legalUpdatedAt: "4 octobre 2026",
 } as const;
