@@ -23,3 +23,12 @@ test("AI cost: tokens recorded per account at each call, priced and ranked in Ad
   assert.equal(costs.total.calls, 3);
   assert.ok(Math.abs(costs.total.usd - aiCost({ input: 14000, output: 3700 }, {})) < 1e-9);
 });
+
+test("AI provider errors are explained in plain French (no raw JSON)", async () => {
+  const { explainAiError } = await import("../lib/ai");
+  const raw = '{"error":{"code":402,"message":"Your prepayment credits are depleted. Please go to AI Studio…","status":"RESOURCE_EXHAUSTED"}}';
+  assert.match(explainAiError(new Error(raw)), /^Crédit IA épuisé/);
+  assert.match(explainAiError(new Error('{"error":{"code":429,"status":"RESOURCE_EXHAUSTED"}}')), /^Limite de l’IA/);
+  assert.match(explainAiError(new Error("API key not valid. Please pass a valid API key.")), /^Clé IA refusée/);
+  assert.match(explainAiError(new Error("503 UNAVAILABLE: The model is overloaded")), /momentanément indisponible/);
+});

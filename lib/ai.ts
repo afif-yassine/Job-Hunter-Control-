@@ -35,6 +35,37 @@ export function modelFor(task: AiTask, env: Env = process.env): string {
 
 export const AI_NOT_CONFIGURED = "GEMINI_API_KEY is not configured";
 
+/**
+ * Provider errors in plain French. The raw JSON of Gemini ("prepayment
+ * credits are depleted"…) is never shown as such.
+ */
+export function explainAiError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (/prepay|credits? (are )?depleted|billing|\b402\b/i.test(raw))
+    return "Crédit IA épuisé : le compte Google AI Studio de la plateforme n’a plus de crédit. L’administrateur doit le recharger (ai.studio > Billing).";
+  if (/RESOURCE_EXHAUSTED|\b429\b|quota|rate.?limit/i.test(raw))
+    return "Limite de l’IA atteinte pour le moment : réessaie dans quelques minutes.";
+  if (/API key not valid|API_KEY_INVALID|PERMISSION_DENIED|\b40[13]\b/i.test(raw))
+    return "Clé IA refusée : vérifie GEMINI_API_KEY dans Vercel.";
+  if (/\b50[0-9]\b|UNAVAILABLE|overloaded|INTERNAL/i.test(raw)) return "L’IA est momentanément indisponible : réessaie dans un instant.";
+  return raw.length > 200 ? `${raw.slice(0, 200)}…` : raw;
+}
+
+export class AiUnavailable extends Error {
+  constructor(error: unknown) {
+    super(explainAiError(error));
+    this.name = "AiUnavailable";
+  }
+}
+
+async function call<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    throw new AiUnavailable(error);
+  }
+}
+
 /** One prompt in, one JSON text out. */
 export async function generateJson(prompt: string, task: AiTask, env: Env = process.env): Promise<AiResult> {
   const provider = (env.AI_PROVIDER || "gemini").trim().toLowerCase();
@@ -42,11 +73,13 @@ export async function generateJson(prompt: string, task: AiTask, env: Env = proc
   if (!aiConfigured(env)) throw new Error(AI_NOT_CONFIGURED);
   const model = modelFor(task, env);
   const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
-  const result = await ai.models.generateContent({
-    model,
-    contents: prompt,
-    config: { responseMimeType: "application/json" },
-  });
+  const result = await call(() =>
+    ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: { responseMimeType: "application/json" },
+    }),
+  );
   const meta = result.usageMetadata;
   const usage = meta
     ? {
@@ -85,16 +118,18 @@ export async function generateJsonFromPdf(
   if (!aiConfigured(env)) throw new Error(AI_NOT_CONFIGURED);
   const model = modelFor(task, env);
   const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
-  const result = await ai.models.generateContent({
-    model,
-    contents: [
-      {
-        role: "user",
-        parts: [{ inlineData: { mimeType: "application/pdf", data: Buffer.from(pdf).toString("base64") } }, { text: prompt }],
-      },
-    ],
-    config: { responseMimeType: "application/json" },
-  });
+  const result = await call(() =>
+    ai.models.generateContent({
+      model,
+      contents: [
+        {
+          role: "user",
+          parts: [{ inlineData: { mimeType: "application/pdf", data: Buffer.from(pdf).toString("base64") } }, { text: prompt }],
+        },
+      ],
+      config: { responseMimeType: "application/json" },
+    }),
+  );
   const meta = result.usageMetadata;
   return {
     text: result.text || "",
