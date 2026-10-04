@@ -467,3 +467,13 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .import-review h3 { margin: 0; font-size: 16px; }
 .import-review h4 { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
 .import-review ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+
+/* Job card: "En bref" summary */
+.brief { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.brief ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.brief p { margin: 0; }
+
+/* Offers: métier / contrat filters */
+.facets { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; margin: 4px 0 12px; }
+.facets label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.facets select { min-width: 220px; }

@@ -36,7 +36,7 @@ export function useDashboardData(demo?: Data) {
       return;
     }
     const [j, a, q, d, r, n] = await Promise.all([
-      supabase.from("jobs").select("*,job_sources(platform,url)").order("created_at", { ascending: false }),
+      supabase.from("jobs").select("*,job_sources(platform,url),offers(summary)").order("created_at", { ascending: false }),
       supabase.from("applications").select("*,jobs(company,title)").order("created_at", { ascending: false }),
       supabase
         .from("application_questions")
@@ -48,8 +48,9 @@ export function useDashboardData(demo?: Data) {
     ]);
     let jobs = j;
     if (j.error) {
-      // Before the Phase 1 migration there is no job_sources table.
-      jobs = await supabase.from("jobs").select("*").order("created_at", { ascending: false });
+      // Older databases: without the catalogue, then without job_sources.
+      jobs = await supabase.from("jobs").select("*,job_sources(platform,url)").order("created_at", { ascending: false });
+      if (jobs.error) jobs = await supabase.from("jobs").select("*").order("created_at", { ascending: false });
     }
     let questions = q.data as Question[] | null;
     if (q.error) {

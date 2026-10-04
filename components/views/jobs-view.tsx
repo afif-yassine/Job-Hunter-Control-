@@ -1,9 +1,10 @@
 "use client";
 import { useMemo, useState } from "react";
 import { CheckCheck, CircleOff, ExternalLink, LoaderCircle, Plus, Search, ShieldAlert } from "lucide-react";
-import { Chip, Empty, PageHead, ScoreBadge, Soon } from "@/components/ui";
+import { Chip, Empty, PageHead, ScoreBadge } from "@/components/ui";
+import { CATEGORIES, categorize, contractKind, type ContractKind } from "@/lib/scan/categories";
 import { REVIEW, jobStatus, platformsOf, timeAgo } from "@/lib/labels";
-import type { Job } from "@/lib/types";
+import type { Job, OfferSummary } from "@/lib/types";
 import type { Ctx, JobFilter } from "./types";
 
 const FILTERS: { id: JobFilter; label: string }[] = [
@@ -51,15 +52,32 @@ const PLATFORMS = ["LinkedIn", "Indeed", "Welcome to the Jungle", "HelloWork", "
 
 type Insight = { verified_strengths?: string[]; gaps?: string[]; cv_summary?: string };
 
+/** "En bref": from this account's analysis, or shared by the first account that analysed the offer. */
+function summaryOf(job: Job): OfferSummary | null {
+  const own = (job.score_breakdown as { summary?: OfferSummary } | undefined)?.summary;
+  const s = own ?? job.offers?.summary ?? null;
+  return s && (s.missions?.length || s.stack?.length || s.conditions) ? s : null;
+}
+
 function insight(job: Job): Insight | null {
   const raw = job.score_breakdown as Insight | undefined;
   if (!raw || (!raw.verified_strengths?.length && !raw.gaps?.length)) return null;
   return raw;
 }
 
+const CONTRACT_LABEL: Record<ContractKind, string> = { alternance: "Alternance", stage: "Stage", cdd: "CDD", cdi: "CDI", autre: "Autre" };
+
 export function JobsView({ ctx }: { ctx: Ctx }) {
   const { data, jobFilter, setJobFilter, act, busy } = ctx;
   const [query, setQuery] = useState("");
+  const [metier, setMetier] = useState("");
+  const [contract, setContract] = useState("");
+
+  // Category and contract of every offer, computed once per list.
+  const facets = useMemo(
+    () => new Map(data.jobs.map((j) => [j.id, { cats: categorize({ title: j.title, romeCode: j.rome_code }), kind: contractKind(j) }])),
+    [data.jobs],
+  );
 
   const counts = useMemo(
     () =>
@@ -70,13 +88,29 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
     [data.jobs],
   );
 
+  const inTab = useMemo(() => data.jobs.filter(MATCH[jobFilter]), [data.jobs, jobFilter]);
+  const metierCounts = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const j of inTab) for (const c of facets.get(j.id)?.cats ?? []) n.set(c, (n.get(c) ?? 0) + 1);
+    return n;
+  }, [inTab, facets]);
+  const contractCounts = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const j of inTab) {
+      const k = facets.get(j.id)?.kind ?? "autre";
+      n.set(k, (n.get(k) ?? 0) + 1);
+    }
+    return n;
+  }, [inTab, facets]);
+
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = data.jobs.filter(MATCH[jobFilter]).filter((j) =>
-      q ? `${j.title} ${j.company} ${j.location || ""}`.toLowerCase().includes(q) : true,
-    );
+    const list = inTab
+      .filter((j) => (q ? `${j.title} ${j.company} ${j.location || ""}`.toLowerCase().includes(q) : true))
+      .filter((j) => !metier || (facets.get(j.id)?.cats ?? []).includes(metier as never))
+      .filter((j) => !contract || facets.get(j.id)?.kind === contract);
     return jobFilter === "best" ? [...list].sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0)) : list;
-  }, [data.jobs, jobFilter, query]);
+  }, [inTab, jobFilter, query, metier, contract, facets]);
 
   return (
     <>
@@ -90,9 +124,6 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
         }
       />
 
-      <Soon id="filters" />
-      <Soon id="summary" />
-
       <div className="filters" role="tablist" aria-label="Filtrer les offres">
         {FILTERS.map((f) => (
           <button
@@ -105,6 +136,38 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
             {f.label} <span className="count">{counts[f.id]}</span>
           </button>
         ))}
+      </div>
+
+      <div className="facets">
+        <label>
+          Métier
+          <select value={metier} onChange={(e) => setMetier(e.target.value)}>
+            <option value="">Tous ({inTab.length})</option>
+            {CATEGORIES.filter((c) => metierCounts.get(c.id)).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label} ({metierCounts.get(c.id)})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Contrat
+          <select value={contract} onChange={(e) => setContract(e.target.value)}>
+            <option value="">Tous</option>
+            {(Object.keys(CONTRACT_LABEL) as ContractKind[])
+              .filter((k) => contractCounts.get(k))
+              .map((k) => (
+                <option key={k} value={k}>
+                  {CONTRACT_LABEL[k]} ({contractCounts.get(k)})
+                </option>
+              ))}
+          </select>
+        </label>
+        {(metier || contract) && (
+          <button className="linkbtn small-text" onClick={() => (setMetier(""), setContract(""))}>
+            Effacer les filtres
+          </button>
+        )}
       </div>
 
       <label className="search">
@@ -241,6 +304,7 @@ function JobCard({ job, ctx, working }: { job: Job; ctx: Ctx; working: boolean }
         <Chip>{platforms.length > 1 ? `Vu sur ${platforms.length} sites` : platforms[0]}</Chip>
         {age && <span className="muted small-text">{age}</span>}
       </div>
+      {summaryOf(job) && <Brief summary={summaryOf(job)!} />}
       <SourceCredits job={job} />
       <div className="jobactions">
         {primary}
@@ -390,6 +454,29 @@ function AppliedElsewhere({ job, ctx, disabled }: { job: Job; ctx: Ctx; disabled
       <button className="btn ghost small" onClick={() => setOpen(false)}>
         Annuler
       </button>
+    </div>
+  );
+}
+
+function Brief({ summary }: { summary: OfferSummary }) {
+  return (
+    <div className="brief">
+      <strong className="small-text">En bref</strong>
+      {summary.missions?.length ? (
+        <ul>
+          {summary.missions.slice(0, 3).map((m, i) => (
+            <li key={i}>{m}</li>
+          ))}
+        </ul>
+      ) : null}
+      {summary.stack?.length ? (
+        <div className="chips">
+          {summary.stack.slice(0, 8).map((t) => (
+            <Chip key={t}>{t}</Chip>
+          ))}
+        </div>
+      ) : null}
+      {summary.conditions ? <p className="muted small-text">{summary.conditions}</p> : null}
     </div>
   );
 }

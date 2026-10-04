@@ -292,3 +292,18 @@ test("still online? France Travail asked through its API; only 404 / 410 / 204 m
   assert.equal((await stillOnline(page, {}, reply(403))).online, null);
   assert.equal((await stillOnline(page, {}, (async () => { throw new Error("timeout"); }) as typeof fetch)).online, null);
 });
+
+test("analysis: the offer's short summary is kept with the analysis (shown as « En bref »)", async () => {
+  const { db, tables } = world([job("j1")]);
+  const answer = JSON.parse(ANALYSIS(84));
+  answer.summary = { missions: ["Développer l’API"], stack: ["Python", "FastAPI"], conditions: "Alternance 24 mois, Paris" };
+  const { ai, calls } = aiReturning(JSON.stringify(answer));
+  const r = await analyzeJob({ supabase: db, userId: "u1", jobId: "j1", ai });
+  assert.equal(r.status, 200);
+  assert.match(calls[0].prompt, /summary \{missions/);
+  assert.deepEqual((tables.jobs[0].score_breakdown as { summary: unknown }).summary, answer.summary);
+  // A model that forgets it changes nothing else.
+  const other = world([job("j2")]);
+  const r2 = await analyzeJob({ supabase: other.db, userId: "u1", jobId: "j2", ai: aiReturning(ANALYSIS(70)).ai });
+  assert.equal(r2.status, 200);
+});

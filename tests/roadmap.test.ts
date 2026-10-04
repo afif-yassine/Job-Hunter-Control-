@@ -12,7 +12,7 @@ function tsxFiles(dir: string): string[] {
 
 test("every « Bientôt » card points at a feature of the roadmap (a typo would crash the page)", () => {
   const used = tsxFiles("components").flatMap((f) => [...readFileSync(f, "utf8").matchAll(/<Soon id="([^"]+)"/g)].map((m) => m[1]));
-  assert.ok(used.length >= 5);
+  assert.ok(used.length >= 3);
   for (const id of used) assert.doesNotThrow(() => feature(id), id);
   const ids = FEATURES.map((f) => f.id);
   assert.equal(new Set(ids).size, ids.length);

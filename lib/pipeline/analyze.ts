@@ -16,6 +16,15 @@ const output = z.object({
   gaps: z.array(z.string()),
   questions: z.array(z.string()),
   cv_summary: z.string(),
+  /** Written from the offer only, shared with every account (offers.summary). */
+  summary: z
+    .object({
+      missions: z.array(z.string()).catch([]),
+      stack: z.array(z.string()).catch([]),
+      conditions: z.string().catch(""),
+    })
+    .optional()
+    .catch(undefined),
   suspicion: z
     .object({
       level: z.enum(["none", "low", "high"]).catch("none"),
@@ -180,7 +189,7 @@ export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
   if (!quota.ok) return quotaRefusal("analysis", quota.limit);
 
   const hints = signals.reasons.length ? `\nSIGNAUX_A_VERIFIER=${JSON.stringify(signals.reasons)}` : "";
-  const prompt = `Analyse cette offre uniquement avec le profil et le registre de vérité. N'invente jamais une compétence, une expérience, une date, un statut légal ou un diplôme. Réponds en JSON: score_breakdown avec contract/20, mission/20, technical/25, education/15, experience/10, location/10; total sur 100; verified_strengths; gaps; questions; cv_summary; suspicion {level: "none"|"low"|"high", reasons: string[]} — "high" seulement pour une offre qui ressemble à une arnaque (paiement demandé au candidat, entreprise invérifiable, contact uniquement par messagerie ou e-mail personnel, promesse de gains, mission sans rapport avec l'intitulé), jamais pour une simple offre peu adaptée au profil.\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify({
+  const prompt = `Analyse cette offre uniquement avec le profil et le registre de vérité. N'invente jamais une compétence, une expérience, une date, un statut légal ou un diplôme. Réponds en JSON: score_breakdown avec contract/20, mission/20, technical/25, education/15, experience/10, location/10; total sur 100; verified_strengths; gaps; questions; cv_summary; summary {missions: 3 phrases courtes max sur ce que la personne fera, stack: outils et technologies cités (8 max), conditions: une ligne avec contrat, durée, rythme, lieu, télétravail et salaire SEULEMENT s'ils sont écrits} — résumé tiré uniquement du texte de l'offre, sans rien ajouter; suspicion {level: "none"|"low"|"high", reasons: string[]} — "high" seulement pour une offre qui ressemble à une arnaque (paiement demandé au candidat, entreprise invérifiable, contact uniquement par messagerie ou e-mail personnel, promesse de gains, mission sans rapport avec l'intitulé), jamais pour une simple offre peu adaptée au profil.\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify({
     company: job.company,
     title: job.title,
     contract_type: job.contract_type,
@@ -212,6 +221,11 @@ export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
       details: { score: analysis.total, model: result.model, suspected },
     });
     if (!suspected) await enrichWithFranceTravail(ctx, job).catch(() => {});
+    // The offer's summary is written once for every account.
+    if (analysis.summary && job.offer_id) {
+      const service = serviceClient();
+      if (service) await service.from("offers").update({ summary: analysis.summary }).eq("id", job.offer_id).is("summary", null);
+    }
     return { status: 200, body: { ...analysis, suspected, reasons: suspected ? suspicion.reasons : [] } };
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Erreur inconnue Gemini";

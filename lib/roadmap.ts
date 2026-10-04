@@ -26,11 +26,11 @@ export const FEATURES: Feature[] = [
   // Sprint 2
   { id: "harvest", label: "Collecte plateforme 2 fois par jour (France Travail toute la France, Adzuna, pages carrière)", state: "doing", sprint: 2 },
   { id: "categories", label: "Choix des métiers par catégories, avec le nombre d’offres près de chez toi", state: "doing", sprint: 2 },
-  { id: "filters", label: "Filtres et catégories dans la liste des offres", state: "soon", sprint: 2 },
+  { id: "filters", label: "Filtres et catégories dans la liste des offres", state: "done", sprint: 2 },
   // Sprint 3
   { id: "cv-import", label: "Import du CV en PDF, une seule fois", state: "done", sprint: 3, detail: "Réglages > Ton CV : lu par l’IA, vérifié par toi, métiers proposés." },
   { id: "ranking", label: "Toutes les offres classées pour ton profil (embeddings)", state: "soon", sprint: 3 },
-  { id: "summary", label: "Résumé court de chaque offre", state: "soon", sprint: 3 },
+  { id: "summary", label: "Résumé court de chaque offre", state: "done", sprint: 3, detail: "Écrit à la première analyse de l’offre, partagé avec tous les comptes." },
   // Sprint 4
   { id: "design", label: "Nouveau design, thème clair et sombre, mobile", state: "soon", sprint: 4 },
   { id: "versions", label: "Historique et comparaison des versions de CV", state: "soon", sprint: 4 },
