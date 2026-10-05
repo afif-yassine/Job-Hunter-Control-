@@ -1,53 +1,59 @@
 type MarkProps = {
   /** Width in px (the drawing is square). */
   size?: number;
-  /** Colour of the pin head and of the thread. */
-  color?: string;
-  /** Colour of the second pin and the needle. */
-  ink?: string;
-  /** Livelier thread: the "searching" state. */
+  /** Plays the arrival animation (frame draws, arrow springs out). */
+  intro?: boolean;
+  /** Arrow keeps leaving the frame: the "searching" state. */
   busy?: boolean;
+  /** Shapes only, without the dark tile (for dark backgrounds). */
+  bare?: boolean;
   className?: string;
   title?: string;
 };
 
 /**
- * The LeBonTaf mark: a red push-pin whose thread runs to a second pin, the
- * way a detective links two clues on a board. Animated in CSS (app/jinnjob.css).
+ * The LeBonTaf mark: a frame (where you are) and an arrow leaving it toward
+ * the top right — "ton bon départ". Animated in CSS (app/jinnjob.css).
  */
-export function Mark({ size = 44, color = "#d2372c", ink = "#1c1a17", busy, className, title }: MarkProps) {
+export function Mark({ size = 40, intro = true, busy, bare, className, title }: MarkProps) {
   return (
     <svg
-      viewBox="0 0 64 64"
+      viewBox="0 0 48 48"
       width={size}
       height={size}
-      className={["jj-mark", busy ? "is-busy" : "", className ?? ""].join(" ").trim()}
+      className={["lbt-mark", intro ? "is-intro" : "", busy ? "is-busy" : "", className ?? ""].join(" ").trim()}
       role={title ? "img" : undefined}
       aria-label={title}
       aria-hidden={title ? undefined : true}
     >
-      <path className="mk-thread-shadow" d="M20 22 C 30 46, 44 48, 50 44" />
-      <path className="mk-thread" d="M20 20 C 30 44, 44 46, 50 42" style={{ stroke: color }} />
-      <g className="mk-pin2">
-        <path d="M50 42 L56 52" stroke={ink} strokeWidth="2.2" strokeLinecap="round" />
-        <circle cx="50" cy="42" r="6.2" fill={ink} />
-        <circle cx="48" cy="40" r="1.8" fill="#fff" opacity=".45" />
-      </g>
-      <g className="mk-pin">
-        <path d="M20 20 L12 34" stroke={ink} strokeWidth="2.4" strokeLinecap="round" />
-        <circle cx="20" cy="18" r="11" fill={color} />
-        <path d="M11.5 22 A 11 11 0 0 0 29 23" fill="none" stroke="rgba(0,0,0,.22)" strokeWidth="3" />
-        <circle cx="16" cy="14" r="3.2" fill="#fff" opacity=".5" />
+      {!bare && <rect className="mk-tile" width="48" height="48" rx="11" />}
+      <g transform={bare ? undefined : "translate(7.2 7.2) scale(.7)"}>
+        <path className="mk-frame" d="M4 4 H15 V33 H44 V44 H18 A14 14 0 0 1 4 30 Z" />
+        <g className="mk-arrow">
+          <path d="M22 4 H44 V26 H35 V13 H22 Z" />
+          <path d="M20.6 25.6 L31.2 15 L36 19.8 L25.4 30.4 Z" />
+        </g>
       </g>
     </svg>
   );
 }
 
-/** "LeBonTaf" in the bold grotesque, "Taf" in thread red. */
+/** "lebon" in the bold grotesque, "taf" in an italic serif, and a full stop. */
 export function Wordmark({ size = 28, dark }: { size?: number; dark?: boolean }) {
   return (
-    <span className="jj-word" style={{ fontSize: size, color: dark ? "#f4f1ea" : undefined }}>
-      LeBon<em style={{ color: dark ? "#ff8a7a" : undefined }}>Taf</em>
+    <span className={`lbt-word${dark ? " is-dark" : ""}`} style={{ fontSize: size }}>
+      lebon<em>taf</em>
+      <i>.</i>
+    </span>
+  );
+}
+
+/** Mark and wordmark together, as one logo. */
+export function Logo({ size = 36, dark, intro = true }: { size?: number; dark?: boolean; intro?: boolean }) {
+  return (
+    <span className="lbt-logo">
+      <Mark size={size} intro={intro} />
+      <Wordmark size={Math.round(size * 0.78)} dark={dark} />
     </span>
   );
 }

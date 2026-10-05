@@ -15,7 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { PushPin, Tape, Tent, Thread, type PinColor, type Pt } from "./board";
 import { Chapters, Features, Filature, Final, Footer, Kinetic, Ledger, Pistes, Recruit, Ribbons } from "./landing-sections";
-import { Mark, Wordmark } from "./logo";
+import { Logo } from "./logo";
 import { Magnetic } from "./magnetic";
 import { SoonModal } from "./soon";
 
@@ -42,13 +42,13 @@ export function Landing() {
     }
   }, []);
 
-  const start = reduce ? 0 : returning ? 0.45 : 1.9;
+  const start = reduce ? 0 : returning ? 0.95 : 2.55;
 
   return (
     <MotionConfig reducedMotion="user">
       <div className="jj">
         <ScrollProgress />
-        {!reduce && <Folder quick={returning} />}
+        {!reduce && <Door quick={returning} />}
         <Nav />
         <main>
           <Hero start={start} />
@@ -75,38 +75,54 @@ function ScrollProgress() {
   return <motion.div className="jj-progress" style={{ scaleX }} aria-hidden="true" />;
 }
 
-/** The case file that opens on arrival: stamped, then its flap lifts (shorter for a returning visitor). */
-function Folder({ quick }: { quick: boolean }) {
+/** A door that opens on arrival, light pours out, and we walk through it (shorter for a returning visitor; a click skips it). */
+function Door({ quick }: { quick: boolean }) {
   const [gone, setGone] = useState(false);
   if (gone) return null;
-  const open = quick ? 0.1 : 1.15;
+  const open = quick ? 0.1 : 0.75;
+  const zoomAt = quick ? 0.5 : 1.95;
   return (
-    <div className="jj-folder" aria-hidden="true">
-      <motion.div
-        className="jj-folder-flap"
-        initial={{ rotateX: 0, opacity: 1 }}
-        animate={{ rotateX: -100, opacity: [1, 1, 0] }}
-        transition={{ delay: open, duration: quick ? 0.55 : 0.95, ease: [0.7, 0, 0.25, 1] }}
-        onAnimationComplete={() => setGone(true)}
-      >
-        <div className="jj-folder-tab">DOSSIER N° 2026</div>
-        <div className="jj-folder-mid">
-          <Mark size={quick ? 72 : 96} />
-          <Wordmark size={quick ? 40 : 56} />
-          {!quick && (
-            <motion.div
-              className="jj-folder-stamp"
-              initial={{ opacity: 0, scale: 2.8, rotate: -24 }}
-              animate={{ opacity: 1, scale: 1, rotate: -11 }}
-              transition={{ delay: 0.35, type: "spring", stiffness: 520, damping: 17 }}
-            >
-              ENQUÊTE OUVERTE
-            </motion.div>
-          )}
+    <motion.div
+      className="lbt-door-scene"
+      aria-hidden="true"
+      onClick={() => setGone(true)}
+      initial={{ opacity: 1 }}
+      animate={{ opacity: 0 }}
+      transition={{ delay: zoomAt + (quick ? 0.35 : 0.55), duration: 0.4 }}
+      onAnimationComplete={() => setGone(true)}
+    >
+      <motion.div className="lbt-door-zoom" initial={{ scale: 1 }} animate={{ scale: quick ? 7 : 10 }} transition={{ delay: zoomAt, duration: quick ? 0.6 : 0.95, ease: [0.7, 0, 0.25, 1] }}>
+        {!quick && (
+          <motion.div className="lbt-door-top" initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.55, ease: EASE }}>
+            <Logo size={46} dark />
+          </motion.div>
+        )}
+        <motion.div className="lbt-door-glow" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: open + 0.2, duration: 0.9 }} />
+        <div className="lbt-door-frame">
+          <motion.div className="lbt-door-light" initial={{ opacity: 0, scale: 0.4 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: open + 0.12, duration: 0.8, ease: EASE }} />
+          <motion.div
+            className="lbt-door-leaf"
+            initial={{ rotateY: 0 }}
+            animate={{ rotateY: -112 }}
+            transition={{ delay: open, duration: quick ? 0.5 : 0.95, ease: [0.55, 0, 0.2, 1] }}
+          >
+            <span className="lbt-door-panel" />
+            <span className="lbt-door-panel is-low" />
+            <motion.span className="lbt-door-knob" initial={{ rotate: 0 }} animate={{ rotate: [0, -50, 0] }} transition={{ delay: Math.max(0, open - 0.35), duration: 0.35 }} />
+          </motion.div>
+          <motion.div className="lbt-door-floor" initial={{ opacity: 0, scaleY: 0 }} animate={{ opacity: 1, scaleY: 1 }} transition={{ delay: open + 0.2, duration: 0.7, ease: EASE }} />
         </div>
-        <div className="jj-folder-lines" />
+        {!quick && (
+          <div className="lbt-door-tag">
+            {["Ton alternance.", "Ton stage.", "Ton bon départ."].map((t, i) => (
+              <motion.span key={t} className={i === 2 ? "is-last" : undefined} initial={{ opacity: 0, y: 18, filter: "blur(6px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} transition={{ delay: 0.95 + i * 0.24, duration: 0.55, ease: EASE }}>
+                {t}
+              </motion.span>
+            ))}
+          </div>
+        )}
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -118,8 +134,7 @@ function Nav() {
     <header className={`jj-nav${stuck ? " is-stuck" : ""}`}>
       <div className="jj-wrap jj-nav-in">
         <Link href="/" className="jj-brand" aria-label="LeBonTaf, accueil">
-          <Mark size={40} />
-          <Wordmark />
+          <Logo size={38} />
         </Link>
         <nav className="jj-nav-links" aria-label="Navigation principale">
           <a className="jj-nav-a is-optional" href="#chapitres">Comment ça marche</a>
@@ -133,9 +148,9 @@ function Nav() {
 }
 
 const LINES: { words: string[]; accent?: number }[] = [
-  { words: ["Ton", "prochain"] },
-  { words: ["taf,", "on", "mène"] },
-  { words: ["l’enquête."], accent: 0 },
+  { words: ["Ton", "alternance."] },
+  { words: ["Ton", "stage."] },
+  { words: ["Ton", "bon\u00a0départ."], accent: 1 },
 ];
 
 function Hero({ start }: { start: number }) {
@@ -144,7 +159,7 @@ function Hero({ start }: { start: number }) {
     const delay = start + 0.07 * n++;
     const inner = (
       <motion.span initial={{ y: "110%", rotate: 3 }} animate={{ y: 0, rotate: 0 }} transition={{ delay, duration: 0.9, ease: EASE }} style={{ transformOrigin: "left bottom" }}>
-        {w}
+        {accent ? <em>{w}</em> : w}
       </motion.span>
     );
     if (!accent) return <span className="jj-mask">{inner}</span>;
@@ -183,7 +198,7 @@ function Hero({ start }: { start: number }) {
           ))}
         </h1>
         <motion.p className="jj-lead" {...fade(0.9)}>
-          LeBonTaf fouille toute la France deux fois par jour, relie chaque offre à ton CV, puis écrit ton CV et ta lettre de motivation pour celles qui te ressemblent. Toi, tu relis et tu postules.
+          On mène l’enquête pour toi : LeBonTaf fouille toute la France deux fois par jour, relie chaque offre à ton CV, puis écrit ton CV et ta lettre de motivation pour celles qui te ressemblent. Toi, tu relis et tu postules.
         </motion.p>
         <motion.div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 28 }} {...fade(1.05)}>
           <Magnetic>

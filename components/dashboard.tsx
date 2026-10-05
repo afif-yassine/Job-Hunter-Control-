@@ -1,5 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MotionConfig, motion } from "motion/react";
+import { Mark, Wordmark } from "@/components/jinnjob/logo";
 import {
   Activity,
   BriefcaseBusiness,
@@ -327,15 +329,18 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
     : 0;
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="app">
       <aside className="side">
         <div className="brand">
-          <div className="mark">JH</div>
-          <div>
-            <strong>Job Hunter</strong>
-            <span className="muted">Ton assistant candidatures</span>
-          </div>
+          <span className="brand-logo" role="img" aria-label="LeBonTaf">
+            <span className="lbt-logo">
+              <Mark size={38} busy={pipeline.running} />
+              <Wordmark size={28} dark />
+            </span>
+          </span>
         </div>
+        <p className="brand-tag">Ton alternance. Ton stage. Ton bon départ.</p>
         <nav aria-label="Navigation principale">
           {nav.map(({ id, label, icon: Icon }) => (
             <button
@@ -344,6 +349,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
               onClick={() => go(id)}
               aria-current={view === id ? "page" : undefined}
             >
+              {view === id && <motion.span layoutId="navpill" className="navpill" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
               <Icon size={18} aria-hidden />
               <span>{label}</span>
               {badge(id) > 0 && <b className="badge">{badge(id)}</b>}
@@ -367,10 +373,12 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
 
       <div className="main">
         <header className="topbar">
-          <div className="brand">
-            <div className="mark">JH</div>
-            <strong>Job Hunter</strong>
-          </div>
+          <span className="brand-logo" role="img" aria-label="LeBonTaf">
+            <span className="lbt-logo">
+              <Mark size={32} busy={pipeline.running} />
+              <Wordmark size={24} />
+            </span>
+          </span>
           <span className="chip good">
             <ShieldCheck size={13} aria-hidden /> Aucun envoi auto
           </span>
@@ -407,6 +415,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
             </div>
           )}
           <ErrorBoundary key={view} name={view}>
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }}>
           {loading ? (
             <div className="empty">
               <LoaderCircle className="spin" aria-hidden /> Chargement…
@@ -438,6 +447,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
           ) : (
             <MoreView ctx={ctx} badge={badge} />
           )}
+          </motion.div>
           </ErrorBoundary>
         </main>
       </div>
@@ -450,6 +460,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
             onClick={() => go(id)}
             aria-current={activeTab === id ? "page" : undefined}
           >
+            {activeTab === id && <motion.span layoutId="tabpill" className="tabpill" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
             <span className="tabicon">
               <Icon size={22} aria-hidden />
               {badge(id) > 0 && <b className="badge">{badge(id)}</b>}
@@ -547,5 +558,6 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
         </form>
       </dialog>
     </div>
+    </MotionConfig>
   );
 }

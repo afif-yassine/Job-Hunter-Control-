@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BRAND } from "@/lib/brand";
-import { Mark, Wordmark } from "./logo";
+import { Logo, Wordmark } from "./logo";
 
 export const LEGAL_LINKS = [
   { href: "/mentions-legales", label: "Mentions légales" },
@@ -16,8 +16,7 @@ export function LegalPage({ title, lead, children }: { title: string; lead: Reac
       <header className="jj-nav is-stuck">
         <div className="jj-wrap jj-nav-in">
           <Link href="/" className="jj-brand" aria-label={`${BRAND.name}, accueil`}>
-            <Mark size={40} />
-            <Wordmark />
+            <Logo size={38} />
           </Link>
           <nav className="jj-nav-links" aria-label="Pages légales">
             {LEGAL_LINKS.map((l) => (

@@ -29,6 +29,15 @@ export const typewriter = localFont({
   fallback: ["Courier New", "monospace"],
 });
 
+export const serif = localFont({
+  src: "./fonts/instrument-serif-latin-400-italic.woff2",
+  style: "italic",
+  weight: "400",
+  variable: "--font-serif",
+  display: "swap",
+  fallback: ["Iowan Old Style", "Georgia", "serif"],
+});
+
 export const sans = localFont({
   src: [
     { path: "./fonts/instrument-sans-latin-400-normal.woff2", weight: "400" },
@@ -51,4 +60,4 @@ export const mono = localFont({
   fallback: ["Courier New", "monospace"],
 });
 
-export const fontVariables = [display.variable, hand.variable, typewriter.variable, sans.variable, mono.variable].join(" ");
+export const fontVariables = [display.variable, serif.variable, hand.variable, typewriter.variable, sans.variable, mono.variable].join(" ");
