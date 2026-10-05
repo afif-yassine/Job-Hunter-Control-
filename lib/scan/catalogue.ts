@@ -91,6 +91,7 @@ export async function harvestOffers(
     board: o.board ?? null,
     categories: categorize(o),
     contract_kind: contractKind(o),
+    salary: o.salary ?? null,
   }));
   for (let i = 0; i < rows.length; i += 200) {
     const { data, error } = await db.rpc("upsert_offers", { p_rows: rows.slice(i, i + 200) });

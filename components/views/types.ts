@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DocumentRecord, Job } from "@/lib/types";
+import type { Stage } from "@/lib/journey";
 import type { Data } from "@/components/use-dashboard-data";
 import type { SystemStatus } from "@/components/use-status";
 import type { usePipeline } from "@/components/use-pipeline";
@@ -9,6 +10,7 @@ import type { AdminOverview } from "@/lib/admin/overview";
 export type View =
   | "home"
   | "jobs"
+  | "track"
   | "documents"
   | "questions"
   | "more"
@@ -18,7 +20,7 @@ export type View =
   | "admin"
   | "roadmap";
 
-export type JobFilter = "all" | "best" | "todo" | "missing" | "ready" | "review" | "applied" | "gone";
+export type JobFilter = "new" | "all" | "best" | "review" | "gone";
 
 export type ReviewAction = "keep" | "merge" | "dismiss" | "applied_elsewhere";
 
@@ -41,7 +43,14 @@ export type Ctx = {
   adminDemo?: AdminOverview;
   jobFilter: JobFilter;
   setJobFilter: (filter: JobFilter) => void;
+  /** Opens the offer panel (and marks the offer as seen). */
+  openOffer: (job: Job) => void;
   act: {
+    /** Analyse when needed, then write the CV and letter. */
+    prepareKit: (job: Job) => Promise<void>;
+    moveStage: (job: Job, stage: Stage, extra?: { interviewAt?: string | null }) => Promise<void>;
+    undoStage: (job: Job) => Promise<void>;
+    saveNotes: (job: Job, notes: string) => Promise<void>;
     analyze: (job: Job) => Promise<void>;
     generate: (job: Job) => Promise<void>;
     review: (job: Job, action: ReviewAction, platform?: string) => Promise<void>;

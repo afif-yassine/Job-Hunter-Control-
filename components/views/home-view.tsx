@@ -1,21 +1,24 @@
 "use client";
 import {
   ArrowRight,
+  BellRing,
+  CalendarDays,
   CircleCheck,
   CircleHelp,
-  FileText,
   LoaderCircle,
   Play,
-  Search,
+  Send,
   Settings,
   TriangleAlert,
   Check,
   ShieldAlert,
 } from "lucide-react";
 import { openQuestionCount } from "@/components/questions-panel";
-import { Callout, Chip, PageHead, Progress, ScoreBadge } from "@/components/ui";
+import { Callout, PageHead, Progress } from "@/components/ui";
+import { kitsByJob, stageOf, todayTasks, TRACK } from "@/lib/journey";
+import { OfferCard } from "./offer-card";
 import { summarize } from "@/lib/pipeline-client";
-import { sourceLabel, timeAgo } from "@/lib/labels";
+import { timeAgo } from "@/lib/labels";
 import type { Ctx } from "./types";
 
 const STEPS = [
@@ -28,19 +31,8 @@ const STEPS = [
 export function HomeView({ ctx }: { ctx: Ctx }) {
   const { data, status, pipeline, go } = ctx;
   const { jobs, documents, questions, runs } = data;
-  const replaced = new Set(documents.map((d) => d.based_on_document_id).filter(Boolean));
-  const toApprove = documents.filter((d) => !d.approved && !replaced.has(d.id)).length;
   const openQuestions = openQuestionCount(questions);
-  // Offers waiting for a decision, dismissed or already applied are not "to do".
-  const open = jobs.filter((j) => !j.review_flag && !["SKIPPED", "SUBMITTED", "CONFIRMED", "INTERVIEW", "REJECTED"].includes(j.status));
   const toReview = jobs.filter((j) => j.review_flag && j.status !== "SKIPPED").length;
-  const missing = open.filter((j) => j.status === "DISCOVERED" && !j.description).length;
-  const best = open.filter((j) => (j.match_score ?? 0) >= 80).length;
-  const ready = open.filter((j) => j.status === "WAITING_APPROVAL" || j.status === "PREPARED").length;
-  const top = [...open]
-    .filter((j) => (j.match_score ?? 0) >= 60)
-    .sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0))
-    .slice(0, 5);
 
   const noSource = status ? !status.scanConfigured : false;
   const lastRun = runs.find((r) => r.run_type === "PIPELINE");
@@ -48,7 +40,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
 
   // What is left to set up, most important first.
   const setup: { tone: "bad" | "warn"; title: string; text: string; cta?: string; view?: "settings" }[] = [];
-  if (status) {
+  if (status?.isAdmin) {
     if (!status.scanConfigured)
       setup.push({
         tone: "bad",
@@ -82,43 +74,117 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
   const phaseIndex = p ? STEPS.findIndex((s) => s.id === p.phase) : -1;
   const report = pipeline.report;
 
-  const todo: { icon: typeof CircleHelp; count: number; title: string; text: string; onClick: () => void }[] = [];
+  const tasks = todayTasks(jobs);
+  const kits = kitsByJob(documents);
+  const counts = Object.fromEntries(TRACK.map((c) => [c.id, jobs.filter((j) => c.stages.includes(stageOf(j))).length])) as Record<string, number>;
+  const fresh = jobs.filter((j) => stageOf(j) === "new" && !j.review_flag && !j.gone_reason);
+  const freshTop = [...fresh]
+    .sort((a, b) => (b.match_score ?? Math.round((b.similarity ?? 0) * 100)) - (a.match_score ?? Math.round((a.similarity ?? 0) * 100)))
+    .slice(0, 4);
+  const plan = status?.plan;
+
+  // Small things that still block a step, shown after the journey tasks.
+  const extras: { icon: typeof CircleHelp; title: string; text: string; onClick: () => void }[] = [];
   if (openQuestions)
-    todo.push({
+    extras.push({
       icon: CircleHelp,
-      count: openQuestions,
-      title: `${openQuestions} question${openQuestions > 1 ? "s" : ""} à répondre`,
-      text: "L’assistant a besoin de toi avant de continuer.",
+      title: `${openQuestions} question${openQuestions > 1 ? "s" : ""} de formulaire`,
+      text: "Réponds une fois, on la reprend dans toutes tes candidatures.",
       onClick: () => go("questions"),
     });
-  if (toApprove)
-    todo.push({
-      icon: FileText,
-      count: toApprove,
-      title: `${toApprove} document${toApprove > 1 ? "s" : ""} à valider`,
-      text: "Relis ton CV et ta lettre, puis approuve-les.",
-      onClick: () => go("documents"),
-    });
   if (toReview)
-    todo.push({
+    extras.push({
       icon: ShieldAlert,
-      count: toReview,
       title: `${toReview} offre${toReview > 1 ? "s" : ""} à vérifier`,
-      text: "Suspecte, en double, ou déjà postulée ailleurs : c’est toi qui décides.",
+      text: "Suspecte ou en double : c’est toi qui décides.",
       onClick: () => go("jobs", "review"),
-    });
-  if (missing)
-    todo.push({
-      icon: Search,
-      count: missing,
-      title: `${missing} offre${missing > 1 ? "s" : ""} à compléter`,
-      text: "L’annonce n’a pas pu être lue : colle son texte.",
-      onClick: () => go("jobs", "missing"),
     });
 
   return (
     <>
-      <PageHead title="Accueil" subtitle="Cherche, choisis, postule : l’assistant prépare tout, tu valides." />
+      <PageHead title="Accueil" subtitle="Où en est chacune de tes candidatures, et ce qui t’attend aujourd’hui." />
+      <section className="journey-strip" aria-label="Où en sont tes candidatures">
+        {TRACK.map((c) => (
+          <button key={c.id} className="journey-count card" onClick={() => go("track")}>
+            <strong>{counts[c.id]}</strong>
+            <span>{c.label}</span>
+          </button>
+        ))}
+      </section>
+
+      {plan && plan.limit !== null && (
+        <div className={`plan-card card${plan.used >= plan.limit ? " is-full" : ""}`}>
+          <div>
+            <strong>Offre gratuite</strong>
+            <span className="muted small-text">
+              {plan.used >= plan.limit
+                ? `Tes ${plan.limit} dossiers du mois sont utilisés. Les prochains arrivent le ${plan.resetsOn}.`
+                : `${plan.limit - plan.used} dossier${plan.limit - plan.used > 1 ? "s" : ""} (CV + lettre) restant${plan.limit - plan.used > 1 ? "s" : ""} ce mois-ci. Recherche et suivi illimités.`}
+            </span>
+          </div>
+          <span className="plan-dots" aria-label={`${plan.used} sur ${plan.limit} utilisés`}>
+            {Array.from({ length: plan.limit }, (_, i) => (
+              <span key={i} className={i < plan.used ? "is-used" : ""} />
+            ))}
+          </span>
+        </div>
+      )}
+
+      <section aria-label="À faire aujourd’hui">
+        <h2 className="section-title">À faire aujourd’hui</h2>
+        {tasks.length || extras.length ? (
+          <div className="todo-grid">
+            {tasks.slice(0, 6).map((t) => (
+              <button key={`${t.kind}-${t.job.id}`} className={`todo card is-${t.kind}`} onClick={() => ctx.openOffer(t.job)}>
+                <span className="todo-icon">
+                  {t.kind === "interview" ? <CalendarDays size={20} aria-hidden /> : t.kind === "follow-up" ? <BellRing size={20} aria-hidden /> : <Send size={20} aria-hidden />}
+                </span>
+                <span className="todo-text">
+                  <strong>{t.label}</strong>
+                  <span className="muted">
+                    {t.job.title} · {t.job.company}
+                    {t.when ? ` · ${new Date(t.when).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}
+                  </span>
+                </span>
+                <ArrowRight size={18} aria-hidden />
+              </button>
+            ))}
+            {extras.map((item) => (
+              <button key={item.title} className="todo card" onClick={item.onClick}>
+                <span className="todo-icon">
+                  <item.icon size={20} aria-hidden />
+                </span>
+                <span className="todo-text">
+                  <strong>{item.title}</strong>
+                  <span className="muted">{item.text}</span>
+                </span>
+                <ArrowRight size={18} aria-hidden />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="card allgood">
+            <CircleCheck aria-hidden /> Rien d’urgent. Ouvre une nouvelle offre pour avancer.
+          </div>
+        )}
+      </section>
+
+      {freshTop.length > 0 && (
+        <section aria-label="Nouvelles offres">
+          <div className="section-row">
+            <h2 className="section-title">Nouvelles offres pour toi</h2>
+            <button className="btn ghost small" onClick={() => go("jobs", "new")}>
+              Toutes les nouvelles ({fresh.length})
+            </button>
+          </div>
+          <div className="offers">
+            {freshTop.map((job) => (
+              <OfferCard key={job.id} job={job} kit={kits.get(job.id)} onOpen={ctx.openOffer} />
+            ))}
+          </div>
+        </section>
+      )}
+      <h2 className="section-title">Ta recherche</h2>
       <div className="card cv-cta">
         <div>
           <strong>Ton CV</strong>
@@ -224,8 +290,9 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
               </p>
             )}
             <p className="muted small-text">
-              Ce que fait « Lancer la recherche » : cherche les nouvelles offres, calcule ton score, écrit CV + lettre
-              pour celles ≥ 80, puis lit le formulaire. <strong>Rien n’est jamais envoyé sans toi.</strong>
+              Ce que fait « Lancer la recherche » : cherche les nouvelles offres et calcule ton score
+              {status?.plan?.plan === "free" ? ". Tu choisis ensuite les offres pour lesquelles écrire ton CV et ta lettre." : ", puis écrit CV + lettre pour celles ≥ 80."}{" "}
+              <strong>Rien n’est jamais envoyé sans toi.</strong>
             </p>
           </>
         )}
@@ -248,7 +315,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
               tone="info"
               title={`${report.needsDescription} offre${report.needsDescription > 1 ? "s" : ""} à compléter`}
               action={
-                <button className="btn secondary small" onClick={() => go("jobs", "missing")}>
+                <button className="btn secondary small" onClick={() => go("jobs", "all")}>
                   Voir
                 </button>
               }
@@ -300,72 +367,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
         </section>
       )}
 
-      <section aria-label="À faire">
-        <h2 className="section-title">À faire pour toi</h2>
-        {todo.length ? (
-          <div className="todo-grid">
-            {todo.map((item) => (
-              <button key={item.title} className="todo card" onClick={item.onClick}>
-                <span className="todo-icon">
-                  <item.icon size={20} aria-hidden />
-                </span>
-                <span className="todo-text">
-                  <strong>{item.title}</strong>
-                  <span className="muted">{item.text}</span>
-                </span>
-                <ArrowRight size={18} aria-hidden />
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="card allgood">
-            <CircleCheck aria-hidden /> Tout est à jour. Lance une recherche pour trouver de nouvelles offres.
-          </div>
-        )}
-      </section>
-
-      <section className="stats" aria-label="Chiffres">
-        <Stat value={jobs.length} label="Offres" onClick={() => go("jobs", "all")} />
-        <Stat value={best} label="Très bonnes (≥ 80)" onClick={() => go("jobs", "best")} />
-        <Stat value={ready} label="Dossiers prêts" onClick={() => go("jobs", "ready")} />
-        <Stat value={documents.length} label="Documents" onClick={() => go("documents")} />
-      </section>
-
-      {top.length > 0 && (
-        <section aria-label="Meilleures offres">
-          <div className="section-row">
-            <h2 className="section-title">Tes meilleures offres</h2>
-            <button className="btn ghost small" onClick={() => go("jobs", "best")}>
-              Tout voir
-            </button>
-          </div>
-          <div className="card list">
-            {top.map((job) => (
-              <button key={job.id} className="row" onClick={() => go("jobs", "all")}>
-                <ScoreBadge score={job.match_score} />
-                <span className="row-main">
-                  <strong>{job.title}</strong>
-                  <span className="muted">
-                    {job.company} · {job.location || "—"} · {sourceLabel(job.source_platform, job.source_url)}
-                  </span>
-                </span>
-                <Chip tone={job.status === "WAITING_APPROVAL" ? "good" : "neutral"}>
-                  {job.status === "WAITING_APPROVAL" ? "Dossier prêt" : "Analysée"}
-                </Chip>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
     </>
   );
 }
 
-function Stat({ value, label, onClick }: { value: number; label: string; onClick: () => void }) {
-  return (
-    <button className="stat card" onClick={onClick}>
-      <strong>{value}</strong>
-      <span className="muted">{label}</span>
-    </button>
-  );
-}

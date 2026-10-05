@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AiCall } from "@/lib/ai";
+import { PLAN_CODE, PLAN_MANUAL_CODE } from "@/lib/plan";
 import { QUOTA_CODE } from "@/lib/quota";
 import { runScan } from "@/lib/scan";
 import type { ScanSummary } from "@/lib/scan/types";
@@ -188,9 +189,11 @@ export async function runServerTick(options: TickOptions): Promise<TickReport> {
         // Real runs check the offer is still online; injected test runs do not.
         checkOnline: options.ai ? undefined : (j) => stillOnline(j, env),
         service: supabase,
+        automatic: true,
       });
       const error = String(result.body.error ?? "");
       if (result.status === 200) t.generated += 1;
+      else if (result.body.code === PLAN_MANUAL_CODE || result.body.code === PLAN_CODE) generationBlocked.add(job.user_id);
       else if (result.body.code === QUOTA_CODE) {
         generationBlocked.add(job.user_id);
         t.quotaReached.push("generation");

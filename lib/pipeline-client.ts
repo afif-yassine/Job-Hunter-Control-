@@ -249,7 +249,12 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRep
     if (strong.length) progress("generate", 0, strong.length, `Rédaction des documents (0/${strong.length})`);
     await pool(strong, 2, signal, async (job) => {
       if (generationStopped) return;
-      const generation = await call(`/api/jobs/${job.id}/generate`, signal);
+      const generation = await call(`/api/jobs/${job.id}/generate`, signal, { auto: true });
+      if (!generation.ok && (generation.body.code === "PLAN_MANUAL_ONLY" || generation.body.code === "PLAN_LIMIT")) {
+        // Free plan: the student picks the offers that get a kit; nothing to report.
+        generationStopped = true;
+        return;
+      }
       written += 1;
       if (generation.ok) {
         report.generated += 1;

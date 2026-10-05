@@ -69,7 +69,7 @@ export function DocumentsView({ ctx }: { ctx: Ctx }) {
           title="Aucun document pour l’instant"
           text="Ils sont créés automatiquement pour les offres notées 80 ou plus. Tu peux aussi les créer depuis une offre analysée."
           action={
-            <button className="btn" onClick={() => ctx.go("jobs", "todo")}>
+            <button className="btn" onClick={() => ctx.go("jobs", "all")}>
               Voir les offres à traiter
             </button>
           }

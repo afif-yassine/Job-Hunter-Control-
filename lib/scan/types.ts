@@ -18,6 +18,8 @@ export type ScannedOffer = {
   links?: string[];
   /** Careers board it was read from ("lever:acme"): closure detection. */
   board?: string;
+  /** Salary in one short line ("1 400 – 1 600 € / mois"), when the source gives it. */
+  salary?: string | null;
 };
 
 export type SourceReport = {

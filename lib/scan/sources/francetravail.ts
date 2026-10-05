@@ -1,3 +1,4 @@
+import { cleanSalaryText } from "@/lib/salary";
 import { getFranceTravailToken } from "@/lib/france-travail/client";
 import type { ScanConfig } from "../config";
 import type { ScannedOffer } from "../types";
@@ -19,6 +20,7 @@ type FtOffer = {
   origineOffre?: { urlOrigine?: string };
   contact?: { urlPostulation?: string };
   romeCode?: string;
+  salaire?: { libelle?: string; commentaire?: string };
 };
 
 export function ftDate(d: Date) {
@@ -42,6 +44,7 @@ export function mapFranceTravailOffer(o: FtOffer): ScannedOffer | null {
     applyUrl: o.contact?.urlPostulation || o.origineOffre?.urlOrigine || null,
     publishedAt: o.dateCreation || null,
     romeCode: o.romeCode?.trim() || null,
+    salary: cleanSalaryText(o.salaire?.libelle) ?? cleanSalaryText(o.salaire?.commentaire),
   };
 }
 

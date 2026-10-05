@@ -1,3 +1,4 @@
+import { formatSalaryRange } from "@/lib/salary";
 import type { ScanConfig } from "../config";
 import type { ScannedOffer } from "../types";
 import { clip } from "../text";
@@ -18,6 +19,10 @@ type JSearchJob = {
   job_publisher?: string;
   /** Same offer on other sites — often the company's own careers board. */
   apply_options?: { apply_link?: string; publisher?: string }[];
+  job_min_salary?: number | null;
+  job_max_salary?: number | null;
+  job_salary_currency?: string | null;
+  job_salary_period?: string | null;
 };
 
 const CONTRACT: Record<string, string> = {
@@ -47,6 +52,7 @@ export function mapJSearchOffer(j: JSearchJob): ScannedOffer | null {
     applyUrl: j.job_apply_link || null,
     publishedAt: j.job_posted_at_datetime_utc || null,
     links: (j.apply_options ?? []).map((o) => o.apply_link).filter((l): l is string => Boolean(l)),
+    salary: formatSalaryRange(j.job_min_salary, j.job_max_salary, j.job_salary_period, j.job_salary_currency || "EUR"),
   };
 }
 

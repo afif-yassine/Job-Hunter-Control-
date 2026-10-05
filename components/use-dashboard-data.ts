@@ -36,7 +36,7 @@ export function useDashboardData(demo?: Data) {
       return;
     }
     const [j, a, q, d, r, n] = await Promise.all([
-      supabase.from("jobs").select("*,job_sources(platform,url),offers(summary)").order("created_at", { ascending: false }),
+      supabase.from("jobs").select("*,job_sources(platform,url),offers(summary,salary)").order("created_at", { ascending: false }),
       supabase.from("applications").select("*,jobs(company,title)").order("created_at", { ascending: false }),
       supabase
         .from("application_questions")
@@ -48,8 +48,9 @@ export function useDashboardData(demo?: Data) {
     ]);
     let jobs = j;
     if (j.error) {
-      // Older databases: without the catalogue, then without job_sources.
-      jobs = await supabase.from("jobs").select("*,job_sources(platform,url)").order("created_at", { ascending: false });
+      // Older databases: without the salary, without the catalogue, then without job_sources.
+      jobs = await supabase.from("jobs").select("*,job_sources(platform,url),offers(summary)").order("created_at", { ascending: false });
+      if (jobs.error) jobs = await supabase.from("jobs").select("*,job_sources(platform,url)").order("created_at", { ascending: false });
       if (jobs.error) jobs = await supabase.from("jobs").select("*").order("created_at", { ascending: false });
     }
     let questions = q.data as Question[] | null;
@@ -65,6 +66,13 @@ export function useDashboardData(demo?: Data) {
     const near = await supabase.rpc("my_job_similarity");
     const similarity = new Map(((near.data ?? []) as { job_id: string; similarity: number }[]).map((x) => [x.job_id, x.similarity]));
     if (jobs.data) for (const job of jobs.data as Job[]) job.similarity = similarity.get(job.id) ?? null;
+    // How many LeBonTaf students applied to the same offer (only from 3, anonymous).
+    const offerIds = [...new Set(((jobs.data ?? []) as Job[]).map((x) => x.offer_id).filter((x): x is string => Boolean(x)))];
+    if (offerIds.length) {
+      const crowd = await supabase.rpc("offer_applicants", { p_offer_ids: offerIds.slice(0, 2000) });
+      const applicants = new Map(((crowd.data ?? []) as { offer_id: string; applicants: number }[]).map((x) => [x.offer_id, x.applicants]));
+      for (const job of (jobs.data ?? []) as Job[]) job.applicants = job.offer_id ? (applicants.get(job.offer_id) ?? null) : null;
+    }
     const failure = [jobs, a, d, r, n].find((x) => x.error)?.error;
     setError(failure ? failure.message : "");
     setData({
@@ -103,5 +111,10 @@ export function useDashboardData(demo?: Data) {
     };
   }, [supabase, load]);
 
-  return { supabase, data, loading, error, reload: load };
+  /** Optimistic change of one offer (the realtime reload brings the stored truth). */
+  const patchJob = useCallback((id: string, patch: Partial<Job>) => {
+    setData((d) => ({ ...d, jobs: d.jobs.map((j) => (j.id === id ? { ...j, ...patch } : j)) }));
+  }, []);
+
+  return { supabase, data, loading, error, reload: load, patchJob };
 }

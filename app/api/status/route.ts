@@ -1,6 +1,7 @@
 import { authenticatedClient } from "@/lib/api";
 import { applicationMode, isSafeMode } from "@/lib/config";
 import { integrationStatus } from "@/lib/integrations";
+import { planUsage } from "@/lib/plan";
 import { usageToday } from "@/lib/quota";
 import { workerState } from "@/lib/worker-status";
 import { loadUserSettings } from "@/lib/settings";
@@ -13,12 +14,13 @@ export async function GET() {
   const auth = await authenticatedClient();
   if ("error" in auth) return auth.error;
   const has = (name: string) => Boolean(process.env[name]?.trim());
-  const [providers, settings, worker, usage, admin] = await Promise.all([
+  const [providers, settings, worker, usage, admin, plan] = await Promise.all([
     integrationStatus(auth.supabase, auth.userId),
     loadUserSettings(auth.supabase, auth.userId),
     workerState(),
     usageToday(auth.supabase, auth.userId),
     auth.supabase.rpc("is_admin"),
+    planUsage(auth.supabase, auth.userId).catch(() => null),
   ]);
   return Response.json({
     applicationMode: applicationMode(),
@@ -41,6 +43,7 @@ export async function GET() {
     // The server runs search → score → documents by itself (see /api/cron/tick).
     scheduledScan: has("CRON_SECRET") && has("SUPABASE_SERVICE_ROLE_KEY"),
     usage,
+    plan,
     isAdmin: admin.data === true,
   });
 }

@@ -1,3 +1,4 @@
+import { formatSalaryRange } from "@/lib/salary";
 import type { ScanConfig } from "../config";
 import type { ScannedOffer } from "../types";
 import { clip } from "../text";
@@ -12,6 +13,9 @@ type AdzunaResult = {
   location?: { display_name?: string };
   contract_type?: string;
   contract_time?: string;
+  salary_min?: number;
+  salary_max?: number;
+  salary_is_predicted?: string | number;
 };
 
 export function mapAdzunaOffer(r: AdzunaResult): ScannedOffer | null {
@@ -26,6 +30,8 @@ export function mapAdzunaOffer(r: AdzunaResult): ScannedOffer | null {
     description: clip(r.description),
     url: r.redirect_url,
     publishedAt: r.created || null,
+    // Adzuna estimates some salaries: only the ones written in the ad are kept.
+    salary: String(r.salary_is_predicted ?? "0") === "1" ? null : formatSalaryRange(r.salary_min, r.salary_max, "YEAR"),
   };
 }
 

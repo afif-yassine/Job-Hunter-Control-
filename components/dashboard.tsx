@@ -4,7 +4,6 @@ import { MotionConfig, motion } from "motion/react";
 import { Mark, Wordmark } from "@/components/jinnjob/logo";
 import {
   Activity,
-  BriefcaseBusiness,
   CircleHelp,
   Ellipsis,
   FileText,
@@ -13,6 +12,8 @@ import {
   LogOut,
   Search,
   Settings,
+  SquareKanban,
+  Map as MapIcon,
   ShieldCheck,
   Gauge,
   X,
@@ -21,7 +22,7 @@ import {
 import { logout } from "@/app/login/actions";
 import { explainError, cleanRaw } from "@/lib/errors";
 import { fingerprintOf } from "@/lib/scan/ingest";
-import type { DocumentRecord, Job } from "@/lib/types";
+import type { Job } from "@/lib/types";
 import { DocumentDialog, type DocumentDialogState } from "@/components/document-tools";
 import { openQuestionCount, QuestionsPanel } from "@/components/questions-panel";
 import { usePipeline } from "@/components/use-pipeline";
@@ -33,7 +34,9 @@ import { RoadmapView } from "@/components/views/roadmap-view";
 import { HomeView } from "@/components/views/home-view";
 import { JobsView } from "@/components/views/jobs-view";
 import { DocumentsView } from "@/components/views/documents-view";
-import { ApplicationsView } from "@/components/views/applications-view";
+import { TrackView } from "@/components/views/track-view";
+import { OfferPanel } from "@/components/views/offer-panel";
+import { stagePatch, stageOf, todayTasks, undoPatch, type Stage } from "@/lib/journey";
 import { ActivityView } from "@/components/views/activity-view";
 import { SettingsView } from "@/components/views/settings-view";
 import { MoreView } from "@/components/views/more-view";
@@ -42,22 +45,39 @@ import type { AdminOverview } from "@/lib/admin/overview";
 import { PageHead } from "@/components/ui";
 import type { Ctx, JobFilter, Tone, View } from "@/components/views/types";
 
+/** The student space: four places, the rest lives in "Plus" and in each offer's panel. */
 const NAV: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "home", label: "Accueil", icon: House },
   { id: "jobs", label: "Offres", icon: Search },
-  { id: "documents", label: "Documents", icon: FileText },
-  { id: "questions", label: "Questions", icon: CircleHelp },
-  { id: "applications", label: "Candidatures", icon: BriefcaseBusiness },
-  { id: "activity", label: "Activité", icon: Activity },
+  { id: "track", label: "Mon suivi", icon: SquareKanban },
   { id: "settings", label: "Réglages", icon: Settings },
 ];
+const SECONDARY_NAV: { id: View; label: string; icon: LucideIcon }[] = [
+  { id: "documents", label: "Mes documents", icon: FileText },
+  { id: "questions", label: "Mes réponses", icon: CircleHelp },
+];
 const TABS: { id: View; label: string; icon: LucideIcon }[] = [
-  ...NAV.slice(0, 4),
+  ...NAV.slice(0, 3),
   { id: "more", label: "Plus", icon: Ellipsis },
 ];
-const ADMIN_NAV = { id: "admin" as View, label: "Admin", icon: Gauge };
-const VIEWS = new Set<string>([...NAV.map((n) => n.id), "more", "admin", "applications", "activity", "settings", "roadmap"]);
-const MORE_VIEWS = new Set<View>(["more", "applications", "activity", "settings", "admin", "roadmap"]);
+const ADMIN_NAV = [
+  { id: "activity" as View, label: "Activité", icon: Activity },
+  { id: "admin" as View, label: "Admin", icon: Gauge },
+];
+const VIEWS = new Set<string>(["home", "jobs", "track", "documents", "questions", "more", "admin", "activity", "settings", "roadmap"]);
+const MORE_VIEWS = new Set<View>(["more", "documents", "questions", "activity", "settings", "admin", "roadmap"]);
+
+/** What the student hears after moving an offer. */
+const MOVED: Record<Stage, string> = {
+  new: "Remise dans les nouvelles offres.",
+  seen: "Remise dans tes offres à préparer.",
+  ready: "Dossier prêt.",
+  applied: "Candidature notée comme envoyée. On te rappellera de relancer dans 7 jours.",
+  interview: "Entretien noté. Bonne préparation !",
+  offer: "Bravo ! Offre acceptée.",
+  rejected: "C’est noté. La suivante sera la bonne.",
+  dismissed: "Offre écartée : elle ne reviendra plus.",
+};
 
 /** Server error → one readable sentence. */
 function readable(raw: unknown): string {
@@ -88,12 +108,16 @@ async function post(url: string, body: unknown = {}) {
 export type DemoState = { data: Data; status: SystemStatus; admin?: AdminOverview };
 
 export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?: DemoState }) {
-  const { supabase, data, loading, error: loadError, reload } = useDashboardData(demo?.data);
+  const { supabase, data, loading, error: loadError, reload, patchJob } = useDashboardData(demo?.data);
   const { status, failed: statusFailed, refresh: refreshStatus } = useSystemStatus(Boolean(supabase), demo?.status);
   const pipeline = usePipeline({ supabase, status, reload, refreshStatus });
 
   const [view, setView] = useState<View>("home");
-  const [jobFilter, setJobFilter] = useState<JobFilter>("all");
+  const [jobFilter, setJobFilter] = useState<JobFilter>("new");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const openJob = openId ? (data.jobs.find((j) => j.id === openId) ?? null) : null;
+  // The last move of each offer, so "Revenir à l’étape d’avant" restores it.
+  const history = useRef(new Map<string, Partial<Job>>());
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState<{ text: string; tone: Tone } | null>(null);
   const [docDialog, setDocDialog] = useState<DocumentDialogState>(null);
@@ -106,7 +130,8 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
   // Restore the tab from the address (#jobs) so a refresh keeps the place.
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const hash = window.location.hash.slice(1);
+      const raw = window.location.hash.slice(1);
+      const hash = raw === "applications" ? "track" : raw;
       if (VIEWS.has(hash)) setView(hash as View);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -231,8 +256,71 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
         await reload();
       },
       openDocument: (state) => setDocDialog(state),
+      prepareKit: (job) =>
+        run(job.id, async () => {
+          if (job.status === "DISCOVERED") {
+            notify(`Lecture de l’offre « ${job.company} »…`);
+            const a = await post(`/api/jobs/${job.id}/analyze`);
+            if (!a.ok) return notify(readable(a.body.error), "bad");
+          }
+          notify(`Rédaction de ton CV et de ta lettre pour « ${job.company} »… (environ 20 secondes)`);
+          const r = await post(`/api/jobs/${job.id}/generate`);
+          void refreshStatus();
+          if (!r.ok) return notify(readable(r.body.error), "bad");
+          notify("Ton dossier est prêt : relis ton CV et ta lettre, puis postule.", "good");
+        }),
+      moveStage: async (job, stage, extra) => {
+        const patch = stagePatch(stage, job, extra);
+        history.current.set(job.id, {
+          stage: job.stage ?? stageOf(job),
+          status: job.status,
+          applied_at: job.applied_at ?? null,
+          interview_at: job.interview_at ?? null,
+        });
+        patchJob(job.id, patch as Partial<Job>);
+        if (!supabase) return;
+        const { error } = await supabase.from("jobs").update(patch).eq("id", job.id);
+        if (error) {
+          notify(readable(error.message), "bad");
+          await reload();
+          return;
+        }
+        notify(MOVED[stage], "good");
+      },
+      undoStage: async (job) => {
+        const saved = history.current.get(job.id);
+        const kit = data.documents.some((d) => d.job_id === job.id);
+        const patch = saved ?? undoPatch(job, kit);
+        if (!patch) return;
+        history.current.delete(job.id);
+        patchJob(job.id, patch as Partial<Job>);
+        if (!supabase) return;
+        const { error } = await supabase.from("jobs").update(patch).eq("id", job.id);
+        notify(error ? readable(error.message) : "C’est annulé.", error ? "bad" : "info");
+        if (error) await reload();
+      },
+      saveNotes: async (job, notes) => {
+        patchJob(job.id, { notes });
+        if (!supabase) return;
+        const { error } = await supabase.from("jobs").update({ notes: notes.trim() || null }).eq("id", job.id);
+        notify(error ? readable(error.message) : "Notes enregistrées.", error ? "bad" : "info");
+      },
     }),
-    [notify, reload, run, supabase],
+    [notify, reload, run, supabase, patchJob, refreshStatus, data.documents],
+  );
+
+  const closeOffer = useCallback(() => setOpenId(null), []);
+
+  /** Opening an offer marks it as seen: it joins "Mon suivi". */
+  const openOffer = useCallback(
+    (job: Job) => {
+      setOpenId(job.id);
+      if (stageOf(job) !== "new") return;
+      const patch = stagePatch("seen", job);
+      patchJob(job.id, patch as Partial<Job>);
+      if (supabase) void supabase.from("jobs").update(patch).eq("id", job.id);
+    },
+    [patchJob, supabase],
   );
 
   async function saveDescription() {
@@ -300,26 +388,31 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
     reload,
     jobFilter,
     setJobFilter,
+    openOffer,
     act,
     adminDemo: demo?.admin,
   };
-  const nav = status?.isAdmin ? [...NAV, ADMIN_NAV] : NAV;
+  const nav = NAV;
+  const subNav = [...SECONDARY_NAV, { id: "roadmap" as View, label: "Feuille de route", icon: MapIcon }, ...(status?.isAdmin ? ADMIN_NAV : [])];
+  const tasks = todayTasks(data.jobs).length;
 
-  const replaced = new Set(data.documents.map((d) => d.based_on_document_id).filter(Boolean));
-  const toApprove = data.documents.filter((d: DocumentRecord) => !d.approved && !replaced.has(d.id)).length;
   const unread = data.notifications.filter((n) => !n.read_at).length;
   const openQuestions = openQuestionCount(data.questions);
   const sourceAlerts = data.notifications.filter((n) => !n.read_at && n.notification_type === "SOURCE_ALERT").length;
   const badge = (id: View) =>
     id === "questions"
       ? openQuestions
-      : id === "documents"
-        ? toApprove
-        : id === "activity" || id === "more"
-          ? unread
-          : id === "admin"
-            ? sourceAlerts
-            : 0;
+      : id === "track" || id === "home"
+        ? id === "track"
+          ? tasks
+          : 0
+        : id === "more"
+          ? openQuestions
+          : id === "activity"
+            ? unread
+            : id === "admin"
+              ? sourceAlerts
+              : 0;
   const activeTab: View = MORE_VIEWS.has(view) ? "more" : view;
 
   const p = pipeline.progress;
@@ -351,6 +444,21 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
             >
               {view === id && <motion.span layoutId="navpill" className="navpill" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
               <Icon size={18} aria-hidden />
+              <span>{label}</span>
+              {badge(id) > 0 && <b className="badge">{badge(id)}</b>}
+            </button>
+          ))}
+        </nav>
+        <nav className="subnav" aria-label="Autres pages">
+          {subNav.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              className={view === id ? "navlink small active" : "navlink small"}
+              onClick={() => go(id)}
+              aria-current={view === id ? "page" : undefined}
+            >
+              {view === id && <motion.span layoutId="navpill" className="navpill" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+              <Icon size={16} aria-hidden />
               <span>{label}</span>
               {badge(id) > 0 && <b className="badge">{badge(id)}</b>}
             </button>
@@ -434,8 +542,8 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
               />
               <QuestionsPanel rows={data.questions} supabase={supabase} reload={reload} notify={(t) => notify(t, "info")} />
             </>
-          ) : view === "applications" ? (
-            <ApplicationsView ctx={ctx} />
+          ) : view === "track" ? (
+            <TrackView ctx={ctx} />
           ) : view === "activity" ? (
             <ActivityView ctx={ctx} />
           ) : view === "settings" ? (
@@ -478,6 +586,8 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
           </button>
         </div>
       )}
+
+      <OfferPanel job={openJob} ctx={ctx} onClose={closeOffer} />
 
       <DocumentDialog
         state={docDialog}

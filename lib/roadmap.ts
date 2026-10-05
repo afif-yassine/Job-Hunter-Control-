@@ -34,9 +34,11 @@ export const FEATURES: Feature[] = [
   // Sprint 4
   { id: "design", label: "Design LeBonTaf : tableau d’enquête, logo animé, porte d’entrée (accueil, connexion et espace étudiant)", state: "doing", sprint: 4 },
   { id: "versions", label: "Historique et comparaison des versions de CV", state: "soon", sprint: 4 },
-  { id: "tracking", label: "Suivi des candidatures en colonnes", state: "soon", sprint: 4 },
+  { id: "tracking", label: "Mon suivi : chaque offre de « vue » à « réponse », avec dates, notes et étape suivante", state: "done", sprint: 6 },
+  { id: "free-plan", label: "Offre gratuite : 2 dossiers (CV + lettre) par mois, recherche et suivi illimités", state: "done", sprint: 6 },
+  { id: "salary", label: "Salaire, date, plateforme et score visibles sur chaque offre", state: "done", sprint: 6 },
   { id: "extension", label: "Extension Chrome pour enregistrer une candidature faite ailleurs", state: "soon", sprint: 4 },
-  { id: "follow-up", label: "Relances proposées", state: "soon", sprint: 4 },
+  { id: "follow-up", label: "Relance conseillée après 7 jours sans réponse", state: "done", sprint: 6 },
   { id: "interview", label: "Fiche de préparation d’entretien", state: "soon", sprint: 4 },
   // Sprint 5
   { id: "gmail-replies", label: "Réponses des recruteurs lues dans Gmail", state: "soon", sprint: 5 },

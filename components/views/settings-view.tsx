@@ -21,16 +21,17 @@ export function SettingsView({ ctx }: { ctx: Ctx }) {
   const [searchVersion, setSearchVersion] = useState(0);
   return (
     <>
-      <PageHead title="Réglages" subtitle="Connecte tes sources d’offres et choisis ce que l’assistant cherche." />
+      <PageHead title="Réglages" subtitle="Ton CV, les métiers que tu cherches et ton compte." />
       {statusFailed && !status && (
         <Callout tone="bad" title="Impossible de lire l’état des connexions">
           Recharge la page. Si ça continue, vérifie que tu es bien connecté.
         </Callout>
       )}
       <ProfileSection ctx={ctx} onCategories={() => setSearchVersion((v) => v + 1)} />
-      <SourcesSection ctx={ctx} />
       <SearchSection key={searchVersion} ctx={ctx} />
-      <SystemSection status={status} ctx={ctx} />
+      {/* Offer sources and technical connections: the administrator's business, not the student's. */}
+      {status?.isAdmin && <SourcesSection ctx={ctx} />}
+      {status?.isAdmin && <SystemSection status={status} ctx={ctx} />}
       {ctx.supabase && <AccountSection ctx={ctx} />}
     </>
   );
@@ -47,7 +48,7 @@ function SourcesSection({ ctx }: { ctx: Ctx }) {
 
   return (
     <section className="settings-section">
-      <h2 className="section-title">1 · Où chercher les offres</h2>
+      <h2 className="section-title">Admin · Où chercher les offres</h2>
       <p className="muted">
         LinkedIn, Indeed et les autres interdisent qu’un robot les parcoure directement. On passe donc par des services
         officiels qui les regroupent. Il suffit d’en connecter <strong>un seul</strong> pour chercher sur tout internet.
@@ -564,7 +565,7 @@ function SystemSection({ status, ctx }: { status: SystemStatus | null; ctx: Ctx 
   if (!status)
     return (
       <section className="settings-section">
-        <h2 className="section-title">3 · Connexions</h2>
+        <h2 className="section-title">Admin · Connexions</h2>
         <p className="muted">
           <LoaderCircle size={14} className="spin" aria-hidden /> Vérification…
         </p>
@@ -596,7 +597,7 @@ function SystemSection({ status, ctx }: { status: SystemStatus | null; ctx: Ctx 
   ];
   return (
     <section className="settings-section">
-      <h2 className="section-title">3 · Connexions</h2>
+      <h2 className="section-title">Admin · Connexions</h2>
       <div className="card list">
         {rows.map((row) => (
           <div key={row.name} className="row static">
@@ -722,7 +723,7 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
   const d = answer?.draft;
   return (
     <section className="settings-section">
-      <h2 className="section-title">0 · Ton CV</h2>
+      <h2 className="section-title">1 · Ton CV</h2>
       <div className="card form">
         <p className="muted wide">
           Dépose ton CV une seule fois : l’IA en tire ton profil (expériences, formations, projets, compétences) et chaque CV ou
@@ -910,7 +911,7 @@ function AccountSection({ ctx }: { ctx: Ctx }) {
 
   return (
     <section className="settings-section">
-      <h2 className="section-title">4 · Ton compte</h2>
+      <h2 className="section-title">3 · Ton compte</h2>
       <div className="card list">
         <div className="row static">
           <span className="row-main">

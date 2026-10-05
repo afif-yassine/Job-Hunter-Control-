@@ -215,7 +215,7 @@ test("server run: searches due accounts, scores, writes documents, logs and noti
     allow,
     {
       user_settings: [
-        { user_id: "u1", auto_scan: true, last_scan_at: null },
+        { user_id: "u1", auto_scan: true, last_scan_at: null, plan: "pro" },
         { user_id: "u2", auto_scan: true, last_scan_at: new Date().toISOString() },
       ],
     },
@@ -306,4 +306,13 @@ test("analysis: the offer's short summary is kept with the analysis (shown as «
   const other = world([job("j2")]);
   const r2 = await analyzeJob({ supabase: other.db, userId: "u1", jobId: "j2", ai: aiReturning(ANALYSIS(70)).ai });
   assert.equal(r2.status, 200);
+});
+
+test("server run: a free account's kits are never spent automatically", async () => {
+  const { db, tables } = world([job("a1")], allow, { user_settings: [{ user_id: "u1", auto_scan: false, last_scan_at: null, plan: "free" }] });
+  const { ai } = aiReturning(ANALYSIS(91), DOCS);
+  const report = await runServerTick({ supabase: db, env: {}, ai, scan: async () => { throw new Error("no scan"); }, fetchPage: async () => null });
+  assert.equal(report.users.u1.analyzed, 1);
+  assert.equal(tables.documents?.length ?? 0, 0);
+  assert.equal(report.users.u1.errors.length, 0);
 });

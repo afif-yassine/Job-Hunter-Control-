@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { ProviderStatus } from "@/lib/integrations";
+import type { PlanUsage } from "@/lib/plan";
 import type { Usage } from "@/lib/quota";
 
 export type SystemStatus = {
@@ -20,6 +21,8 @@ export type SystemStatus = {
   scheduledScan: boolean;
   /** Today's use of the daily limits (null before the migration). */
   usage?: Usage | null;
+  /** Plan and application kits used this month (free plan: limited). */
+  plan?: PlanUsage | null;
   /** The account administers the platform (sees the Admin page). */
   isAdmin?: boolean;
 };

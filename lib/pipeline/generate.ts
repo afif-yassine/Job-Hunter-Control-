@@ -3,6 +3,7 @@ import { AI_NOT_CONFIGURED, aiConfigured, defaultAi, type AiCall } from "@/lib/a
 import { recordAiUsage } from "@/lib/ai-usage";
 import { normaliseGenerated, parseJson, type Generated } from "@/lib/generated";
 import { queueQuestions, type QueueResult } from "@/lib/question-store";
+import { checkPlan } from "@/lib/plan";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
 import type { StepResult } from "./analyze";
 import { markGone, type OnlineCheck, type OnlineJob } from "./availability";
@@ -17,6 +18,8 @@ type Ctx = {
   checkOnline?: (job: OnlineJob) => Promise<OnlineCheck>;
   /** Service client, to close the shared offer when it is gone. */
   service?: SupabaseClient | null;
+  /** Started by the automatic pipeline, not by the student's click. */
+  automatic?: boolean;
 };
 
 /** Same rule as lib/api safeFilename (kept here: no server-only import). */
@@ -66,6 +69,10 @@ export async function generateForJob(ctx: Ctx): Promise<StepResult> {
       };
     }
   }
+
+  // Free plan: a set number of new kits per month (rewriting this offer's kit is free).
+  const plan = await checkPlan(supabase, userId, id, env, new Date(), ctx.automatic === true);
+  if (!plan.ok) return { status: plan.status, body: plan.body };
 
   const quota = await consumeQuota(supabase, userId, "generation", env);
   if (!quota.ok) return quotaRefusal("generation", quota.limit);

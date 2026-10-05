@@ -1,19 +1,23 @@
 "use client";
-import { Activity, BriefcaseBusiness, ChevronRight, Gauge, LogOut, Map as MapIcon, Settings, ShieldCheck } from "lucide-react";
+import { Activity, ChevronRight, CircleHelp, FileText, Gauge, LogOut, Map as MapIcon, Settings, ShieldCheck } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { PageHead } from "@/components/ui";
 import type { Ctx, View } from "./types";
 
 const ITEMS: { id: View; label: string; text: string; icon: typeof Settings }[] = [
-  { id: "applications", label: "Candidatures", text: "État de chaque dossier et de son formulaire", icon: BriefcaseBusiness },
-  { id: "activity", label: "Activité", text: "Journal et notifications", icon: Activity },
-  { id: "settings", label: "Réglages", text: "Sources d’offres, recherche, connexions", icon: Settings },
+  { id: "documents", label: "Mes documents", text: "Tous tes CV et lettres, offre par offre", icon: FileText },
+  { id: "questions", label: "Mes réponses", text: "Tes réponses aux questions des formulaires, réutilisées partout", icon: CircleHelp },
+  { id: "settings", label: "Réglages", text: "Ton CV, tes métiers, ton compte", icon: Settings },
   { id: "roadmap", label: "Feuille de route", text: "Ce qui marche, ce qui est en cours, ce qui arrive", icon: MapIcon },
 ];
 
 export function MoreView({ ctx, badge }: { ctx: Ctx; badge: (id: View) => number }) {
   const items = ctx.status?.isAdmin
-    ? [...ITEMS, { id: "admin" as View, label: "Admin", text: "IA, sources d’offres, quotas, alertes", icon: Gauge }]
+    ? [
+        ...ITEMS,
+        { id: "activity" as View, label: "Activité", text: "Journal technique des recherches (admin)", icon: Activity },
+        { id: "admin" as View, label: "Admin", text: "IA, sources d’offres, quotas, alertes", icon: Gauge },
+      ]
     : ITEMS;
   return (
     <>

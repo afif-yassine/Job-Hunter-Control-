@@ -1,3 +1,4 @@
+import { cleanSalaryText } from "@/lib/salary";
 import type { ScanConfig } from "../config";
 import type { ScannedOffer } from "../types";
 import { clip } from "../text";
@@ -12,6 +13,7 @@ type JoobleJob = {
   link?: string;
   company?: string;
   updated?: string;
+  salary?: string;
 };
 
 export function mapJoobleOffer(j: JoobleJob): ScannedOffer | null {
@@ -25,6 +27,7 @@ export function mapJoobleOffer(j: JoobleJob): ScannedOffer | null {
     description: clip(j.snippet),
     url: j.link,
     publishedAt: j.updated || null,
+    salary: cleanSalaryText(j.salary),
   };
 }
 
