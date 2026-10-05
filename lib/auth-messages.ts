@@ -11,6 +11,8 @@ export const AUTH_ERRORS = {
   google_failed: "Google n’a pas pu confirmer ta connexion. Réessaie dans un instant.",
   google_off: "La connexion avec Google n’est pas encore ouverte : utilise ton adresse e-mail.",
   bad_password: "Adresse e-mail ou mot de passe incorrect.",
+  not_confirmed: "Ton adresse n’est pas encore confirmée : ouvre l’e-mail de confirmation, ou demande un lien de connexion.",
+  password_reset_done: "Mot de passe changé. Tu es connecté.",
   config: "Le service de connexion n’est pas configuré. Réessaie plus tard.",
   unknown: "La connexion n’a pas abouti. Réessaie dans un instant.",
 } as const;
@@ -50,4 +52,26 @@ export function magicLinkError(error: { message?: string; status?: number; code?
     return "Les inscriptions par e-mail ouvrent bientôt. En attendant, connecte-toi avec Google.";
   if (/invalid|validate|email_address_invalid/.test(text)) return "Cette adresse e-mail ne semble pas valide.";
   return "Le lien n’a pas pu être envoyé. Réessaie dans un instant.";
+}
+
+export const MIN_PASSWORD = 8;
+
+/** Rules checked before calling Supabase (the dashboard enforces the same minimum and the leaked-password check). */
+export function passwordProblem(password: string): string | null {
+  if (password.length < MIN_PASSWORD) return `Ton mot de passe doit faire au moins ${MIN_PASSWORD} caractères.`;
+  if (password.length > 72) return "Ton mot de passe est trop long (72 caractères au plus).";
+  return null;
+}
+
+/** French message for an error from supabase.auth.signUp / updateUser. */
+export function passwordError(error: { message?: string; status?: number; code?: string }): string {
+  const text = `${error.code ?? ""} ${error.message ?? ""}`.toLowerCase();
+  if (error.status === 429 || /rate limit|too many|security purposes|over_email_send_rate_limit/.test(text))
+    return "Un e-mail vient déjà de partir. Attends une minute avant de réessayer.";
+  if (/weak_password|pwned|compromised|breach|leaked|known to be weak/.test(text))
+    return "Ce mot de passe est apparu dans une fuite de données connue ou est trop simple. Choisis-en un autre.";
+  if (/same_password|different from the old/.test(text)) return "Choisis un mot de passe différent de l’ancien.";
+  if (/signups? not allowed|signup_disabled/.test(text)) return "Les inscriptions par e-mail ouvrent bientôt. En attendant, connecte-toi avec Google.";
+  if (/invalid|validate|email_address_invalid/.test(text)) return "Cette adresse e-mail ne semble pas valide.";
+  return "L’opération n’a pas pu aboutir. Réessaie dans un instant.";
 }

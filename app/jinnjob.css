@@ -456,3 +456,14 @@ a:hover .lbt-mark .mk-arrow, .lbt-mark:hover .mk-arrow, .lbt-mark.is-busy .mk-ar
 .lbt-word.is-dark { color: #f4ece2; }
 .lbt-word.is-dark em, .lbt-word.is-dark i { color: #e2b096; }
 @media (prefers-reduced-motion: reduce) { .lbt-mark .mk-frame, .lbt-mark .mk-arrow { animation: none !important; } }
+
+/* Sign-in modes and password field */
+.jj-modes { display: flex; border: 1px solid rgba(28, 26, 23, 0.25); }
+.jj-modes button { flex: 1; min-height: 44px; padding: 0 8px; background: transparent; border: 0; font: inherit; font-size: 14px; color: var(--ink-2); cursor: pointer; }
+.jj-modes button + button { border-left: 1px solid rgba(28, 26, 23, 0.25); }
+.jj-modes button.is-on { background: var(--ink); color: var(--paper); }
+.jj-modes button:focus-visible { outline: 2px solid var(--ox); outline-offset: -2px; }
+.jj-pwrow { display: flex; gap: 8px; align-items: stretch; }
+.jj-pwrow .jj-input { flex: 1; min-width: 0; }
+.jj-pwrow .jj-quill { min-width: 64px; }
+@media (max-width: 420px) { .jj-modes button { font-size: 13px; } }

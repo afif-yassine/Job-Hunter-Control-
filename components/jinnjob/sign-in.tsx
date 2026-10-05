@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { AnimatePresence, motion } from "motion/react";
-import { useActionState, useEffect, useState } from "react";
+import { motion } from "motion/react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { login, sendMagicLink, type MagicLinkState } from "@/app/login/actions";
+import { login, sendMagicLink, sendPasswordReset, signUpWithPassword, type MagicLinkState, type PasswordState } from "@/app/login/actions";
 
 const RESEND_AFTER = 60;
 const EASE = [0.2, 0.8, 0.2, 1] as const;
@@ -42,115 +42,188 @@ function useCountdown(from: number | null) {
   return Math.max(0, RESEND_AFTER - Math.floor((now - from) / 1000));
 }
 
-export function SignIn({ google, next, error }: { google: boolean; next: string; error: string | null }) {
-  const [state, action] = useActionState<MagicLinkState, FormData>(sendMagicLink, { status: "idle" });
-  const [editing, setEditing] = useState(false);
-  const sent = state.status === "sent" && !editing;
-  const left = useCountdown(state.status === "sent" ? state.at : null);
+type Mode = "signup" | "signin" | "link";
+const MODES: { id: Mode; label: string }[] = [
+  { id: "signup", label: "Créer un compte" },
+  { id: "signin", label: "Se connecter" },
+  { id: "link", label: "Lien par e-mail" },
+];
 
+export function SignIn({ google, next, error }: { google: boolean; next: string; error: string | null }) {
+  const [mode, setMode] = useState<Mode>("signup");
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      {sent ? (
-        <motion.div
-          key="sent"
-          className="jj-sent"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -12 }}
-          transition={{ duration: 0.45, ease: EASE }}
-          role="status"
-          aria-live="polite"
-        >
-          <Envelope />
-          <h2 className="jj-fell" style={{ fontSize: 34, lineHeight: 1.05 }}>Regarde ta boîte mail.</h2>
-          <p>
-            Un lien de connexion vient de partir vers <strong>{state.email}</strong>. Il est valable une heure et ne sert qu’une fois.
-            Tu peux l’ouvrir sur ce téléphone ou cet ordinateur, peu importe.
-          </p>
-          {(() => {
-            const inbox = inboxFor(state.email);
-            return inbox ? (
-              <a className="jj-bound" href={inbox.href} target="_blank" rel="noreferrer" style={{ width: "100%" }}>{inbox.label}</a>
-            ) : null;
-          })()}
-          <p className="jj-sent-help">Rien reçu ? Regarde dans les indésirables ou l’onglet Promotions.</p>
-          <form action={action} className="jj-sent-actions">
-            <input type="hidden" name="email" value={state.email} />
-            <input type="hidden" name="next" value={next} />
-            <button className="jj-quill" type="submit" disabled={left > 0}>
-              {left > 0 ? `Renvoyer le lien dans ${left} s` : "Renvoyer le lien"}
-            </button>
-            <button className="jj-quill" type="button" onClick={() => setEditing(true)}>Changer d’adresse</button>
-          </form>
-        </motion.div>
-      ) : (
-        <motion.div
-          key="form"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -12 }}
-          transition={{ duration: 0.45, ease: EASE }}
-          style={{ display: "flex", flexDirection: "column", gap: 20 }}
-        >
-          {error && !editing && state.status === "idle" && <p className="jj-error" role="alert">{error}</p>}
-          {google && (
-            <>
-              <a className="jj-bound" href={next === "/" ? "/auth/google" : `/auth/google?next=${encodeURIComponent(next)}`} style={{ width: "100%" }}>
-                <GoogleMark />
-                Continuer avec Google
-              </a>
-              <div className="jj-or jj-mono" style={{ fontSize: 13, letterSpacing: ".12em" }}>OU AVEC TON E-MAIL</div>
-            </>
-          )}
-          <form action={(fd) => { setEditing(false); return action(fd); }} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <input type="hidden" name="next" value={next} />
-            <label className="jj-field">
-              Adresse e-mail
-              <input
-                className="jj-input"
-                name="email"
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                autoCapitalize="none"
-                spellCheck={false}
-                placeholder="prenom.nom@exemple.fr"
-                defaultValue={state.status === "idle" ? "" : state.email}
-                required
-                aria-invalid={state.status === "error"}
-                aria-describedby={state.status === "error" ? "jj-mail-error" : "jj-mail-hint"}
-              />
-            </label>
-            {state.status === "error" ? (
-              <p id="jj-mail-error" className="jj-error" role="alert">{state.message}</p>
-            ) : (
-              <p id="jj-mail-hint" className="jj-hint">Pas de mot de passe : on t’envoie un lien, tu cliques, tu es dedans. Ton compte est créé à la première connexion.</p>
-            )}
-            <Submit>Recevoir mon lien</Submit>
-          </form>
-          <PasswordFallback next={next} />
-          <p className="jj-consent">
-            En continuant, tu acceptes les <Link href="/conditions">conditions d’utilisation</Link> et tu as lu la{" "}
-            <Link href="/confidentialite">politique de confidentialité</Link>. Rien n’est envoyé à un recruteur sans ton accord.
-          </p>
-        </motion.div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {error && <p className="jj-error" role="alert">{error}</p>}
+      {google && (
+        <>
+          <a className="jj-bound" href={next === "/" ? "/auth/google" : `/auth/google?next=${encodeURIComponent(next)}`} style={{ width: "100%" }}>
+            <GoogleMark />
+            Continuer avec Google
+          </a>
+          <div className="jj-or jj-mono" style={{ fontSize: 13, letterSpacing: ".12em" }}>OU AVEC TON E-MAIL</div>
+        </>
       )}
-    </AnimatePresence>
+      <div className="jj-modes" role="tablist" aria-label="Façon de se connecter">
+        {MODES.map((m) => (
+          <button key={m.id} type="button" role="tab" aria-selected={mode === m.id} className={mode === m.id ? "is-on" : ""} onClick={() => setMode(m.id)}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      {mode === "signup" && <SignUpForm next={next} />}
+      {mode === "signin" && <SignInForm next={next} />}
+      {mode === "link" && <MagicLinkForm next={next} />}
+      <p className="jj-consent">
+        En continuant, tu acceptes les <Link href="/conditions">conditions d’utilisation</Link> et tu as lu la{" "}
+        <Link href="/confidentialite">politique de confidentialité</Link>. Rien n’est envoyé à un recruteur sans ton accord.
+      </p>
+    </div>
   );
 }
 
-/** Kept discreet: only the accounts created before magic links have a password. */
-function PasswordFallback({ next }: { next: string }) {
+/** "Regarde ta boîte mail" screen shared by the three e-mail flows. */
+function Sent({ email, title, children, again, left, onChange, againLabel = "Renvoyer l’e-mail" }: { email: string; title: string; children: React.ReactNode; again: () => void; left: number; onChange: () => void; againLabel?: string }) {
+  const inbox = inboxFor(email);
   return (
-    <details className="jj-pw">
-      <summary>J’ai un mot de passe</summary>
-      <form action={login} style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 14 }}>
-        <input type="hidden" name="next" value={next} />
-        <label className="jj-field">Adresse e-mail<input className="jj-input" name="email" type="email" autoComplete="username" required /></label>
-        <label className="jj-field">Mot de passe<input className="jj-input" name="password" type="password" autoComplete="current-password" required /></label>
-        <button className="jj-bound" type="submit" style={{ width: "100%" }}>Entrer avec mon mot de passe</button>
-      </form>
-    </details>
+    <motion.div className="jj-sent" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: EASE }} role="status" aria-live="polite">
+      <Envelope />
+      <h2 className="jj-fell" style={{ fontSize: 34, lineHeight: 1.05 }}>{title}</h2>
+      <p>{children}</p>
+      {inbox && <a className="jj-bound" href={inbox.href} target="_blank" rel="noreferrer" style={{ width: "100%" }}>{inbox.label}</a>}
+      <p className="jj-sent-help">Rien reçu ? Regarde dans les indésirables ou l’onglet Promotions.</p>
+      <div className="jj-sent-actions">
+        <button className="jj-quill" type="button" onClick={again} disabled={left > 0}>
+          {left > 0 ? `${againLabel} dans ${left} s` : againLabel}
+        </button>
+        <button className="jj-quill" type="button" onClick={onChange}>Changer d’adresse</button>
+      </div>
+    </motion.div>
+  );
+}
+
+function MagicLinkForm({ next }: { next: string }) {
+  const [state, action] = useActionState<MagicLinkState, FormData>(sendMagicLink, { status: "idle" });
+  const [editing, setEditing] = useState(false);
+  const left = useCountdown(state.status === "sent" ? state.at : null);
+  const form = useRef<HTMLFormElement>(null);
+  if (state.status === "sent" && !editing)
+    return (
+      <>
+        <form ref={form} action={action} hidden>
+          <input name="email" defaultValue={state.email} />
+          <input name="next" defaultValue={next} />
+        </form>
+        <Sent email={state.email} title="Regarde ta boîte mail." left={left} again={() => form.current?.requestSubmit()} onChange={() => setEditing(true)}>
+          Un lien de connexion vient de partir vers <strong>{state.email}</strong>. Il est valable une heure et ne sert qu’une fois. Tu peux l’ouvrir sur ce téléphone ou cet ordinateur, peu importe.
+        </Sent>
+      </>
+    );
+  return (
+    <form action={(fd) => { setEditing(false); return action(fd); }} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <input type="hidden" name="next" value={next} />
+      <EmailField state={state} />
+      {state.status === "error" ? (
+        <p id="jj-mail-error" className="jj-error" role="alert">{state.message}</p>
+      ) : (
+        <p id="jj-mail-hint" className="jj-hint">Pas de mot de passe : on t’envoie un lien, tu cliques, tu es dedans. Ton compte est créé à la première connexion.</p>
+      )}
+      <Submit>Recevoir mon lien</Submit>
+    </form>
+  );
+}
+
+function EmailField({ state }: { state: { status: string; email?: string } }) {
+  return (
+    <label className="jj-field">
+      Adresse e-mail
+      <input
+        className="jj-input"
+        name="email"
+        type="email"
+        inputMode="email"
+        autoComplete="email"
+        autoCapitalize="none"
+        spellCheck={false}
+        placeholder="prenom.nom@exemple.fr"
+        defaultValue={state.status === "idle" ? "" : (state.email ?? "")}
+        required
+        aria-invalid={state.status === "error"}
+        aria-describedby={state.status === "error" ? "jj-mail-error" : undefined}
+      />
+    </label>
+  );
+}
+
+function PasswordField({ label, autoComplete, hint }: { label: string; autoComplete: "new-password" | "current-password"; hint?: string }) {
+  const [shown, setShown] = useState(false);
+  return (
+    <label className="jj-field">
+      {label}
+      <span className="jj-pwrow">
+        <input className="jj-input" name="password" type={shown ? "text" : "password"} autoComplete={autoComplete} minLength={autoComplete === "new-password" ? 8 : undefined} maxLength={72} required />
+        <button type="button" className="jj-quill" onClick={() => setShown((v) => !v)} aria-pressed={shown}>{shown ? "Cacher" : "Voir"}</button>
+      </span>
+      {hint && <small className="jj-hint">{hint}</small>}
+    </label>
+  );
+}
+
+function SignUpForm({ next }: { next: string }) {
+  const [state, action] = useActionState<PasswordState, FormData>(signUpWithPassword, { status: "idle" });
+  const [editing, setEditing] = useState(false);
+  const left = useCountdown(state.status === "confirm" ? state.at : null);
+  const form = useRef<HTMLFormElement>(null);
+  if (state.status === "confirm" && !editing)
+    return (
+      <Sent email={state.email} title="Confirme ton adresse." left={left} againLabel="Recommencer" again={() => setEditing(true)} onChange={() => setEditing(true)}>
+        Un e-mail de confirmation vient de partir vers <strong>{state.email}</strong>. Clique sur le lien dedans : ton compte sera prêt et tu seras connecté. Si cette adresse a déjà un compte, utilise « Se connecter ».
+      </Sent>
+    );
+  return (
+    <form ref={form} action={(fd) => { setEditing(false); return action(fd); }} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <input type="hidden" name="next" value={next} />
+      <EmailField state={state} />
+      <PasswordField label="Mot de passe" autoComplete="new-password" hint="8 caractères au moins. Les mots de passe déjà apparus dans une fuite de données sont refusés." />
+      {state.status === "error" && <p id="jj-mail-error" className="jj-error" role="alert">{state.message}</p>}
+      <Submit>Créer mon compte</Submit>
+    </form>
+  );
+}
+
+function SignInForm({ next }: { next: string }) {
+  const [forgot, setForgot] = useState(false);
+  if (forgot) return <ForgotForm onBack={() => setForgot(false)} />;
+  return (
+    <form action={login} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <input type="hidden" name="next" value={next} />
+      <label className="jj-field">
+        Adresse e-mail
+        <input className="jj-input" name="email" type="email" inputMode="email" autoComplete="username" autoCapitalize="none" spellCheck={false} required />
+      </label>
+      <PasswordField label="Mot de passe" autoComplete="current-password" />
+      <Submit>Entrer</Submit>
+      <button type="button" className="jj-quill" onClick={() => setForgot(true)} style={{ alignSelf: "flex-start" }}>Mot de passe oublié ?</button>
+    </form>
+  );
+}
+
+function ForgotForm({ onBack }: { onBack: () => void }) {
+  const [state, action] = useActionState<PasswordState, FormData>(sendPasswordReset, { status: "idle" });
+  const [editing, setEditing] = useState(false);
+  const left = useCountdown(state.status === "reset-sent" ? state.at : null);
+  if (state.status === "reset-sent" && !editing)
+    return (
+      <Sent email={state.email} title="Regarde ta boîte mail." left={left} againLabel="Recommencer" again={() => setEditing(true)} onChange={() => setEditing(true)}>
+        Si un compte existe pour <strong>{state.email}</strong>, un lien pour choisir un nouveau mot de passe vient de partir. Il est valable une heure.
+      </Sent>
+    );
+  return (
+    <form action={(fd) => { setEditing(false); return action(fd); }} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <EmailField state={state} />
+      {state.status === "error" ? <p id="jj-mail-error" className="jj-error" role="alert">{state.message}</p> : <p className="jj-hint">On t’envoie un lien pour choisir un nouveau mot de passe.</p>}
+      <Submit>Recevoir le lien</Submit>
+      <button type="button" className="jj-quill" onClick={onBack} style={{ alignSelf: "flex-start" }}>← Retour</button>
+    </form>
   );
 }
 

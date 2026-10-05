@@ -27,7 +27,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </Link>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <h1 className="jj-fell" style={{ fontSize: 56, lineHeight: 1, letterSpacing: "-.01em" }}>Ouvre ton dossier.</h1>
-              <p style={{ fontSize: 18, lineHeight: 1.55, color: "#4a4136" }}>Connexion ou inscription, c’est la même porte : ton compte se crée à la première visite. Gratuit pendant la phase de test.</p>
+              <p style={{ fontSize: 18, lineHeight: 1.55, color: "#4a4136" }}>Crée ton compte avec Google ou avec ton e-mail, ou reconnecte-toi. Gratuit pendant la phase de test.</p>
             </div>
             <SignIn google={google} next={next} error={authErrorMessage(error)} />
           </div>
