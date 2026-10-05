@@ -4,11 +4,11 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 const EXCUSES = [
-  "Ce chapitre est encore chez le relieur.",
-  "Le génie est parti chercher de l’encre.",
-  "Page en cours d’écriture : l’encre n’est pas sèche.",
-  "Un ver de bibliothèque a grignoté cette page. On la réimprime.",
-  "Le génie a dit : « Ton vœu est entendu. Repasse bientôt. »",
+  "Ce dossier est encore sous scellés.",
+  "L’inspecteur est parti chercher des indices.",
+  "Pièce à conviction en cours d’analyse au labo.",
+  "Le témoin principal n’a pas encore rappelé.",
+  "Affaire en cours. Repasse bientôt, on te tient au courant.",
 ];
 
 /**
@@ -42,17 +42,14 @@ export function SoonModal({ feature, onClose }: { feature: string | null; onClos
             onClick={(e) => e.stopPropagation()}
           >
             <button ref={closeRef} type="button" className="jj-soon-close" onClick={onClose} aria-label="Fermer">×</button>
-            <div className="jj-mini-book" aria-hidden="true">
-              <div className="jj-book-cover" />
-              <div className="jj-page is-left"><div className="jj-lines" style={{ height: 80 }} /></div>
-              <div className="jj-page is-right" style={{ display: "grid", placeItems: "center" }}>
-                <span className="jj-fell" style={{ fontSize: 40, color: "rgba(31,26,20,.25)" }}>?</span>
+            <div className="jj-mini-case" aria-hidden="true">
+              <div className="jj-mini-folder">
+                <span className="jj-mini-tab" />
+                <span className="jj-mini-stamp">SOUS SCELLÉS</span>
               </div>
-              <div className="jj-leaf" />
-              <div className="jj-leaf" style={{ animationDelay: "1.5s" }} />
-              <svg className="jj-worm" viewBox="0 0 44 18" width="44" height="18">
-                <path className="jj-ic" d="M2 13 C 6 5, 10 5, 14 13 C 18 5, 22 5, 26 13 C 30 5, 34 6, 38 9" style={{ strokeWidth: 3.2 }} />
-                <circle cx="38" cy="8" r="1.3" fill="#1f1a14" />
+              <svg className="jj-mini-lens" viewBox="0 0 60 60" width="60" height="60">
+                <circle cx="24" cy="24" r="15" fill="rgba(255,255,255,.35)" stroke="#1c1a17" strokeWidth="4" />
+                <path d="M35 35 L52 52" stroke="#1c1a17" strokeWidth="7" strokeLinecap="round" />
               </svg>
             </div>
             <div className="jj-label" style={{ marginTop: 18 }}>Bientôt · {feature}</div>
@@ -69,9 +66,9 @@ export function SoonModal({ feature, onClose }: { feature: string | null; onClos
                 {EXCUSES[i % EXCUSES.length]}
               </motion.h2>
             </AnimatePresence>
-            <p style={{ fontSize: 17, color: "var(--ink-2)", maxWidth: 460 }}>Cette fonction arrive bientôt. Le reste du livre, lui, est déjà ouvert.</p>
+            <p style={{ fontSize: 17, color: "var(--ink-2)", maxWidth: 460 }}>Cette fonction arrive bientôt. Le reste de l’enquête, lui, est déjà ouvert.</p>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 24, minHeight: 60 }}>
-              <button type="button" className="jj-bound" onClick={onClose}>Retourner au livre</button>
+              <button type="button" className="jj-bound" onClick={onClose}>Retour au tableau</button>
               <button type="button" className="jj-quill" onClick={() => setI((n) => n + 1)}>Une autre excuse</button>
             </div>
           </motion.div>

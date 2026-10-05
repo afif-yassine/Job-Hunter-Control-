@@ -1,7 +1,7 @@
 /**
  * One place for the product name and the legal identity shown on the public
  * pages. Renaming the brand is a change here, plus the wordmark
- * (components/jinnjob/lamp.tsx).
+ * (components/jinnjob/logo.tsx).
  */
 export const BRAND = {
   name: "LeBonTaf",

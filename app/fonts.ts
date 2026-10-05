@@ -1,21 +1,32 @@
 import localFont from "next/font/local";
 
-/** LeBonTaf type: an old printing face for stories, a clean sans to read fast, a typewriter for labels. */
-export const fell = localFont({
+/** LeBonTaf type: a bold grotesque for headlines, a typewriter for case labels, a hand for the sticky notes. */
+export const display = localFont({
   src: [
-    { path: "./fonts/im-fell-english-latin-400-normal.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/im-fell-english-latin-400-italic.woff2", weight: "400", style: "italic" },
+    { path: "./fonts/bricolage-grotesque-latin-600-normal.woff2", weight: "600" },
+    { path: "./fonts/bricolage-grotesque-latin-700-normal.woff2", weight: "700" },
+    { path: "./fonts/bricolage-grotesque-latin-800-normal.woff2", weight: "800" },
   ],
-  variable: "--font-fell",
+  variable: "--font-display",
   display: "swap",
-  fallback: ["Iowan Old Style", "Georgia", "serif"],
+  fallback: ["Helvetica Neue", "Arial", "sans-serif"],
 });
 
-export const fellSc = localFont({
-  src: "./fonts/im-fell-english-sc-latin-400-normal.woff2",
-  variable: "--font-fell-sc",
+export const hand = localFont({
+  src: [
+    { path: "./fonts/caveat-latin-600-normal.woff2", weight: "600" },
+    { path: "./fonts/caveat-latin-700-normal.woff2", weight: "700" },
+  ],
+  variable: "--font-hand",
   display: "swap",
-  fallback: ["Iowan Old Style", "Georgia", "serif"],
+  fallback: ["Segoe Print", "Comic Sans MS", "cursive"],
+});
+
+export const typewriter = localFont({
+  src: "./fonts/special-elite-latin-400-normal.woff2",
+  variable: "--font-type",
+  display: "swap",
+  fallback: ["Courier New", "monospace"],
 });
 
 export const sans = localFont({
@@ -40,4 +51,4 @@ export const mono = localFont({
   fallback: ["Courier New", "monospace"],
 });
 
-export const fontVariables = [fell.variable, fellSc.variable, sans.variable, mono.variable].join(" ");
+export const fontVariables = [display.variable, hand.variable, typewriter.variable, sans.variable, mono.variable].join(" ");
