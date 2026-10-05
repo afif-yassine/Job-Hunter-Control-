@@ -1,3 +1,4 @@
+import { fitScore } from "./fit";
 import type { Data } from "@/components/use-dashboard-data";
 import type { SystemStatus } from "@/components/use-status";
 import { AI_ADVICE, EMBEDDINGS_PLAN, ENRICHMENT_SOURCES, NOT_CONNECTED, SOURCES } from "@/lib/admin/catalog";
@@ -190,3 +191,8 @@ export const demoQuests = [
   { id: "deploy-sprint6", done: true, done_at: "2026-10-06T18:00:00Z" },
   { id: "gemini-paid", done: true, done_at: "2026-10-06T19:00:00Z" },
 ];
+
+// The free comparison for demo offers that the AI did not analyse.
+for (const job of demoData.jobs)
+  if (job.match_score === null && typeof job.similarity === "number")
+    job.fit = fitScore(job.similarity, ["linux", "bash", "docker"], ["ansible", "kubernetes"]);

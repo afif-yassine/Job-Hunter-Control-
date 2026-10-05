@@ -61,10 +61,10 @@ export const TASK_TOKENS = {
 export type Models = { analysis: string; writing: string; reading: string; embedding: string };
 
 export function configuredModels(env: Env = process.env): Models {
-  const base = env.AI_MODEL?.trim() || "gemini-3.6-flash";
+  const base = env.AI_MODEL?.trim();
   return {
-    analysis: env.AI_MODEL_ANALYSIS?.trim() || base,
-    writing: env.AI_MODEL_WRITING?.trim() || base,
+    analysis: env.AI_MODEL_ANALYSIS?.trim() || base || "gemini-2.5-flash-lite",
+    writing: env.AI_MODEL_WRITING?.trim() || base || "gemini-3.6-flash",
     reading: env.AI_MODEL_READING?.trim() || "gemini-2.5-flash-lite",
     embedding: env.EMBEDDING_MODEL?.trim() || "gemini-embedding-001",
   };

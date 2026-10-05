@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { GoogleGenAI } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AiUnavailable, aiConfigured } from "@/lib/ai";
+import { profileSkills } from "@/lib/skills";
 
 /**
  * Embeddings (Gemini, 768 dimensions): a vector per open offer, computed once
@@ -14,22 +15,45 @@ type Env = Record<string, string | undefined>;
 export const EMBED_DIM = 768;
 const BATCH = 50;
 
+/** What a text is: an offer (stored) or a profile (compared with the offers). */
+export type EmbedKind = "document" | "query";
 /** texts → vectors (same order). Injected in tests. */
-export type Embedder = (texts: string[]) => Promise<number[][]>;
+export type Embedder = (texts: string[], kind?: EmbedKind) => Promise<number[][]>;
 
+/**
+ * gemini-embedding-001: one vector per text of a batch. (gemini-embedding-2
+ * reads a batch as the parts of ONE input and answers a single vector: that
+ * is why no offer had a vector until October 6.)
+ */
 export function embeddingModel(env: Env = process.env): string {
-  return env.AI_EMBEDDING_MODEL?.trim() || "gemini-embedding-2";
+  return env.AI_EMBEDDING_MODEL?.trim() || env.EMBEDDING_MODEL?.trim() || "gemini-embedding-001";
 }
+
+/** Rough token count of texts (the embedding API does not report it). */
+export const approxTokens = (texts: string[]) => Math.ceil(texts.reduce((n, t) => n + t.length, 0) / 4);
 
 export function geminiEmbedder(env: Env = process.env): Embedder | null {
   if (!aiConfigured(env)) return null;
   const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
-  return async (texts) => {
+  const model = embeddingModel(env);
+  const call = async (contents: string[], kind: EmbedKind) => {
+    const r = await ai.models.embedContent({
+      model,
+      contents,
+      config: { outputDimensionality: EMBED_DIM, taskType: kind === "query" ? "RETRIEVAL_QUERY" : "RETRIEVAL_DOCUMENT" },
+    });
+    return (r.embeddings ?? []).map((e) => e.values ?? []);
+  };
+  return async (texts, kind = "document") => {
     try {
-      const r = await ai.models.embedContent({ model: embeddingModel(env), contents: texts, config: { outputDimensionality: EMBED_DIM } });
-      const vectors = (r.embeddings ?? []).map((e) => e.values ?? []);
+      let vectors = await call(texts, kind);
+      // A model that merges the batch into one input: one text per call.
+      if (vectors.length !== texts.length && texts.length > 1) {
+        vectors = [];
+        for (const t of texts) vectors.push(...(await call([t], kind)));
+      }
       if (vectors.length !== texts.length || vectors.some((v) => v.length !== EMBED_DIM))
-        throw new Error(`réponse d’embedding inattendue (${vectors.length}/${texts.length})`);
+        throw new Error(`réponse d’embedding inattendue (${vectors.length}/${texts.length}, modèle ${model})`);
       return vectors;
     } catch (error) {
       throw new AiUnavailable(error);
@@ -51,7 +75,6 @@ type OfferForEmbedding = {
 
 export function offerText(o: OfferForEmbedding): string {
   return [
-    "task: search result",
     `Offre : ${o.title}`,
     o.contract_type ? `Contrat : ${o.contract_type}` : "",
     o.categories?.length ? `Métiers : ${o.categories.join(", ")}` : "",
@@ -67,7 +90,7 @@ type Profile = Record<string, unknown>;
 /** The facts of a profile, as one text (what the offers are compared with). */
 export function profileText(profile: Profile): string {
   const arr = (v: unknown) => (Array.isArray(v) ? (v as Record<string, unknown>[]) : []);
-  const lines: string[] = ["task: search result", "Profil de candidat"];
+  const lines: string[] = ["Profil de candidat"];
   for (const e of arr(profile.experience))
     lines.push(`Expérience : ${e.title ?? ""} — ${e.organization ?? ""}. ${(Array.isArray(e.facts) ? e.facts : []).join(" ")} ${(Array.isArray(e.technologies) ? e.technologies : []).join(", ")}`);
   for (const p of arr(profile.projects))
@@ -85,7 +108,7 @@ export function profileText(profile: Profile): string {
 export async function embedPendingOffers(
   db: SupabaseClient,
   embed: Embedder,
-  opts: { limit?: number; timeLeft?: () => number } = {},
+  opts: { limit?: number; timeLeft?: () => number; onUsage?: (tokens: number) => void } = {},
 ): Promise<number> {
   const { data, error } = await db
     .from("offers")
@@ -98,7 +121,9 @@ export async function embedPendingOffers(
   for (let i = 0; i < data.length; i += BATCH) {
     if (opts.timeLeft && opts.timeLeft() < 6_000) break;
     const chunk = data.slice(i, i + BATCH) as (OfferForEmbedding & { id: string })[];
-    const vectors = await embed(chunk.map(offerText));
+    const texts = chunk.map(offerText);
+    const vectors = await embed(texts, "document");
+    opts.onUsage?.(approxTokens(texts));
     const { data: n } = await db.rpc("set_offer_embeddings", {
       p_rows: chunk.map((o, k) => ({ id: o.id, embedding: toVector(vectors[k]) })),
     });
@@ -108,15 +133,28 @@ export async function embedPendingOffers(
 }
 
 /** The account's profile vector, (re)computed when missing or when the profile changed. Never throws. */
-export async function ensureProfileEmbedding(supabase: SupabaseClient, userId: string, embed: Embedder | null, force = false): Promise<boolean> {
-  if (!embed) return false;
+export async function ensureProfileEmbedding(
+  supabase: SupabaseClient,
+  userId: string,
+  embed: Embedder | null,
+  force = false,
+  model = embeddingModel(),
+): Promise<boolean> {
   try {
-    const { data } = await supabase.from("candidate_profiles").select("profile,embedding_hash").eq("user_id", userId).maybeSingle();
+    const { data } = await supabase.from("candidate_profiles").select("profile,embedding_hash,skills").eq("user_id", userId).maybeSingle();
     if (!data?.profile) return false;
-    const text = profileText(data.profile as Profile);
-    const hash = createHash("sha256").update(text).digest("hex").slice(0, 32);
+    const profile = data.profile as Profile;
+    // Skills in common are compared even without a vector: kept in step first.
+    const skills = profileSkills(profile);
+    const stored = Array.isArray(data.skills) ? (data.skills as string[]) : null;
+    if (stored && (stored.length !== skills.length || stored.some((s, i) => s !== skills[i])))
+      await supabase.from("candidate_profiles").update({ skills }).eq("user_id", userId);
+    if (!embed) return false;
+    const text = profileText(profile);
+    // The model is part of the version: vectors of two models never meet.
+    const hash = createHash("sha256").update(`${model}\n${text}`).digest("hex").slice(0, 32);
     if (data.embedding_hash === hash && !force) return true;
-    const [vector] = await embed([text]);
+    const [vector] = await embed([text], "query");
     const { error } = await supabase
       .from("candidate_profiles")
       .update({ embedding: toVector(vector), embedding_at: new Date().toISOString(), embedding_hash: hash })

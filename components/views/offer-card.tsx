@@ -1,5 +1,6 @@
 "use client";
 import { CalendarDays, Euro, Globe, MapPin, Users } from "lucide-react";
+import { displayScore } from "@/lib/fit";
 import { milestones, stageOf, STAGE, type Stage } from "@/lib/journey";
 import { platformsOf, timeAgo } from "@/lib/labels";
 import type { Job } from "@/lib/types";
@@ -14,23 +15,23 @@ export function salaryOf(job: Job): string | null {
   return job.offers?.salary ?? null;
 }
 
-/** Score shown on the card: the AI score when the offer was analysed, else closeness to the CV. */
+/** Score shown on the card: the AI's detailed score when the offer was analysed, else the free comparison with the CV. */
 export function ScoreRing({ job, size = 54 }: { job: Job; size?: number }) {
-  const score = job.match_score;
-  const near = typeof job.similarity === "number" ? job.similarity : null;
-  if (score === null || score === undefined) {
+  const shown = displayScore(job);
+  if (!shown) {
     return (
-      <span className="ring is-none" style={{ width: size, height: size }} title={near !== null ? "Pas encore notée : classée d’après ton CV" : "Pas encore notée"}>
+      <span className="ring is-none" style={{ width: size, height: size }} title="Pas encore comparée à ton CV">
         <b>—</b>
         <small>score</small>
       </span>
     );
   }
+  const score = shown.score;
   const tone = score >= 80 ? "good" : score >= 60 ? "mid" : "low";
   const r = 22;
   const c = 2 * Math.PI * r;
   return (
-    <span className={`ring is-${tone}`} style={{ width: size, height: size }} title={`Compatibilité avec ton CV : ${score}/100`}>
+    <span className={`ring is-${tone}`} style={{ width: size, height: size }} title={shown.detailed ? `Compatibilité avec ton CV (analyse IA) : ${score}/100` : `Compatibilité avec ton CV : ${score}/100, comparaison de l’offre et de ton CV`}>
       <svg viewBox="0 0 54 54" aria-hidden="true">
         <circle cx="27" cy="27" r={r} className="ring-track" />
         <circle cx="27" cy="27" r={r} className="ring-value" strokeDasharray={`${(c * score) / 100} ${c}`} />

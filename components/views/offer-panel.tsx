@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { displayScore } from "@/lib/fit";
 import { followUpDue, isSent, stageOf, type Stage } from "@/lib/journey";
 import { Soon } from "@/components/ui";
 import { DOCUMENT_KIND, platformsOf, REVIEW } from "@/lib/labels";
@@ -108,6 +109,7 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   const disabled = Boolean(busy);
   const url = job.official_url || job.source_url;
   const summary = summaryOf(job);
+  const shown = displayScore(job);
   const insight = insightOf(job);
   const docs = latestDocs(data.documents, job.id);
   const salary = salaryOf(job);
@@ -224,18 +226,57 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
           <div className="panel-score">
             <ScoreRing job={job} size={64} />
             <div>
-              <strong>{job.match_score !== null && job.match_score !== undefined ? "Compatibilité avec ton CV" : "Pas encore notée"}</strong>
+              <strong>{shown ? "Compatibilité avec ton CV" : "Pas encore comparée"}</strong>
               <p className="muted small-text">
-                {job.match_score !== null && job.match_score !== undefined
-                  ? job.match_score >= 80
+                {shown
+                  ? shown.score >= 80
                     ? "Très proche de ton profil : fonce."
-                    : job.match_score >= 60
+                    : shown.score >= 60
                       ? "Une bonne piste, avec quelques écarts."
                       : "Assez loin de ton profil."
-                  : "Le score arrive avec le résumé de l’offre."}
+                  : "Le score arrive dès que l’offre et ton CV sont lus."}
               </p>
             </div>
           </div>
+          {!insight && job.fit && (
+            <details className="why">
+              <summary>Pourquoi ce score ?</summary>
+              <p className="muted small-text">
+                Comparaison de l’offre et de ton CV
+                {job.fit.similarity !== null ? ` : sens proche à ${Math.round(Math.max(0, Math.min(1, (job.fit.similarity - 0.5) / 0.3)) * 100)} %` : ""}
+                {job.fit.matched.length + job.fit.missing.length ? `, ${job.fit.matched.length} compétence${job.fit.matched.length > 1 ? "s" : ""} sur ${job.fit.matched.length + job.fit.missing.length} demandée${job.fit.matched.length + job.fit.missing.length > 1 ? "s" : ""}` : ""}.
+              </p>
+              {job.fit.matched.length ? (
+                <>
+                  <h4>Ce que tu as déjà</h4>
+                  <div className="chips">
+                    {job.fit.matched.map((s) => (
+                      <span key={s} className="tag is-good">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+              {job.fit.missing.length ? (
+                <>
+                  <h4>Demandé, absent de ton CV</h4>
+                  <div className="chips">
+                    {job.fit.missing.map((s) => (
+                      <span key={s} className="tag is-gap">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+              {job.description && !job.review_flag && !gone && (
+                <button className="btn ghost small" onClick={() => void act.analyze(job)} disabled={disabled}>
+                  <Sparkles size={15} aria-hidden /> Analyse approfondie par l’IA
+                </button>
+              )}
+            </details>
+          )}
           {insight && (
             <details className="why">
               <summary>Pourquoi ce score ?</summary>
@@ -296,7 +337,7 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
               <p className="muted small-text">
                 {missingText
                   ? "L’annonce n’a pas pu être lue automatiquement : colle son texte pour la résumer."
-                  : "Le résumé (missions, outils, rythme) s’écrit à la première analyse de l’offre."}
+                  : "Le résumé (missions, outils, rythme) arrive dès que l’offre est lue, quelques minutes après son arrivée."}
               </p>
             )
           )}

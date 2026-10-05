@@ -1,4 +1,5 @@
 "use client";
+import { scoreOf } from "@/lib/fit";
 import { useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Empty, PageHead } from "@/components/ui";
@@ -29,16 +30,16 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
   const [query, setQuery] = useState("");
   const [metier, setMetier] = useState("");
   const [contract, setContract] = useState("");
-  const [sort, setSort] = useState<"recent" | "score" | "profile">("recent");
+  const [sort, setSort] = useState<"recent" | "score">("recent");
   const kits = useMemo(() => kitsByJob(data.documents), [data.documents]);
 
-  // The closest offers to the profile (top 25 by embeddings, or a high AI score).
+  // The closest offers to the profile (top 25 by score: the AI's or the free comparison).
   const closest = useMemo(
     () =>
       new Set(
         [...data.jobs]
-          .filter((j) => typeof j.similarity === "number")
-          .sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0))
+          .filter((j) => scoreOf(j) >= 0)
+          .sort((a, b) => scoreOf(b) - scoreOf(a))
           .slice(0, 25)
           .map((j) => j.id),
       ),
@@ -86,8 +87,7 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
       .filter((j) => (q ? `${j.title} ${j.company} ${j.location || ""}`.toLowerCase().includes(q) : true))
       .filter((j) => !metier || (facets.get(j.id)?.cats ?? []).includes(metier as never))
       .filter((j) => !contract || facets.get(j.id)?.kind === contract);
-    if (sort === "profile" || (jobFilter === "best" && sort === "recent")) return [...list].sort((a, b) => (b.similarity ?? -1) - (a.similarity ?? -1));
-    if (sort === "score") return [...list].sort((a, b) => (b.match_score ?? -1) - (a.match_score ?? -1));
+    if (sort === "score" || (jobFilter === "best" && sort === "recent")) return [...list].sort((a, b) => scoreOf(b) - scoreOf(a));
     return list;
   }, [inTab, jobFilter, query, metier, contract, facets, sort]);
 
@@ -154,8 +154,7 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
           Trier
           <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
             <option value="recent">Les plus récentes</option>
-            <option value="score">Meilleur score</option>
-            <option value="profile" disabled={!hasSimilarity}>
+            <option value="score" disabled={!hasSimilarity}>
               Les plus proches de mon CV{hasSimilarity ? "" : " (importe ton CV)"}
             </option>
           </select>

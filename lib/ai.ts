@@ -7,12 +7,16 @@ import { GoogleGenAI } from "@google/genai";
  *
  * - AI_MODEL_ANALYSIS: scoring (high volume → a cheap model is fine)
  * - AI_MODEL_WRITING: CV, letter, revisions (quality matters more)
- * - AI_MODEL: default for both
+ * - AI_MODEL_READING: reading each offer once for everybody (cheapest)
+ * - AI_MODEL: default for analysis and writing
  */
 
 export const DEFAULT_MODEL = "gemini-3.6-flash";
 
-export type AiTask = "analysis" | "writing";
+export type AiTask = "analysis" | "writing" | "reading";
+export const DEFAULT_READING_MODEL = "gemini-2.5-flash-lite";
+/** The detailed analysis is on demand and short: the cheap model is enough. */
+export const DEFAULT_ANALYSIS_MODEL = "gemini-2.5-flash-lite";
 export type AiResult = {
   text: string;
   model: string;
@@ -29,8 +33,9 @@ export function aiConfigured(env: Env = process.env): boolean {
 }
 
 export function modelFor(task: AiTask, env: Env = process.env): string {
-  const specific = task === "analysis" ? env.AI_MODEL_ANALYSIS : env.AI_MODEL_WRITING;
-  return specific?.trim() || env.AI_MODEL?.trim() || DEFAULT_MODEL;
+  if (task === "reading") return env.AI_MODEL_READING?.trim() || DEFAULT_READING_MODEL;
+  if (task === "analysis") return env.AI_MODEL_ANALYSIS?.trim() || env.AI_MODEL?.trim() || DEFAULT_ANALYSIS_MODEL;
+  return env.AI_MODEL_WRITING?.trim() || env.AI_MODEL?.trim() || DEFAULT_MODEL;
 }
 
 export const AI_NOT_CONFIGURED = "GEMINI_API_KEY is not configured";

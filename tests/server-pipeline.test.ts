@@ -81,7 +81,9 @@ const job = (id: string, extra: Record<string, unknown> = {}) => ({
 });
 
 test("AI model is chosen by configuration, per task", () => {
-  assert.equal(modelFor("analysis", {}), "gemini-3.6-flash");
+  assert.equal(modelFor("analysis", {}), "gemini-2.5-flash-lite");
+  assert.equal(modelFor("writing", {}), "gemini-3.6-flash");
+  assert.equal(modelFor("reading", {}), "gemini-2.5-flash-lite");
   assert.equal(modelFor("writing", { AI_MODEL: "gemini-x" }), "gemini-x");
   assert.equal(modelFor("analysis", { AI_MODEL: "gemini-x", AI_MODEL_ANALYSIS: "small" }), "small");
 });

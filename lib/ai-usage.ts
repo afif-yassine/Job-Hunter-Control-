@@ -2,8 +2,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AiResult, AiTask } from "@/lib/ai";
 import { callCost } from "@/lib/economics";
 
-/** Remembers the tokens of one AI call for this account (Admin: cost per account). Never throws. */
-export async function recordAiUsage(supabase: SupabaseClient, userId: string, task: AiTask, result: AiResult): Promise<void> {
+/**
+ * Remembers the tokens and the cost of one AI call (Admin: costs per account
+ * and per model). `userId` is null for the platform's shared work (reading
+ * and embedding the catalogue). Never throws.
+ */
+export async function recordAiUsage(
+  supabase: SupabaseClient,
+  userId: string | null,
+  task: AiTask | "embedding",
+  result: { model: string; usage?: AiResult["usage"]; text?: string },
+): Promise<void> {
   if (!result.usage) return;
   try {
     await supabase.from("ai_usage").insert({

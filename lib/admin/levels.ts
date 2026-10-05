@@ -80,7 +80,7 @@ export const LEVELS: LevelDef[] = [
       {
         id: "cheap-analysis",
         label: "Score sur un modèle bon marché",
-        hint: "Dans Vercel : AI_MODEL_ANALYSIS = gemini-2.5-flash-lite. Le score coûte alors environ 17 fois moins cher.",
+        hint: "gemini-2.5-flash-lite par défaut depuis le Sprint 7 (environ 17 fois moins cher que Gemini 3.6 Flash). Rien à faire, sauf si AI_MODEL_ANALYSIS est réglé dans Vercel.",
         xp: 40,
         auto: (f) => f.analysisPriceIn <= 0.2,
       },

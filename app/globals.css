@@ -559,6 +559,9 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .tag.is-good { background: #e5f4ea; border-color: #a6d4b9; color: var(--good); }
 .tag.is-warn { background: #fcf1da; border-color: #e6c47e; color: var(--warn); }
 .tag.is-bad { background: #fbe7e4; border-color: #eaa79f; color: var(--bad); }
+.tag.is-gap { background: transparent; border-style: dashed; color: var(--muted); }
+.why .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.why > .btn { margin-top: 6px; }
 .offer-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
 
 /* Score ring */

@@ -1,4 +1,5 @@
 "use client";
+import { scoreOf } from "@/lib/fit";
 import {
   ArrowRight,
   BellRing,
@@ -79,7 +80,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
   const counts = Object.fromEntries(TRACK.map((c) => [c.id, jobs.filter((j) => c.stages.includes(stageOf(j))).length])) as Record<string, number>;
   const fresh = jobs.filter((j) => stageOf(j) === "new" && !j.review_flag && !j.gone_reason);
   const freshTop = [...fresh]
-    .sort((a, b) => (b.match_score ?? Math.round((b.similarity ?? 0) * 100)) - (a.match_score ?? Math.round((a.similarity ?? 0) * 100)))
+    .sort((a, b) => scoreOf(b) - scoreOf(a))
     .slice(0, 4);
   const plan = status?.plan;
 

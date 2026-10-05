@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { fitScore } from "@/lib/fit";
 import { createClient } from "@/lib/supabase/client";
 import type {
   AgentRun,
@@ -62,10 +63,18 @@ export function useDashboardData(demo?: Data) {
         .order("created_at", { ascending: false });
       questions = plain.data as Question[] | null;
     }
-    // How close each offer is to the profile (embeddings); missing = not computed yet.
-    const near = await supabase.rpc("my_job_similarity");
-    const similarity = new Map(((near.data ?? []) as { job_id: string; similarity: number }[]).map((x) => [x.job_id, x.similarity]));
-    if (jobs.data) for (const job of jobs.data as Job[]) job.similarity = similarity.get(job.id) ?? null;
+    // The free score of every offer: closeness to the CV (vectors) and skills
+    // in common, compared in the database without any AI call.
+    type FitRow = { job_id: string; similarity: number | null; matched?: string[] | null; missing?: string[] | null };
+    let near = await supabase.rpc("my_job_fit");
+    if (near.error) near = await supabase.rpc("my_job_similarity");
+    const fits = new Map(((near.data ?? []) as FitRow[]).map((x) => [x.job_id, x]));
+    if (jobs.data)
+      for (const job of jobs.data as Job[]) {
+        const f = fits.get(job.id);
+        job.similarity = f?.similarity ?? null;
+        job.fit = f ? fitScore(f.similarity, f.matched ?? [], f.missing ?? []) : null;
+      }
     // How many LeBonTaf students applied to the same offer (only from 3, anonymous).
     const offerIds = [...new Set(((jobs.data ?? []) as Job[]).map((x) => x.offer_id).filter((x): x is string => Boolean(x)))];
     if (offerIds.length) {

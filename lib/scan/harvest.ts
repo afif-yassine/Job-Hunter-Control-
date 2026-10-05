@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getFranceTravailToken } from "@/lib/france-travail/client";
-import { embedPendingOffers, geminiEmbedder, type Embedder } from "@/lib/embeddings";
+import { recordAiUsage } from "@/lib/ai-usage";
+import type { AiCall } from "@/lib/ai";
+import { embeddingModel, embedPendingOffers, geminiEmbedder, type Embedder } from "@/lib/embeddings";
+import { readPendingOffers } from "@/lib/offer-reader";
 import { closeBoardOffers, expireOffers, harvestOffers } from "./catalogue";
 import { CATEGORIES, EXTRA_ROMES, SCOPE_CONTRACTS, categorize, contractKind } from "./categories";
 import { BudgetReached, budgetFor, budgetedFetch, classifyError, recordSourceRun } from "./health";
@@ -174,6 +177,8 @@ export type HarvestReport = {
   recategorized?: number;
   /** Offers given their embedding during this slice. */
   embedded?: number;
+  /** Offers read once for everybody (summary, skills) during this slice. */
+  read?: number;
   errors: string[];
 };
 
@@ -183,7 +188,7 @@ export type HarvestReport = {
  */
 export async function runHarvestSlice(
   db: SupabaseClient,
-  opts: { env?: Env; now?: Date; budgetMs?: number; fetchImpl?: typeof fetch; embed?: Embedder | null } = {},
+  opts: { env?: Env; now?: Date; budgetMs?: number; fetchImpl?: typeof fetch; embed?: Embedder | null; reader?: AiCall | null } = {},
 ): Promise<HarvestReport> {
   const env = opts.env ?? process.env;
   const now = opts.now ?? new Date();
@@ -194,13 +199,26 @@ export async function runHarvestSlice(
   const fetchImpl = opts.fetchImpl ?? fetch;
   const run = slotOf(now);
   const embed = opts.embed !== undefined ? opts.embed : geminiEmbedder(env);
-  // Vectors for the offers still without one, with the time left (never fails the slice).
+  // With the time left: vectors, then the shared reading of offers still
+  // without them (never fails the slice). Each offer is done once for all.
   const embedSome = async () => {
-    if (!embed || left() < 10_000) return;
-    try {
-      report.embedded = (report.embedded ?? 0) + (await embedPendingOffers(db, embed, { limit: 300, timeLeft: left }));
-    } catch (error) {
-      report.errors.push(`embeddings : ${error instanceof Error ? error.message : "erreur"}`);
+    if (embed && left() >= 10_000) {
+      let tokens = 0;
+      try {
+        report.embedded = (report.embedded ?? 0) + (await embedPendingOffers(db, embed, { limit: 300, timeLeft: left, onUsage: (t) => (tokens += t) }));
+      } catch (error) {
+        report.errors.push(`embeddings : ${error instanceof Error ? error.message : "erreur"}`);
+      }
+      if (tokens) await recordAiUsage(db, null, "embedding", { model: embeddingModel(env), usage: { input: tokens, output: 0 } });
+    }
+    if (opts.reader !== null && left() >= 15_000) {
+      try {
+        const r = await readPendingOffers(db, { env, ai: opts.reader, limit: 60, concurrency: 6, timeLeft: left });
+        report.read = (report.read ?? 0) + r.read;
+        if (r.failed) report.errors.push(`lecture des offres : ${r.failed} illisible(s)`);
+      } catch (error) {
+        report.errors.push(`lecture des offres : ${error instanceof Error ? error.message : "erreur"}`);
+      }
     }
   };
   const report: HarvestReport = { run, created: false, processed: 0, offers: 0, pending: 0, finished: false, errors: [] };
