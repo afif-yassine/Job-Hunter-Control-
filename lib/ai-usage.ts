@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AiResult, AiTask } from "@/lib/ai";
+import { callCost } from "@/lib/economics";
 
 /** Remembers the tokens of one AI call for this account (Admin: cost per account). Never throws. */
 export async function recordAiUsage(supabase: SupabaseClient, userId: string, task: AiTask, result: AiResult): Promise<void> {
@@ -11,6 +12,7 @@ export async function recordAiUsage(supabase: SupabaseClient, userId: string, ta
       model: result.model,
       input_tokens: result.usage.input,
       output_tokens: result.usage.output,
+      cost_usd: Number(callCost(result.model, result.usage).toFixed(6)),
     });
   } catch {
     // Accounting must never break the feature.

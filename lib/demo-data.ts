@@ -155,3 +155,38 @@ export const demoAdmin: AdminOverview = {
     { level: "before_launch", text: "France Travail : Licence ouverte : usage commercial autorisé en citant France Travail." },
   ],
 };
+
+/** Admin growth page fixture (/admin?demo=1 with DEMO_MODE=1). */
+export const demoGrowthRaw = {
+  users: 64,
+  admins: 1,
+  new_today: 3,
+  new_7d: 19,
+  new_30d: 52,
+  active_1d: 11,
+  active_7d: 31,
+  active_30d: 47,
+  pro: 0,
+  with_cv: 38,
+  kits_month: 41,
+  applied_month: 27,
+  interviews_month: 4,
+  offers_open: 3756,
+  offers_summarized: 3410,
+  offers_embedded: 3398,
+  offers_new_7d: 1240,
+  ai_by_model: [
+    { model: "gemini-3.6-flash", calls: 96, input: 290_000, output: 470_000 },
+    { model: "gemini-2.5-flash-lite", calls: 4100, input: 6_200_000, output: 1_500_000 },
+    { model: "gemini-embedding-001", calls: 3398, input: 1_020_000, output: 0 },
+  ],
+  signups_30d: Array.from({ length: 30 }, (_, i) => ({
+    day: new Date(Date.UTC(2026, 8, 21 + i)).toISOString().slice(0, 10),
+    n: [0, 1, 0, 2, 1, 0, 0, 3, 1, 2, 0, 1, 4, 2, 1, 0, 2, 3, 1, 5, 2, 1, 3, 2, 4, 6, 3, 2, 5, 3][i],
+  })),
+};
+
+export const demoQuests = [
+  { id: "deploy-sprint6", done: true, done_at: "2026-10-06T18:00:00Z" },
+  { id: "gemini-paid", done: true, done_at: "2026-10-06T19:00:00Z" },
+];

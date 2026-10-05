@@ -16,7 +16,7 @@ export function MoreView({ ctx, badge }: { ctx: Ctx; badge: (id: View) => number
     ? [
         ...ITEMS,
         { id: "activity" as View, label: "Activité", text: "Journal technique des recherches (admin)", icon: Activity },
-        { id: "admin" as View, label: "Admin", text: "IA, sources d’offres, quotas, alertes", icon: Gauge },
+        { id: "admin" as View, label: "Espace admin", text: "Croissance, niveaux, coûts, sources d’offres", icon: Gauge },
       ]
     : ITEMS;
   return (

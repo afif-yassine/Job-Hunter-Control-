@@ -18,6 +18,9 @@ import type { AdminAction, AdminOverview, AdminSource, SourceState } from "@/lib
 import { timeAgo } from "@/lib/labels";
 import type { Ctx } from "./types";
 
+/** What the admin pages need from their host (student dashboard or /admin). */
+export type AdminCtx = Pick<Ctx, "adminDemo" | "notify">;
+
 type ChipTone = "good" | "warn" | "bad" | "info" | "neutral";
 
 const TONE: Record<SourceState, ChipTone> = {
@@ -50,7 +53,7 @@ function periodLabel(period: string) {
 }
 
 /** Platform health in one page: AI, offer sources, automation, what to do. */
-export function AdminView({ ctx }: { ctx: Ctx }) {
+export function AdminView({ ctx }: { ctx: AdminCtx }) {
   const [data, setData] = useState<AdminOverview | null>(ctx.adminDemo ?? null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!ctx.adminDemo);
@@ -85,7 +88,7 @@ export function AdminView({ ctx }: { ctx: Ctx }) {
   if (!data)
     return (
       <>
-        <PageHead title="Admin" subtitle="Santé de la plateforme." actions={refresh} />
+        <PageHead title="Plateforme" subtitle="Santé de la plateforme." actions={refresh} />
         {error ? (
           <Callout tone="bad" title="Impossible de charger la page admin">
             {error}
@@ -105,7 +108,7 @@ export function AdminView({ ctx }: { ctx: Ctx }) {
   return (
     <>
       <PageHead
-        title="Admin"
+        title="Plateforme"
         subtitle={`IA, points de recherche et automatisation — ${active}/${available} sources en service.`}
         actions={refresh}
       />
@@ -389,7 +392,7 @@ const RUN_TONE: Record<HarvestRun["status"], ChipTone> = { running: "info", done
 const RUN_LABEL: Record<HarvestRun["status"], string> = { running: "En cours", done: "Terminée", partial: "Terminée avec erreurs" };
 
 /** Platform harvest: last runs, progress, errors, and a button to move it forward. */
-function HarvestSection({ ctx }: { ctx: Ctx }) {
+function HarvestSection({ ctx }: { ctx: AdminCtx }) {
   const [state, setState] = useState<HarvestState | null>(null);
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
@@ -539,7 +542,7 @@ const usd = (n: number) => (n < 0.01 && n > 0 ? "< 0,01 $" : `${n.toLocaleString
 const tokens = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M` : n >= 1000 ? `${Math.round(n / 1000)} k` : String(n));
 
 /** What each account costs in AI (tokens counted at every call). */
-function AiCostSection({ ctx }: { ctx: Ctx }) {
+function AiCostSection({ ctx }: { ctx: AdminCtx }) {
   const [state, setState] = useState<AiCostsState | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {

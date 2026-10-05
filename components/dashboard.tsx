@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MotionConfig, motion } from "motion/react";
 import { Mark, Wordmark } from "@/components/jinnjob/logo";
@@ -62,7 +63,7 @@ const TABS: { id: View; label: string; icon: LucideIcon }[] = [
 ];
 const ADMIN_NAV = [
   { id: "activity" as View, label: "Activité", icon: Activity },
-  { id: "admin" as View, label: "Admin", icon: Gauge },
+  { id: "admin" as View, label: "Espace admin", icon: Gauge },
 ];
 const VIEWS = new Set<string>(["home", "jobs", "track", "documents", "questions", "more", "admin", "activity", "settings", "roadmap"]);
 const MORE_VIEWS = new Set<View>(["more", "documents", "questions", "activity", "settings", "admin", "roadmap"]);
@@ -109,6 +110,8 @@ export type DemoState = { data: Data; status: SystemStatus; admin?: AdminOvervie
 
 export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?: DemoState }) {
   const { supabase, data, loading, error: loadError, reload, patchJob } = useDashboardData(demo?.data);
+  const router = useRouter();
+  const isDemo = Boolean(demo);
   const { status, failed: statusFailed, refresh: refreshStatus } = useSystemStatus(Boolean(supabase), demo?.status);
   const pipeline = usePipeline({ supabase, status, reload, refreshStatus });
 
@@ -132,10 +135,12 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
     const timer = window.setTimeout(() => {
       const raw = window.location.hash.slice(1);
       const hash = raw === "applications" ? "track" : raw;
+      // The admin pages live in their own space now.
+      if (hash === "admin" && !isDemo) return router.push("/admin");
       if (VIEWS.has(hash)) setView(hash as View);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [isDemo, router]);
 
   const notify = useCallback((text: string, tone: Tone = "info") => {
     window.clearTimeout(toastTimer.current);
@@ -158,6 +163,10 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
   }, [notify]);
 
   const go = useCallback((next: View, filter?: JobFilter) => {
+    if (next === "admin" && !isDemo) {
+      router.push("/admin");
+      return;
+    }
     setView(next);
     if (filter) setJobFilter(filter);
     try {
@@ -166,7 +175,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
       // ignore
     }
     window.scrollTo({ top: 0 });
-  }, []);
+  }, [isDemo, router]);
 
   const locked = pipeline.running ? "pipeline" : busy;
 
