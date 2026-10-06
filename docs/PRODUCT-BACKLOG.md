@@ -92,7 +92,8 @@ Sources conservées : [passation](PASSATION-CLAUDE-2026-10-06.md) et [backlog Cl
 - [x] Vérifier les tests de cette version : 145 réussis, 1 ignoré (pdflatex absent), aucune erreur.
 - [x] Vérifier TypeScript et lint : aucune erreur.
 - [x] Vérifier en production les trois onglets de connexion et Google ; demande de réinitialisation acceptée, réception de l'e-mail confirmée par le propriétaire. Le modèle reçu reste celui de Supabase, en anglais. Le code accepte les anciens liens PKCE, mais le nouveau mot de passe n'a pas été saisi/testé.
-- [ ] Terminer lint et compilation, pousser puis vérifier le déploiement du dernier commit.
+- [x] TypeScript, lint, tests et compilation de production réussis ; dernier commit de Claude et documents de reprise poussés sur `main`.
+- [ ] Vérifier la fin du déploiement Vercel et la CI GitHub de cette reprise.
 - [ ] Vérifier à l'écran la connexion sur ordinateur et mobile, puis inscription et réinitialisation avec une adresse de test autorisée.
 - [ ] Vérifier le SMTP et les modèles d'e-mail avant de déclarer la connexion terminée.
 - [ ] Terminer le rattrapage du catalogue : contrôle réel du 6 octobre, 3 851 offres ouvertes, 1 664 vectorisées et 0 résumé partagé. Aucun appel `reading` enregistré dans les dernières 24 heures ; cause à établir.
