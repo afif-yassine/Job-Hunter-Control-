@@ -84,6 +84,22 @@ Les autres tâches du backlog historique restent inchangées. Cette mise à jour
 
 Une tâche reste ouverte tant que son résultat n’est pas implémenté et vérifié. Les tests et la compilation ne remplacent pas la revue à l’écran ; une belle maquette ne remplace pas une fonction connectée aux données. Les critères de livraison du backlog historique restent applicables.
 
+## Reprise de Claude — 6 octobre 2026
+
+Sources conservées : [passation](PASSATION-CLAUDE-2026-10-06.md) et [backlog Claude](BACKLOG-CLAUDE-2026-10-06.md). Ce sont des documents transmis par le propriétaire : leurs cases et affirmations historiques doivent être confrontées au code et à la production.
+
+- [x] Lire la passation et récupérer le dernier commit du bundle (`995f185e`) sans écraser les fichiers locaux. Un seul commit manquait ; les autres améliorations étaient déjà présentes.
+- [x] Vérifier les tests de cette version : 145 réussis, 1 ignoré (pdflatex absent), aucune erreur.
+- [x] Vérifier TypeScript et lint : aucune erreur.
+- [x] Vérifier en production les trois onglets de connexion et Google ; demande de réinitialisation acceptée, réception de l'e-mail confirmée par le propriétaire. Le modèle reçu reste celui de Supabase, en anglais. Le code accepte les anciens liens PKCE, mais le nouveau mot de passe n'a pas été saisi/testé.
+- [ ] Terminer lint et compilation, pousser puis vérifier le déploiement du dernier commit.
+- [ ] Vérifier à l'écran la connexion sur ordinateur et mobile, puis inscription et réinitialisation avec une adresse de test autorisée.
+- [ ] Vérifier le SMTP et les modèles d'e-mail avant de déclarer la connexion terminée.
+- [ ] Terminer le rattrapage du catalogue : contrôle réel du 6 octobre, 3 851 offres ouvertes, 1 664 vectorisées et 0 résumé partagé. Aucun appel `reading` enregistré dans les dernières 24 heures ; cause à établir.
+- [ ] Après la vérification de cette livraison : sélectionner les preuves pertinentes du profil pour les CV et lettres (RAG), puis vérifier les quotas et les alertes de coût.
+
+Le document hébergé sur claude.ai n'est pas synchronisé automatiquement avec ces fichiers.
+
 ## Guides de conception et passage de relais
 
 Référence demandée : [sélection design d’Atlas](https://atlas-room.com/t/design). Guides consultés : [Impeccable](https://github.com/pbakaus/impeccable), [Taste](https://github.com/leonxlnx/taste-skill) et [animations d’Emil Kowalski](https://github.com/emilkowalski/skills). Ils orientent le travail ; les décisions du propriétaire restent prioritaires.
