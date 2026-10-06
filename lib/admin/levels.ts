@@ -123,7 +123,7 @@ export const LEVELS: LevelDef[] = [
       { id: "supabase-pro", label: "Passer Supabase en Pro (25 $/mois)", hint: "Sauvegardes quotidiennes et pas de mise en pause.", xp: 40, href: "https://supabase.com/pricing" },
       { id: "stripe", label: "Activer Stripe : Pro à 7,99 €/mois", hint: "Carte européenne : 1,5 % + 0,25 € par paiement, environ 0,7 % de plus pour les abonnements.", xp: 100, href: "https://dashboard.stripe.com/" },
       { id: "first-pro", label: "Premier abonné Pro", xp: 100, auto: (f) => f.pro >= 1 },
-      { id: "email-pro", label: "E-mails pro (Resend + contact@lebontaf.com)", xp: 40 },
+      { id: "email-pro", label: "E-mails pro (Resend + support@lebontaf.com)", xp: 40 },
       { id: "school", label: "Premier partenariat avec une école ou un CFA", hint: "Le canal le moins cher pour trouver des étudiants.", xp: 120 },
       { id: "profitable", label: "Rentable ce mois-ci", hint: "Le revenu Pro paie l’hébergement et l’IA.", xp: 200, auto: (f) => f.pro > 0 && f.monthMarginEur >= 0 },
       { id: "students-1000", label: "1 000 étudiants inscrits", xp: 250, auto: (f) => students(f) >= 1000 },

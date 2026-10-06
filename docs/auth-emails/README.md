@@ -4,7 +4,7 @@ Une seule fois, dans cet ordre.
 
 ## 1. Resend : le domaine
 1. resend.com > Domains > Add Domain > `lebontaf.com` (région Europe).
-2. Ajouter chez le registrar les enregistrements DNS donnés (SPF, DKIM, MX d'envoi). Option conseillée : un enregistrement DMARC `v=DMARC1; p=none; rua=mailto:contact@lebontaf.com`.
+2. Ajouter chez le registrar les enregistrements DNS donnés (SPF, DKIM, MX d'envoi). Option conseillée : un enregistrement DMARC `v=DMARC1; p=none; rua=mailto:support@lebontaf.com`.
 3. Attendre « Verified ».
 4. API Keys > Create API Key (permission « Sending access », domaine lebontaf.com). Copier la clé (`re_...`).
 
