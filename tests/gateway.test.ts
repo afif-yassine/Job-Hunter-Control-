@@ -41,6 +41,25 @@ test("Perplexity cosine does not inherit Gemini's numeric score thresholds", () 
   assert.equal(fitScore(0.35, ["python"], ["sql"], "perplexity/pplx-embed-v1-0.6b@retrieval-v1")?.score, 50);
 });
 
+test("An expired offer slice skips work and embedding requests respect their time budget", async () => {
+  const db = { rpc: async () => { throw new Error("expired slice must not reserve rows"); } } as unknown as SupabaseClient;
+  assert.equal(await embedSemanticOffers(db, env, { timeLeft: () => 5_000 }), 0);
+  let calls = 0;
+  globalThis.fetch = async (_url, init) => {
+    calls++;
+    const signal = init?.signal;
+    assert.ok(signal);
+    await new Promise<void>(resolve => {
+      const keepAlive = setTimeout(resolve, 100);
+      signal.addEventListener("abort", () => { clearTimeout(keepAlive); resolve(); }, { once: true });
+    });
+    assert.equal(signal.aborted, true);
+    throw signal.reason;
+  };
+  await assert.rejects(perplexityEmbedder(env, undefined, 10)(["A"]), /timeout/i);
+  assert.equal(calls, 1);
+});
+
 test("Concurrent embedding reservations skip paid calls and release failed batches", async () => {
   let calls = 0;
   const embed = async () => { calls++; throw new Error("provider unavailable"); };
