@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { aiConfigured, generateJson, type AiCall } from "@/lib/ai";
+import { AiUnavailable, aiConfigured, generateJson, type AiCall } from "@/lib/ai";
 import { recordAiUsage } from "@/lib/ai-usage";
 import { normalizeSkills } from "@/lib/skills";
 import type { OfferSummary } from "@/lib/types";
@@ -100,7 +100,7 @@ export async function readPendingOffers(
       } catch (err) {
         failed += 1;
         // A provider problem (credit, key) stops the round instead of repeating it 60 times.
-        if (/crédit|clé|Crédit|Clé/.test(err instanceof Error ? err.message : "")) throw err;
+        if (err instanceof AiUnavailable || /crédit|clé|Crédit|Clé/.test(err instanceof Error ? err.message : "")) throw err;
       }
     }
   };

@@ -20,10 +20,12 @@ export const SIMILARITY_CEIL = 0.8;
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 
-export function fitScore(similarity: number | null | undefined, matched: string[] = [], missing: string[] = []): Fit | null {
+export function fitScore(similarity: number | null | undefined, matched: string[] = [], missing: string[] = [], model?: string): Fit | null {
   const sim = typeof similarity === "number" && Number.isFinite(similarity) ? similarity : null;
   const asked = matched.length + missing.length;
-  const meaning = sim === null ? null : clamp01((sim - SIMILARITY_FLOOR) / (SIMILARITY_CEIL - SIMILARITY_FLOOR));
+  // The new space ranks by cosine, but gets no numeric semantic grade until calibrated on real CVs.
+  const calibrated = !model || model === "gemini-embedding-001";
+  const meaning = sim === null || !calibrated ? null : clamp01((sim - SIMILARITY_FLOOR) / (SIMILARITY_CEIL - SIMILARITY_FLOOR));
   // A long wish list should not sink a good match: 6 proven skills is a full mark.
   const skills = asked ? clamp01(matched.length / Math.min(asked, 6)) : null;
   if (meaning === null && skills === null) return null;

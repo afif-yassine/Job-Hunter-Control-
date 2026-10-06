@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { GoogleGenAI } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { AiUnavailable, aiConfigured } from "@/lib/ai";
+import { AiUnavailable } from "@/lib/ai";
 import { profileSkills } from "@/lib/skills";
 
 /**
@@ -33,9 +33,11 @@ export function embeddingModel(env: Env = process.env): string {
 export const approxTokens = (texts: string[]) => Math.ceil(texts.reduce((n, t) => n + t.length, 0) / 4);
 
 export function geminiEmbedder(env: Env = process.env): Embedder | null {
-  if (!aiConfigured(env)) return null;
+  if (!env.GEMINI_API_KEY?.trim()) return null;
   const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
   const model = embeddingModel(env);
+  if (model.replace(/^models\//, "") !== "gemini-embedding-001")
+    throw new Error("Le stockage historique accepte uniquement Gemini embedding 001. Utilise la migration versionnée avant de changer de modèle.");
   const call = async (contents: string[], kind: EmbedKind) => {
     const r = await ai.models.embedContent({
       model,
@@ -141,7 +143,7 @@ export async function ensureProfileEmbedding(
   model = embeddingModel(),
 ): Promise<boolean> {
   try {
-    const { data } = await supabase.from("candidate_profiles").select("profile,embedding_hash,skills").eq("user_id", userId).maybeSingle();
+    const { data } = await supabase.from("candidate_profiles").select("profile,embedding,embedding_hash,skills").eq("user_id", userId).maybeSingle();
     if (!data?.profile) return false;
     const profile = data.profile as Profile;
     // Skills in common are compared even without a vector: kept in step first.
@@ -151,9 +153,9 @@ export async function ensureProfileEmbedding(
       await supabase.from("candidate_profiles").update({ skills }).eq("user_id", userId);
     if (!embed) return false;
     const text = profileText(profile);
-    // The model is part of the version: vectors of two models never meet.
+    // The hash invalidates this profile's cache; it does NOT version the SQL offer vectors.
     const hash = createHash("sha256").update(`${model}\n${text}`).digest("hex").slice(0, 32);
-    if (data.embedding_hash === hash && !force) return true;
+    if (data.embedding && data.embedding_hash === hash && !force) return true;
     const [vector] = await embed([text], "query");
     const { error } = await supabase
       .from("candidate_profiles")

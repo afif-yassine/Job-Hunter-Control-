@@ -5,6 +5,7 @@
  * compare with the real month (ai_usage).
  */
 
+import { modelFor } from "./ai";
 type Env = Record<string, string | undefined>;
 
 /** Dollars per million tokens (provider list prices, October 2026). */
@@ -15,7 +16,9 @@ export const MODEL_PRICES: { match: RegExp; label: string; input: number; output
   { match: /gemini-embedding-001/i, label: "Gemini Embedding 001", input: 0.15, output: 0 },
   { match: /gemini-embedding-2/i, label: "Gemini Embedding 2", input: 0.2, output: 0 },
   { match: /text-embedding-3-small/i, label: "OpenAI embedding small", input: 0.02, output: 0 },
-  { match: /gpt-5\.6-luna|gpt-6-luna/i, label: "GPT Luna", input: 0.2, output: 1.2 },
+  { match: /gpt-6-luna/i, label: "GPT-6 Luna (Gateway testé)", input: 0.1, output: 0.5 },
+  { match: /gpt-5\.6-luna/i, label: "GPT Luna", input: 0.2, output: 1.2 },
+  { match: /pplx-embed-v1-0\.6b/i, label: "Perplexity embedding 0.6B", input: 0.004, output: 0 },
   { match: /gpt-5-nano/i, label: "GPT-5 Nano", input: 0.05, output: 0.4 },
   { match: /claude-haiku-4[.-]5/i, label: "Claude Haiku 4.5", input: 1, output: 5 },
   { match: /qwen3\.5-flash/i, label: "Qwen 3.5 Flash", input: 0.1, output: 0.4 },
@@ -61,12 +64,11 @@ export const TASK_TOKENS = {
 export type Models = { analysis: string; writing: string; reading: string; embedding: string };
 
 export function configuredModels(env: Env = process.env): Models {
-  const base = env.AI_MODEL?.trim();
   return {
-    analysis: env.AI_MODEL_ANALYSIS?.trim() || base || "gemini-2.5-flash-lite",
-    writing: env.AI_MODEL_WRITING?.trim() || base || "gemini-3.6-flash",
-    reading: env.AI_MODEL_READING?.trim() || "gemini-2.5-flash-lite",
-    embedding: env.EMBEDDING_MODEL?.trim() || "gemini-embedding-001",
+    analysis: modelFor("analysis", env),
+    writing: modelFor("writing", env),
+    reading: modelFor("reading", env),
+    embedding: env.AI_EMBEDDING_MODEL?.trim() || env.EMBEDDING_MODEL?.trim() || (env.EMBEDDING_PROVIDER === "gateway" ? "perplexity/pplx-embed-v1-0.6b" : "gemini-embedding-001"),
   };
 }
 
