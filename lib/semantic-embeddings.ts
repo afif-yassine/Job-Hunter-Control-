@@ -11,12 +11,12 @@ export const SEMANTIC_DIM = 1024;
 const hash = (text: string) => createHash("sha256").update(`${SEMANTIC_SPACE}\n${text}`).digest("hex");
 export const semanticEnabled = (env: Env = process.env) => env.EMBEDDING_PROVIDER === "gateway";
 
-export function perplexityEmbedder(env: Env = process.env, onUsage?: (usage: { input: number; output: number }, costUsd?: number) => Promise<void>): Embedder {
+export function perplexityEmbedder(env: Env = process.env, onUsage?: (usage: { input: number; output: number }, costUsd?: number) => Promise<void>, timeoutMs = 60_000): Embedder {
   return async texts => {
     if (!env.AI_GATEWAY_API_KEY?.trim()) throw new Error("Clé Gateway manquante pour les embeddings.");
     if (!texts.length || texts.length > 50 || texts.some(t => Buffer.byteLength(t) > 24_000)) throw new Error("Lot d’embeddings invalide.");
     const response = await fetch("https://ai-gateway.vercel.sh/v1/embeddings", {
-      method: "POST", signal: AbortSignal.timeout(60_000),
+      method: "POST", signal: AbortSignal.timeout(timeoutMs),
       headers: { authorization: `Bearer ${env.AI_GATEWAY_API_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({ model: SEMANTIC_MODEL, input: texts }),
     });
@@ -35,7 +35,6 @@ export function perplexityEmbedder(env: Env = process.env, onUsage?: (usage: { i
 
 /** Parallel columns preserve legacy Gemini vectors. Only changed or missing versions are embedded. */
 export async function embedSemanticOffers(db: SupabaseClient, env: Env, opts: { limit?: number; timeLeft?: () => number; embed?: Embedder } = {}) {
-  const embed = opts.embed ?? perplexityEmbedder(env, async (usage, costUsd) => recordAiUsage(db, null, "embedding", { model: SEMANTIC_MODEL, usage, costUsd }));
   let done = 0;
   for (let i = 0; i < (opts.limit ?? 300); i += 50) {
     if (opts.timeLeft && opts.timeLeft() < 6_000) break;
@@ -45,6 +44,7 @@ export async function embedSemanticOffers(db: SupabaseClient, env: Env, opts: { 
     if (!rows?.length) break;
     try {
       const texts = rows.map(offerText);
+      const embed = opts.embed ?? perplexityEmbedder(env, async (usage, costUsd) => recordAiUsage(db, null, "embedding", { model: SEMANTIC_MODEL, usage, costUsd }), Math.max(1, Math.min(60_000, Math.floor((opts.timeLeft?.() ?? 62_000) - 2_000))));
       const vectors = await embed(texts, "document");
       const saved = await db.rpc("set_semantic_offer_embeddings", { p_rows: rows.map((row, k) => ({ id: row.id, token: row.semantic_claim_token, source: { title: row.title, description: row.description, location: row.location, contract_type: row.contract_type, categories: row.categories }, hash: hash(texts[k]), embedding: JSON.stringify(vectors[k]) })) });
       if (saved.error) throw new Error(saved.error.message);
