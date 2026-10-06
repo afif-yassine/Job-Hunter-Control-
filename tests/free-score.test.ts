@@ -63,6 +63,14 @@ test("shared reader: card parsed and normalized, nothing invented", () => {
   assert.ok(readerPrompt({ title: "Dev", description: "x".repeat(9000) }).length < 7000);
 });
 
+test("shared reader: provider outages preserve the cause instead of reporting unreadable offers", async () => {
+  const { AiUnavailable } = await import("../lib/ai");
+  const { db } = fakeSupabase({ offers: [{ id: "a", status: "open", summary: null, description: "x".repeat(150) }] });
+  await assert.rejects(readPendingOffers(db, {
+    ai: async () => { throw new AiUnavailable(new Error("Model unavailable")); },
+  }), /momentanément indisponible/);
+});
+
 test("shared reader: database failures are reported instead of looking like an empty queue", async () => {
   const { db } = fakeSupabase({}, { missingTables: ["offers"] });
   await assert.rejects(readPendingOffers(db, { ai: async () => ({ text: "{}", model: "test" }) }), /Lecture du catalogue impossible/);

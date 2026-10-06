@@ -4,9 +4,83 @@ Référence principale du projet — 6 octobre 2026.
 
 Ce fichier reprend le backlog global fourni par le propriétaire depuis Claude. Il remplace le document centré sur le design, conservé dans [l'archive](archive/PRODUCT-BACKLOG-DESIGN-2026-10-06.md). La [copie originale](BACKLOG-CLAUDE-2026-10-06.md) et la [passation](PASSATION-CLAUDE-2026-10-06.md) sont conservées.
 
+## Optimisation IA et automatisations — décision du 6 octobre 2026
+
+Objectif : lancer le MVP pour les 100 premiers utilisateurs avec des traitements partagés, sans appels IA répétitifs. Les éléments ci-dessous sont à terminer et vérifier ; les constats de code ne constituent pas une validation de production. Cette section complète les sprints existants sur le catalogue, le classement, le RAG et les coûts.
+
+### Base déjà présente dans le code
+
+- Lecture partagée d'une offre : un appel LLM extrait résumé, missions, outils, conditions, compétences, niveau et télétravail, puis sauvegarde le résultat.
+- Embeddings sauvegardés des offres et du profil ; classement par similarité et compétences sans nouvel appel LLM pour chaque résultat. Le rattrapage de production reste incomplet.
+- Détection de doublons par liens normalisés, empreinte entreprise/titre/ville/contrat et comparaison de textes dans les parcours prévus.
+- Fermeture des offres absentes de certains tableaux d'entreprises lus complètement, expiration des offres anciennes et contrôle HTTP/API avant génération des documents.
+- Génération du CV et de la lettre en un appel ; suivi des tokens et contrôles de quotas présents, à compléter et vérifier.
+
+### P0 — catalogue partagé et suppression des répétitions
+
+- [ ] Terminer le rattrapage des embeddings et des résumés, après résolution du crédit Gemini épuisé ; contrôler les résultats en production.
+- [ ] Compléter l'extraction structurée unique avec durée, rythme, dates et salaire lorsqu'ils figurent dans la source. Conserver les faits de la source et laisser les informations absentes inconnues ; valider les formats sans nouvel appel LLM.
+- [ ] Sauvegarder l'empreinte du contenu pertinent, la version de l'extracteur, le modèle et la date de traitement. Une collecte identique ne relance ni lecture ni embedding ; un changement pertinent invalide les résultats concernés.
+- [ ] Garantir qu'une même offre collectée sur plusieurs sources réutilise ses traitements partagés ; vérifier les faux rapprochements pour ne pas fusionner des postes différents.
+- [ ] Réserver atomiquement les traitements en cours pour éviter deux appels simultanés sur la même offre ; prévoir expiration du verrou, reprises bornées et erreurs visibles.
+- [ ] Éviter l'embedding forcé à chaque sauvegarde du profil : le recalculer uniquement après changement pertinent ou changement de version du modèle.
+- [ ] Conserver la compatibilité des modèles et versions d'embeddings entre profils et offres ; prévoir un rattrapage explicite avant tout changement de modèle.
+
+### P0 — classement et rédaction à la demande
+
+- [ ] Vérifier le classement avec de vrais profils : appliquer les critères explicites (contrat, localisation, disponibilité, etc.) puis comparer embeddings et compétences. Ne pas présenter le score comme une probabilité d'embauche.
+- [ ] Produire les explications simples (compétences communes/manquantes, critères incompatibles ou inconnus) par calcul et règles, sans appel LLM.
+- [ ] Retirer l'analyse LLM détaillée obligatoire avant la génération, dans les parcours manuel et automatique ; utiliser les faits structurés et le classement existant. Garder le conseil approfondi comme action facultative et limitée.
+- [ ] Terminer le RAG de rédaction : sélectionner les preuves pertinentes du profil et du registre de vérité pour l'offre choisie, sans envoyer tout le catalogue ou tout l'historique et sans inventer de faits.
+- [ ] Brancher la sélection de preuves testée au pipeline : faits confirmés avec source et version, utilisateur issu de l'authentification serveur, RLS vérifiée, références et reformulations contrôlées avant affichage. Le prototype local n'est pas encore intégré à la production.
+- [ ] Avant remplacement de Gemini : versionner l'espace vectoriel des offres et profils, migrer les deux ensembles et adapter stockage/index aux 1024 dimensions Perplexity testées. Recalibrer les seuils du classement : les bonnes correspondances observées sont sous le seuil Gemini actuel de 0,50.
+- [ ] Sauvegarder les générations avec utilisateur, versions du profil et de l'offre, consignes et version du traitement ; une réouverture réaffiche le résultat, une révision explicite peut relancer l'IA. Isoler les données et résultats personnels entre comptes.
+
+### P0 — disponibilité des offres sans LLM
+
+- [ ] Ajouter un contrôle partagé de disponibilité avec résultat (disponible, retirée, inconnue), source de preuve et date ; réutiliser un contrôle récent pour tous les utilisateurs.
+- [ ] Définir la fraîcheur exigée avant de recommander une offre et avant une action importante ; revérifier lorsque le contrôle est trop ancien, sans requête systématique à chaque affichage.
+- [ ] Détecter les retraits via API source, tableau d'entreprise et réponses HTTP ; ajouter des règles adaptées aux pages HTTP 200 annonçant la clôture. Une réponse 200 seule ne prouve pas que le recrutement continue.
+- [ ] Ne pas retirer une offre pour un blocage robot, un délai dépassé ou une erreur réseau ; conserver un état inconnu et une reprise bornée.
+- [ ] Propager un retrait confirmé au catalogue et aux listes concernées, et bloquer la génération sur l'offre retirée. Vérifier la propagation dans tous les parcours.
+
+### P0 — budget du lancement et automatisations sans IA
+
+- [ ] Mesurer les dépenses par tâche, modèle et utilisateur avec les tarifs réellement utilisés, y compris embeddings, révisions et reprises ; corriger les estimations génériques si elles divergent.
+- [ ] Définir des quotas pour les 100 premiers utilisateurs, un plafond applicatif de dépenses, des alertes et un comportement clair lorsque le budget est atteint. Le budget initial envisagé de 20 € concerne l'IA, pas tous les frais du site ; 5 kits par utilisateur est une hypothèse à valider.
+- [ ] Vérifier puis compléter sans LLM : collecte planifiée, filtres, expiration, rappels de suivi, transitions de statuts, quotas, alertes de coût et rendu PDF. Ne pas envoyer de candidature automatiquement.
+- [ ] Vérifier que le nombre de lectures d'offres dépend du nombre de versions d'offres, pas du nombre d'utilisateurs ; que les recherches ne déclenchent pas de nouvelle analyse ; et que des traitements concurrents ne doublent pas les dépenses.
+
+### P1 — choix des modèles après validation du MVP
+
+Suivi : [intégration IA et ordre d'activation](INTEGRATION-IA-2026-10-06.md). Après les tests, le propriétaire a autorisé la suite : migration appliquée et contrôlée en production ; activation Gateway en attente de clé durable.
+
+- [x] Préparer le routage texte Gateway par tâche, les sorties bornées et l'enregistrement du coût retourné.
+- [x] Brancher une sélection déterministe des preuves du profil au kit et aux révisions ; vérifier les compétences explicites avant sauvegarde. Les reformulations restent à relire.
+- [x] Réutiliser un kit de même version et supprimer l'embedding forcé du profil à chaque sauvegarde.
+- [x] Préparer et tester localement le stockage parallèle Perplexity 1024, l'invalidation, les RPC par espace et la réservation SQL des kits.
+- [x] Appliquer/vérifier la migration sur la base cible : version distante `20261006152810`, tests de permissions réels et advisors sans nouveau problème.
+- [x] Réserver atomiquement les embeddings d'offres/profils ; tests d'appels concurrents et de libération après erreur.
+- [ ] Configurer une clé durable Gateway, rattraper les offres puis activer et vérifier les modèles en préproduction.
+- [ ] Calibrer la note sémantique Perplexity sur de vrais profils ; la proximité sert à classer mais ne reçoit pas encore de note numérique.
+- [ ] Réserver les révisions concurrentes ; contrôler les reformulations et les coûts au niveau global.
+
+- Comparatif réel poursuivi avec les prompts et le schéma de l'application : 298 requêtes cumulées, 294 réponses, coût déclaré Gateway 0,053110 USD ; réservation conservatrice 0,228409 USD ; plafond autorisé 1 USD. [Premier comparatif](RESULTATS-COMPARATIF-IA-2026-10-06.md), [tests CV et lettres](RESULTATS-CV-LETTRES-2026-10-06.md). Qwen3.7 Flash : candidat extraction sur les champs vérifiés. GPT-6 Luna : premier choix provisoire pour les brouillons CV/lettre avec le prompt v5, 6/6 contrôles techniques, environ 0,000464 USD par kit court. Relecture obligatoire ; description d'entreprise non prouvée dans le cas incompatible. DeepSeek ajoute encore des faits non justifiés en rédaction. Aucune migration en production effectuée.
+- [x] Exécuter le comparatif sur profils fictifs, ajouter des alternatives économiques pour la rédaction et sélectionner un candidat provisoire avec schéma strict et consignes professionnelles.
+- Dernier cumul après embeddings, reranking, réponses sourcées et import CV texte : **471 requêtes, 464 réponses ; 0,063568 USD de coût déclaré ; 0,335539 USD réservés conservativement**, sous le plafond total de 1 USD. [Rapport embeddings et RAG](RESULTATS-EMBEDDINGS-RAG-2026-10-06.md). Choix provisoire : Perplexity pplx-embed-v1-0.6b pour embeddings ; Qwen3.7 Flash pour extraction d'offres ; GPT-6 Luna pour import CV et rédaction. Aucun changement de modèle en production.
+- [x] Tester les 28 embeddings du catalogue sur deux séries synthétiques ; comparer les 4 rerankers dont le tarif est exploitable. Perplexity : 24/24 premiers résultats attendus sur les requêtes d'offres difficiles ; reranking facultatif, aucun bénéfice démontré pour ce choix sur ces cas.
+- [x] Tester une sélection de preuves suivie de réponses sourcées (16 réponses), l'import CV texte (3 modèles, 3 cas) et le prototype local d'isolation/versionnage des preuves (22 assertions). Une reformulation non prouvée reste détectée à la relecture ; PDF/OCR, RLS en base et intégration complète restent à valider.
+- [ ] Intégrer le schéma strict et les consignes testées, vérifier les faits du registre avant affichage, les exigences incompatibles avant génération et les paragraphes/PDF. Aucun modèle de secours rédactionnel validé à ce stade.
+- [ ] Comparer les modèles économiques sur un échantillon représentatif d'offres et de documents français : exactitude des faits, qualité rédactionnelle, latence et coût réel.
+- [ ] Décider entre Gemini direct et Vercel AI Gateway sur ces mesures. Gateway utilisé pour les tests avec une clé privée temporaire et le crédit acheté par le propriétaire ; aucune intégration ou migration en production à ce stade.
+- [ ] Si Gateway est retenu, intégrer un routage par tâche et des modèles de secours compatibles, avec limites de coût et confidentialité vérifiées.
+- [ ] Étudier le traitement différé Batch pour le catalogue lorsque le délai est acceptable ; mesurer le gain avant adoption.
+
 ## Vérifications récentes : ces constats priment sur les états historiques ci-dessous
 
 ### Correction du rattrapage — 6 octobre 2026
+
+- [ ] Blocage confirmé dans les réponses du cron : crédit Google AI Studio épuisé (embeddings). Recharge par le propriétaire nécessaire avant de terminer le rattrapage. Le lecteur signale aussi des échecs ; la cause du fournisseur doit rester visible dans le rapport, sans les présenter comme des textes illisibles.
 
 - [x] Reproduire et corriger le cas où le rattrapage des embeddings consomme le temps nécessaire aux résumés. Une réserve de 20 secondes est maintenant prévue pour le lecteur partagé ; les appels déjà en cours peuvent dépasser cette réserve.
 - [x] Rendre visible une erreur de lecture du catalogue au lieu de retourner une file vide ; tests de régression ajoutés.

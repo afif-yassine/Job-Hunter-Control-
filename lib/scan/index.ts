@@ -13,6 +13,7 @@ import { scanJSearch } from "./sources/jsearch";
 import { DEFAULT_TECH_ROMES, scanLba } from "./sources/lba";
 import { serviceClient } from "@/lib/supabase/admin";
 import { ensureProfileEmbedding, geminiEmbedder } from "@/lib/embeddings";
+import { ensureSemanticProfile, semanticEnabled } from "@/lib/semantic-embeddings";
 import {
   closeBoardOffers,
   dayBucket,
@@ -129,7 +130,8 @@ export async function runScan(ctx: {
   // no call to any job site. Their companies' boards are read too, so they
   // stay fresh and withdrawn offers are noticed.
   // The profile's vector first (once per profile version), so the closest offers come too.
-  await ensureProfileEmbedding(ctx.supabase, ctx.userId, geminiEmbedder(env));
+  if (semanticEnabled(env)) await ensureSemanticProfile(ctx.supabase, ctx.userId, env);
+  else await ensureProfileEmbedding(ctx.supabase, ctx.userId, geminiEmbedder(env));
   const fromCatalogue = await importFromCatalogue(ctx.supabase, config);
   // Offers the catalogue gave for each ticked category × contract.
   const coverage = new Map<string, number>();
@@ -477,7 +479,8 @@ export function scanMessage(s: ScanSummary): string {
 export async function seedFromCatalogue(supabase: SupabaseClient, userId: string): Promise<number> {
   const settings = await loadUserSettings(supabase, userId);
   const config = configFromPrefs(settings.prefs);
-  await ensureProfileEmbedding(supabase, userId, geminiEmbedder());
+  if (semanticEnabled()) await ensureSemanticProfile(supabase, userId, process.env);
+  else await ensureProfileEmbedding(supabase, userId, geminiEmbedder());
   const found = await importFromCatalogue(supabase, config);
   const offers = found.offers.filter(isRelevant);
   if (!offers.length) return 0;

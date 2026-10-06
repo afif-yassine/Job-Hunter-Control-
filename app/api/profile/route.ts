@@ -1,5 +1,6 @@
 import { authenticatedClient } from "@/lib/api";
 import { ensureProfileEmbedding, geminiEmbedder } from "@/lib/embeddings";
+import { ensureSemanticProfile, semanticEnabled } from "@/lib/semantic-embeddings";
 import { profileSummary, saveImportedProfile } from "@/lib/profile-store";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,9 @@ export async function PUT(req: Request) {
   const result = await saveImportedProfile(auth.supabase, auth.userId, body.draft, body.filename ?? null);
   if (result.error) return Response.json({ error: result.error }, { status: 400 });
   // New profile → new vector, so the offers closest to it are found (best effort).
-  await ensureProfileEmbedding(auth.supabase, auth.userId, geminiEmbedder(), true);
+  if (semanticEnabled()) {
+    try { await ensureSemanticProfile(auth.supabase, auth.userId, process.env); }
+    catch { /* The confirmed CV stays saved; the next search retries its vector. */ }
+  } else await ensureProfileEmbedding(auth.supabase, auth.userId, geminiEmbedder());
   return Response.json({ profile: await profileSummary(auth.supabase, auth.userId) });
 }

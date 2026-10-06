@@ -11,7 +11,7 @@ export async function recordAiUsage(
   supabase: SupabaseClient,
   userId: string | null,
   task: AiTask | "embedding",
-  result: { model: string; usage?: AiResult["usage"]; text?: string },
+  result: { model: string; usage?: AiResult["usage"]; text?: string; costUsd?: number },
 ): Promise<void> {
   if (!result.usage) return;
   try {
@@ -21,7 +21,7 @@ export async function recordAiUsage(
       model: result.model,
       input_tokens: result.usage.input,
       output_tokens: result.usage.output,
-      cost_usd: Number(callCost(result.model, result.usage).toFixed(6)),
+      cost_usd: typeof result.costUsd === "number" && Number.isFinite(result.costUsd) && result.costUsd >= 0 ? result.costUsd : Number(callCost(result.model, result.usage).toFixed(6)),
     });
   } catch {
     // Accounting must never break the feature.

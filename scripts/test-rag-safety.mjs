@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {retrieveEvidence,evidenceCacheKey,validEvidenceReferences} from '../lib/rag-evidence.ts';
+const space={model:'test-embedding',dimension:2,version:'v1'};
+const make=(id,userId,verified,vector=[1,0])=>({id,userId,verified,vector,text:'Rapprochement bancaire vérifié',sourceId:'CV-1',sourceVersion:'1',space});
+const chunks=[make('a','A',true,[.8,.2]),make('b','B',true),make('unknown','A',false)];
+const get=(extra={})=>retrieveEvidence({userId:'A',query:[1,0],space,chunks,limit:2,...extra});
+assert.deepEqual(get().map(c=>c.id),['a']);
+assert.deepEqual(get({userId:'C'}),[]);
+assert.throws(()=>get({userId:''}),/owner/);
+assert.throws(()=>get({query:[1]}),/vector/);
+assert.throws(()=>get({query:[NaN,0]}),/vector/);
+assert.throws(()=>get({query:[0,0]}),/vector/);
+assert.throws(()=>get({query:[1e308,0]}),/norm/);
+assert.throws(()=>get({query:[1e-300,0]}),/norm/);
+assert.throws(()=>get({chunks:[make('a','A',true),make('a','A',true)]}),/duplicate/);
+assert.throws(()=>get({chunks:[{...make('a','A',true),space:{...space,model:'different'}}]}),/Incompatible/);
+assert.throws(()=>get({chunks:[{...make('a','A',true),space:{...space,version:'v2'}}]}),/Incompatible/);
+assert.throws(()=>get({limit:100}),/limit/);
+assert(validEvidenceReferences(['a'],get()));
+assert(!validEvidenceReferences(['b'],get()));
+assert(!validEvidenceReferences([],get()));
+assert.equal(evidenceCacheKey(chunks[0]),evidenceCacheKey({...chunks[0]}));
+for(const patch of [{userId:'B'},{sourceVersion:'2'},{text:'Fait modifié'},{space:{...space,model:'different'}},{space:{...space,dimension:3}},{space:{...space,version:'v2'}}])
+ assert.notEqual(evidenceCacheKey(chunks[0]),evidenceCacheKey({...chunks[0],...patch}));
+console.log('22 safety assertions passed: owners, verified sources, vectors, versions, citations and cache invalidation.');

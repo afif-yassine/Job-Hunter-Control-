@@ -3,6 +3,7 @@ import { getFranceTravailToken } from "@/lib/france-travail/client";
 import { recordAiUsage } from "@/lib/ai-usage";
 import type { AiCall } from "@/lib/ai";
 import { embeddingModel, embedPendingOffers, geminiEmbedder, type Embedder } from "@/lib/embeddings";
+import { embedSemanticOffers, semanticEnabled } from "@/lib/semantic-embeddings";
 import { readPendingOffers } from "@/lib/offer-reader";
 import { closeBoardOffers, expireOffers, harvestOffers } from "./catalogue";
 import { CATEGORIES, EXTRA_ROMES, SCOPE_CONTRACTS, categorize, contractKind } from "./categories";
@@ -203,7 +204,13 @@ export async function runHarvestSlice(
   // consume every slice and indefinitely leave the summaries empty.
   const embedSome = async () => {
     const readerReserve = opts.reader === null ? 0 : 20_000;
-    if (embed && left() >= 10_000) {
+    if (semanticEnabled(env) && left() >= 10_000) {
+      try {
+        report.embedded = (report.embedded ?? 0) + await embedSemanticOffers(db, env, { limit: 300, timeLeft: () => left() - readerReserve });
+      } catch (error) {
+        report.errors.push(`embeddings versionnés : ${error instanceof Error ? error.message : "erreur"}`);
+      }
+    } else if (embed && left() >= 10_000) {
       let tokens = 0;
       try {
         report.embedded = (report.embedded ?? 0) + (await embedPendingOffers(db, embed, { limit: 300, timeLeft: () => left() - readerReserve, onUsage: (t) => (tokens += t) }));

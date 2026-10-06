@@ -65,15 +65,16 @@ export function useDashboardData(demo?: Data) {
     }
     // The free score of every offer: closeness to the CV (vectors) and skills
     // in common, compared in the database without any AI call.
-    type FitRow = { job_id: string; similarity: number | null; matched?: string[] | null; missing?: string[] | null };
-    let near = await supabase.rpc("my_job_fit");
+    type FitRow = { job_id: string; similarity: number | null; matched?: string[] | null; missing?: string[] | null; model?: string };
+    let near = await supabase.rpc("my_job_fit_v2");
+    if (near.error || !near.data?.length) near = await supabase.rpc("my_job_fit");
     if (near.error) near = await supabase.rpc("my_job_similarity");
     const fits = new Map(((near.data ?? []) as FitRow[]).map((x) => [x.job_id, x]));
     if (jobs.data)
       for (const job of jobs.data as Job[]) {
         const f = fits.get(job.id);
         job.similarity = f?.similarity ?? null;
-        job.fit = f ? fitScore(f.similarity, f.matched ?? [], f.missing ?? []) : null;
+        job.fit = f ? fitScore(f.similarity, f.matched ?? [], f.missing ?? [], f.model) : null;
       }
     // How many LeBonTaf students applied to the same offer (only from 3, anonymous).
     const offerIds = [...new Set(((jobs.data ?? []) as Job[]).map((x) => x.offer_id).filter((x): x is string => Boolean(x)))];

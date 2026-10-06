@@ -1,0 +1,30 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {z} from 'zod';
+import {parseJson} from '../lib/generated.ts';
+const path='test-results/ai-comparison/results.json';const ledger=JSON.parse(await readFile(path,'utf8'));
+const objectMode=process.argv.includes('--object');
+const source=await readFile('lib/profile-import.ts','utf8');const prefix=source.match(/export const IMPORT_PROMPT = `([\s\S]*?)`;/)?.[1];if(!prefix)throw new Error('Import prompt missing');
+const nullable=z.string().nullable();
+const schema=z.object({identity:z.object({full_name:nullable,email:nullable,phone:nullable,location:nullable,linkedin_url:nullable,github_url:nullable,portfolio_url:nullable}),skills:z.record(z.string(),z.array(z.string())),languages:z.array(z.string()),education:z.array(z.object({degree:nullable,institution:nullable,level:nullable,start:nullable,end:nullable})),experience:z.array(z.object({title:nullable,organization:nullable,start:nullable,end:nullable,facts:z.array(z.string()),technologies:z.array(z.string())})),projects:z.array(z.object({name:nullable,technologies:z.array(z.string()),description:nullable}))});
+const fixtures=[
+ {id:'dev',name:'Camille Exemple',location:'Lyon',skills:['Python','SQL'],languages:['B1'],experience:0,projects:1,text:'Camille Exemple\nLyon\nFormation : Licence informatique en cours, Université fictive de Lyon, 2024 – 2027 (prévu).\nCompétences : Python, SQL.\nProjet : Tableau de bord universitaire. Projet individuel : afficher des données de ventes issues de fichiers CSV. Technologies : Python, SQL.\nLangues : Français natif, Anglais B1.'},
+ {id:'compta',name:'Alex Exemple',location:'Lille',skills:['Excel','rapprochements bancaires'],languages:[],experience:1,projects:0,text:'Alex Exemple\nLille\nFormation : BTS comptabilité en cours, Lycée fictif des Rives, 2025 – 2027 (prévu).\nStage : Stagiaire en comptabilité, Atelier du Nord, avril 2026 – juin 2026. Effectuer des rapprochements bancaires sur Excel sous supervision.\nCompétences : Excel, rapprochements bancaires.\nLangues : Français natif.'},
+ {id:'minimal',name:'Sam Exemple',location:null,skills:[],languages:[],experience:0,projects:1,text:'Sam Exemple\nProjet collectif : Journée portes ouvertes. Rédiger une FAQ pour les visiteurs du lycée.\nAucune formation, technologie, langue, date ou coordonnée n’est renseignée.'},
+];
+const models=[{id:'alibaba/qwen3.7-flash',provider:'alibaba',input:.03,output:.13,reasoning:{enabled:false}},{id:'openai/gpt-6-luna',provider:'openai',input:.1,output:.5,reasoning:{effort:'none'}},{id:'google/gemini-2.5-flash-lite',provider:'vertex',input:.1,output:.4,reasoning:{enabled:false}}];
+console.log('Text extraction only: 3 fictional CVs x 3 models; PDF/OCR not covered.');if(!process.argv.includes('--run'))process.exit(0);
+if(!process.env.AI_GATEWAY_API_KEY)throw new Error('Missing private test key');
+const catalog=await fetch('https://ai-gateway.vercel.sh/v1/models').then(r=>r.json());for(const m of models){const live=catalog.data.find(x=>x.id===m.id);if(!live||Number(live.pricing.input)*1e6>m.input||Number(live.pricing.output)*1e6>m.output)throw new Error('Price review');}
+const save=()=>writeFile(path,JSON.stringify(ledger,null,2));
+for(const m of models)for(const c of fixtures){
+ const caseId=`cv-import-text-${objectMode?'v2':'v1'}-${c.id}`;if(ledger.results.some(r=>r.model===m.id&&r.case===caseId))continue;
+ const prompt=prefix.replace('Tu lis le CV joint (PDF).','Tu lis le texte extrait du CV ci-dessous.')+'\nTEXTE_CV='+c.text;
+ const reservationUsd=((Buffer.byteLength(prompt)+1024)*m.input+1500*m.output)/1e6;if(ledger.reservedUsd+reservationUsd>1)throw new Error('Cumulative ceiling');
+ const r={model:m.id,case:caseId,task:'cv-text-extraction',status:'pending',reservationUsd,prompt};ledger.reservedUsd+=reservationUsd;ledger.results.push(r);await save();
+ try{const start=Date.now();const res=await fetch('https://ai-gateway.vercel.sh/v1/chat/completions',{method:'POST',signal:AbortSignal.timeout(60000),headers:{authorization:`Bearer ${process.env.AI_GATEWAY_API_KEY}`,'content-type':'application/json'},body:JSON.stringify({model:m.id,messages:[{role:'user',content:prompt}],max_tokens:1500,reasoning:m.reasoning,response_format:objectMode?{type:'json_object'}:{type:'json_schema',json_schema:{name:'imported_profile',strict:true,schema:z.toJSONSchema(schema)}},providerOptions:{gateway:{only:[m.provider]}}})});const body=await res.json();r.elapsedMs=Date.now()-start;
+ if(!res.ok){r.status='http-error';r.httpStatus=res.status;r.errorSummary=String(body.error?.message??'').replaceAll(process.env.AI_GATEWAY_API_KEY,'[redacted]').slice(0,300);await save();if([401,402,403,429].includes(res.status))throw new Error('Stop: access, credit or rate limit');break;}
+ r.status='completed';r.output=body.choices?.[0]?.message?.content??'';r.usage=body.usage;const p=schema.safeParse(parseJson(r.output));r.schemaValid=p.success;
+ if(p.success){const v=p.data;const skills=Object.values(v.skills).flat().map(s=>s.toLowerCase()).sort();r.checks={identity:v.identity.full_name===c.name&&v.identity.location===c.location&&['email','phone','linkedin_url','github_url','portfolio_url'].every(k=>v.identity[k]===null),skills:JSON.stringify(skills)===JSON.stringify(c.skills.map(s=>s.toLowerCase()).sort()),sections:v.experience.length===c.experience&&v.projects.length===c.projects,levelFaithful:v.education.every(e=>e.level===null||c.text.toLowerCase().includes(e.level.toLowerCase())),educationStatus:c.id==='minimal'||v.education.every(e=>/en cours/i.test(e.degree??'')),languages:c.id==='minimal'?v.languages.length===0:c.languages.every(s=>v.languages.some(l=>l.includes(s))),dates:c.id==='compta'?v.experience[0]?.start==='2026-04'&&v.experience[0]?.end==='2026-06':true};r.automaticPass=Object.values(r.checks).every(Boolean);}
+ await save();console.log(`${m.id} ${c.id}: extraction checks=${r.automaticPass??false}`);
+ }catch(e){if(r.status==='http-error')throw e;r.status='request-error';r.errorType=e.name;await save();console.log(`${m.id}: ${e.name}; no retry`);}
+}

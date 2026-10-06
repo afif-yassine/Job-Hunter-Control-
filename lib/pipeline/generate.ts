@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { AI_NOT_CONFIGURED, aiConfigured, defaultAi, type AiCall } from "@/lib/ai";
+import { AI_NOT_CONFIGURED, aiConfigured, generateJson, modelFor, type AiCall } from "@/lib/ai";
 import { recordAiUsage } from "@/lib/ai-usage";
-import { normaliseGenerated, parseJson, type Generated } from "@/lib/generated";
+import { generated, parseJson, type Generated } from "@/lib/generated";
+import { selectWritingProofs, unsupportedWritingSkills, writingVersion, WRITING_RULES } from "@/lib/writing-context";
 import { queueQuestions, type QueueResult } from "@/lib/question-store";
 import { checkPlan } from "@/lib/plan";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
@@ -38,14 +39,26 @@ export function namePart(fullName: string | null | undefined): string {
  */
 export async function generateForJob(ctx: Ctx): Promise<StepResult> {
   const env = ctx.env ?? process.env;
+  if (env.AI_GENERATION_LEASES !== "1") return generateKit(ctx);
+  const lease = await ctx.supabase.rpc("claim_document_generation", { p_job_id: ctx.jobId, p_user_id: ctx.userId });
+  if (lease.error) return { status: 503, body: { error: "La réservation de génération est indisponible : aucun appel IA lancé." } };
+  if (!lease.data) return { status: 409, body: { error: "Ce dossier est déjà en cours de préparation.", code: "GENERATION_IN_PROGRESS" } };
+  try {
+    return await generateKit(ctx);
+  } finally {
+    await ctx.supabase.rpc("release_document_generation", { p_job_id: ctx.jobId, p_user_id: ctx.userId, p_token: lease.data });
+  }
+}
+
+async function generateKit(ctx: Ctx): Promise<StepResult> {
+  const env = ctx.env ?? process.env;
   const { supabase, userId, jobId: id } = ctx;
-  if (!ctx.ai && !aiConfigured(env)) return { status: 503, body: { error: AI_NOT_CONFIGURED } };
   const [{ data: job }, { data: profile }] = await Promise.all([
     supabase.from("jobs").select("*").eq("id", id).eq("user_id", userId).single(),
     supabase.from("candidate_profiles").select("*").eq("user_id", userId).maybeSingle(),
   ]);
   if (!job || !profile) return { status: 404, body: { error: "Offre ou profil vérifié introuvable" } };
-  if (job.status !== "ANALYZED")
+  if (!["ANALYZED", "WAITING_APPROVAL"].includes(job.status))
     return { status: 409, body: { error: "Analysez l’offre avant de générer les documents." } };
   if (job.gone_reason)
     return {
@@ -70,6 +83,27 @@ export async function generateForJob(ctx: Ctx): Promise<StepResult> {
     }
   }
 
+  const offer = { company: job.company, title: job.title, contract_type: job.contract_type, location: job.location, description: job.description };
+  const version = writingVersion(userId, profile.profile, profile.truth_ledger, offer, modelFor("writing", env));
+  const { data: existing } = await supabase.from("documents").select("*").eq("user_id", userId).eq("job_id", id).eq("generation_prompt", version);
+  if (existing?.some(d => d.kind === "TAILORED_CV")) {
+    let { data: application } = await supabase.from("applications").select("id").eq("job_id", id).eq("user_id", userId).maybeSingle();
+    if (!application) {
+      const repair = await supabase.from("applications").insert({ user_id: userId, job_id: id, status: "WAITING_APPROVAL", platform: job.source_platform }).select("id").single();
+      if (repair.error) return { status: 503, body: { error: "Les documents sont sauvegardés, mais le suivi n’a pas pu être créé. Réessaie : aucune nouvelle génération IA n’est nécessaire." } };
+      application = repair.data;
+    }
+    return { status: 200, body: { documents: existing, applicationId: application?.id, cached: true } };
+  }
+  if (!ctx.ai && !aiConfigured(env)) return { status: 503, body: { error: AI_NOT_CONFIGURED } };
+  let proofs;
+  try {
+    proofs = selectWritingProofs(profile.profile, profile.truth_ledger, `${job.title}\n${job.description ?? ""}`);
+  } catch (error) {
+    return { status: 400, body: { error: error instanceof Error ? error.message : "Profil invalide." } };
+  }
+  if (!proofs.length) return { status: 409, body: { error: "Confirme au moins une réalisation, formation ou compétence dans ton profil avant de générer.", code: "PROFILE_EVIDENCE_REQUIRED" } };
+
   // Free plan: a set number of new kits per month (rewriting this offer's kit is free).
   const plan = await checkPlan(supabase, userId, id, env, new Date(), ctx.automatic === true);
   if (!plan.ok) return { status: plan.status, body: plan.body };
@@ -80,28 +114,24 @@ export async function generateForJob(ctx: Ctx): Promise<StepResult> {
   let parsed: Generated | null = null;
   let model = "";
   try {
-    const prompt = `Génère le contenu d'un CV ATS français d'une page et, si utile, une lettre de motivation. Format de cover_letter : texte français prêt à envoyer, paragraphes séparés par UNE LIGNE VIDE, dans cet ordre : 1) « Objet : Candidature au poste de … » ; 2) « Madame, Monsieur, » ; 3) trois paragraphes courts (pourquoi cette entreprise et ce poste ; ce que j'apporte, avec deux faits vérifiés du PROFIL ; disponibilité) ; 4) une formule de politesse. Ni coordonnées, ni date, ni signature (ajoutées automatiquement). 170 à 240 mots. Utilise exclusivement les faits du PROFIL et du REGISTRE. Sélectionne et reformule, sans inventer. Toute donnée légale, immigration, salaire numérique, handicap, casier, certification incertaine ou information absente devient unresolved_questions. Retourne uniquement un objet JSON avec cv {title,summary,experience[{heading,bullets}],projects[{heading,bullets}],skills[],education[],languages}, cover_letter string|null, unresolved_questions[{question,category}]. Les tableaux peuvent être vides si aucune information vérifiée n'existe.\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify({
-      company: job.company,
-      title: job.title,
-      contract_type: job.contract_type,
-      location: job.location,
-      description: job.description,
-      analysis: job.score_breakdown,
-    })}`;
-    const result = await (ctx.ai ?? defaultAi)(prompt, "writing");
+    const prompt = `${WRITING_RULES}\nDans cv.skills, reprends uniquement les intitulés exacts des compétences et technologies des preuves, un intitulé par élément, sans niveau de maîtrise ajouté.\nPREUVES=${JSON.stringify(proofs)}\nOFFRE=${JSON.stringify(offer)}`;
+    const result = await (ctx.ai ?? ((p, task) => generateJson(p, task, env, { strictKit: true })))(prompt, "writing");
     await recordAiUsage(supabase, userId, "writing", result);
     model = result.model;
-    parsed = normaliseGenerated(parseJson(result.text || ""));
+    const output = generated.safeParse(parseJson(result.text || ""));
+    parsed = output.success ? output.data : null;
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Erreur inconnue Gemini";
     console.error("Document generation failed", detail);
-    return { status: 502, body: { error: `Génération Gemini impossible : ${detail}` } };
+    return { status: 502, body: { error: `Génération IA impossible : ${detail}` } };
   }
   if (!parsed)
     return {
       status: 502,
-      body: { error: "Documents Gemini invalides : le modèle n’a pas retourné un CV exploitable." },
+      body: { error: "Documents IA invalides : le modèle n’a pas retourné un CV exploitable." },
     };
+  if (unsupportedWritingSkills(parsed.cv, proofs).length)
+    return { status: 502, body: { error: "Le CV contient une compétence non justifiée par les preuves : aucun document enregistré. Révise ton profil avant de réessayer.", code: "UNSUPPORTED_SKILL" } };
 
   const base = safeFilename(`${namePart(profile.full_name)}_${job.company}_${job.title}`);
   const docs: Record<string, unknown>[] = [
@@ -111,8 +141,8 @@ export async function generateForJob(ctx: Ctx): Promise<StepResult> {
       kind: "TAILORED_CV",
       filename: `CV_${base}.pdf`,
       mime_type: "application/pdf",
-      content_text: JSON.stringify(parsed.cv),
-      generation_prompt: "verified-profile-v1",
+      content_text: JSON.stringify({ ...parsed.cv, provenance: { version, proofs } }),
+      generation_prompt: version,
       model,
       approved: false,
     },
@@ -124,8 +154,8 @@ export async function generateForJob(ctx: Ctx): Promise<StepResult> {
       kind: "COVER_LETTER",
       filename: `Lettre_${base}.pdf`,
       mime_type: "application/pdf",
-      content_text: JSON.stringify({ letter: parsed.cover_letter }),
-      generation_prompt: "verified-profile-v1",
+      content_text: JSON.stringify({ letter: parsed.cover_letter, provenance: { version, proofs } }),
+      generation_prompt: version,
       model,
       approved: false,
     });
