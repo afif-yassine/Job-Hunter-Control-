@@ -1,108 +1,316 @@
 # LeBonTaf — Product backlog
 
-Mise à jour : 5 octobre 2026. Cette page porte les nouvelles décisions de refonte ; le [backlog complet du 3 octobre](archive/PRODUCT-BACKLOG-2026-10-03.txt) conserve les autres travaux et leurs cases historiques sans modification. Une case historique cochée ne remplace pas une vérification actuelle ; voir le [rapport de vérification](VERIFICATION-2026-10-04.md).
+Référence principale du projet — 6 octobre 2026.
 
-## Décisions confirmées
+Ce fichier reprend le backlog global fourni par le propriétaire depuis Claude. Il remplace le document centré sur le design, conservé dans [l'archive](archive/PRODUCT-BACKLOG-DESIGN-2026-10-06.md). La [copie originale](BACKLOG-CLAUDE-2026-10-06.md) et la [passation](PASSATION-CLAUDE-2026-10-06.md) sont conservées.
 
-### Première livraison demandée le 5 octobre
+## Vérifications récentes : ces constats priment sur les états historiques ci-dessous
 
-Le propriétaire demande désormais de construire **uniquement la page d’accueil**, puis de la publier sur GitHub et Vercel pour évaluer le logo animé, les polices, l’identité et les deux thèmes avant toute extension à l’application.
+### Correction du rattrapage — 6 octobre 2026
 
-- [x] Première implémentation de l’accueil : symbole animé « Le Déclic », offre de démonstration stage/alternance, explication du parcours, CV, futur suivi et FAQ.
-- [x] Révision après retour sur l’aperçu : palette de l’ancien site (ivoire, bordeaux, or), ouverture en deux volets évoquant un nouveau chapitre, logo plus expressif, révélations au défilement et bouton pour revoir l’introduction.
-- [x] Thème clair par défaut et thème sombre mémorisé ; alias public `/accueil` pour consulter la vitrine même connecté.
-- [x] Vérification finale à l’écran et publication GitHub/Vercel de cette version : code `a9827338`, CI verte, production prête et contrôles navigateur réussis sur lebontaf.com aux cinq largeurs de 320 à 1440 px.
-- [x] Retour du propriétaire sur l’identité proposée (5 octobre) : il garde le logo animé, le slogan « Ton alternance. Ton stage. Ton bon départ. » et l’idée d’une porte qui s’ouvre, mais choisit le thème « tableau d’enquête » (liège, punaises, fils rouges) pour tout le site. L’accueil en volets bordeaux de `a9827338` est remplacé ; `DESIGN.md` décrit cette version précédente.
+- [x] Reproduire et corriger le cas où le rattrapage des embeddings consomme le temps nécessaire aux résumés. Une réserve de 20 secondes est maintenant prévue pour le lecteur partagé ; les appels déjà en cours peuvent dépasser cette réserve.
+- [x] Rendre visible une erreur de lecture du catalogue au lieu de retourner une file vide ; tests de régression ajoutés.
+- [x] Contrôles TypeScript et lint réussis ; 147 tests réussis, aucun échec, un test LaTeX ignoré. Compilation et livraison en cours.
+- [ ] Confirmer en production que les résumés progressent et terminer le rattrapage ; dernier contrôle avant correction : 1 964 offres vectorisées sur 3 851 ouvertes, 0 résumé, 3 849 textes admissibles.
+- [ ] Vérifier le classement avec un compte connecté. Le catalogue contient déjà 351 stages ouverts au contrôle du 6 octobre ; le constat historique de 17 stages ci-dessous est dépassé.
 
-Cette première livraison est publiée et vérifiée. Voir le [brief de l’accueil](HOME-DESIGN-BRIEF.md), le [rapport de vérification](HOME-VERIFICATION-2026-10-05.md) et `DESIGN.md` pour la direction implémentée. Les lots globaux ci-dessous restent ouverts car cette livraison ne couvre pas tout le produit.
 
-- Repenser l’ensemble du style autour de LeBonTaf, de la recherche de stages et d’alternances, de l’aide IA, des CV adaptés et du suivi des candidatures.
-- Viser une identité premium et singulière, avec des animations utiles et mesurées.
-- Conserver le caractère typographique apprécié ; sortir de la métaphore du vieux livre et de la bibliothèque.
-- Proposer les thèmes clair et sombre, avec le clair par défaut.
-- Préparer les choix et le plan avant de commencer l’implémentation visuelle.
+- La version de Claude jusqu'à `995f185e` est intégrée et publiée. La reprise documentaire `0e7f4eac` a une CI GitHub réussie et un déploiement Vercel READY ; le contact `support@lebontaf.com` est vérifié sur lebontaf.com.
+- TypeScript, lint et compilation réussis ; 145 tests réussis, aucun échec, un test LaTeX ignoré faute de pdflatex.
+- Embeddings : contrôle du 6 octobre, 1 664 offres ouvertes vectorisées sur 3 851, et 0 résumé partagé. La mention « 0 offre sur 3 940 » ci-dessous est historique. Le rattrapage reste à terminer.
+- Le code du Sprint 6 est en production ; la vérification complète du suivi avec un compte connecté reste à faire. Le déploiement seul ne termine pas le composant.
+- Connexion : trois onglets et Google présents, page contrôlée à 390 px sans débordement horizontal. Demande de réinitialisation acceptée et e-mail reçu ; modèle Supabase encore en anglais. SMTP, expéditeur et réinitialisation complète restent à vérifier.
+- Les coûts et affirmations réglementaires hérités du document sont à revalider avant une décision de paiement ou de lancement.
 
-## Direction proposée — décisions ouvertes
+Ordre de reprise : terminer la vérification de cette livraison et le rattrapage du catalogue ; configurer les e-mails ; sélectionner les preuves pertinentes du CV pour l'écriture (RAG) ; vérifier quotas et alertes de coût. Les autres sprints conservent leur périmètre.
 
-La direction révisée après retour utilisateur est un nouveau chapitre professionnel : titres expressifs, informations d’offres immédiatement lisibles, aperçu concret du produit et ouverture animée inspirée du site précédent. La métaphore de chapitre est explicitement appréciée ; l’accueil doit néanmoins rester immédiatement identifiable comme une plateforme de recherche de stage/alternance.
+Le document sur claude.ai et ce fichier ne se synchronisent pas automatiquement. Ce fichier est la référence du travail dans le dépôt. Les cases ci-dessous reprennent celles transmises par le propriétaire, sans les déclarer toutes vérifiées.
 
-- Palette révisée à la demande du propriétaire : ivoire/parchemin, bordeaux et or ; brun encre pour le sombre. À évaluer sur l’accueil déployé avant généralisation.
-- Logo de la première proposition : mot-symbole LeBonTaf et symbole animé « Le Déclic », évoquant la rencontre profil/offre. À évaluer sur l’accueil déployé avant généralisation.
-- Conserver les familles actuelles comme point de départ : IM Fell English pour quelques titres, Instrument Sans pour l’interface ; réserver la monospace aux informations qui la justifient. Les tailles et usages seront revus pour éviter l’effet livre.
-- L’accueil constitue maintenant le terrain d’essai concret de cette identité. Les autres écrans restent dans leur design actuel jusqu’au retour du propriétaire.
+---
 
-## Priorité design — Sprint 4 révisé
+# Job Hunter — Product backlog
 
-Cette nouvelle direction remplace uniquement l’ancienne tâche « Nouveau design JinnJob — vieux livre, lampe animée ». Les travaux fonctionnels du sprint 4 restent au backlog. Toutes les cases ci-dessous sont à faire.
+Oct 3, 2026 · @Someone
 
-### Lot 1 — identité et système commun
+Coché = livré dans le code. Je coche moi-même chaque case quand l’étape est faite.
 
-- [ ] **DES-01 — Identité LeBonTaf.** Finaliser palette et logo, puis produire mot-symbole, symbole compact, favicon et variantes clair/sombre. Vérifier la lisibilité en petit format. Une recherche juridique de disponibilité de marque reste un travail distinct.
-- [ ] **DES-02 — Système visuel.** Définir couleurs, contrastes, typographie, espacements, bordures, boutons, champs, badges, cartes d’offre, dialogues et états de chargement. Le marketing peut être expressif ; l’espace de travail privilégie la lecture et l’action.
-- [ ] **DES-03 — Thèmes.** Première visite en clair, bascule explicite clair/sombre et mémorisation du choix. Vérifier les deux thèmes sur toutes les surfaces, sans flash gênant au chargement ni perte de contraste.
+## Méthode : agile, pas cycle en V
 
-### Lot 2 — accueil et entrée dans le produit
+On travaille en **agile** (un Scrum léger) : des sprints courts, une version mise en ligne et vérifiée à la fin de chacun, et un backlog qu’on réordonne selon ce qu’on apprend. C’est bien ce que tu as fait depuis le début.
 
-- [ ] **DES-04 — Accueil.** Remplacer l’ouverture du livre par une introduction directement utilisable. Proposition de titre : « Ton prochain stage ou ton alternance commence ici. » Expliquer immédiatement la recherche d’offres, l’adaptation du CV et de la lettre par IA, puis le suivi selon sa disponibilité réelle.
-- [ ] **DES-05 — Preuve par le produit.** Composer un aperçu de carte d’offre, de compatibilité avec le profil et de document adapté. Tout exemple inventé est identifié comme démonstration. Aucun compteur, témoignage ni taux de réussite fictif.
-- [ ] **DES-06 — Parcours d’entrée.** Rendre les actions principales explicites : trouver des offres et préparer son profil/CV. Relier les boutons aux parcours réellement disponibles, avec passage par la connexion si nécessaire. Revoir connexion, inscription, récupération de compte et accompagnement du premier usage sans changer les mécanismes d’authentification.
+|  | Cycle en V | Agile (notre méthode) |
+| --- | --- | --- |
+| Plan | Tout est spécifié au départ | Backlog priorisé, revu à chaque sprint |
+| Livraison | Une seule, à la fin | Une version utilisable à chaque sprint |
+| Changement en route | Coûteux : on remonte le V | Prévu : on déplace des cases du backlog |
+| Tests | Après le développement (branche droite du V) | À chaque envoi (CI) et en production à chaque sprint |
+| Quand on voit le produit | À la fin | Dès le premier sprint |
+| Adapté à | Besoin figé et contrat fixe | Produit qui cherche encore ses utilisateurs |
 
-### Lot 3 — tout l’espace étudiant
+« Parfait dès le début », en agile, veut dire : chaque composant du **socle essentiel** respecte la Définition de « terminé » avant l’ouverture au public. Tout rendre parfait d’un coup, avant de montrer quoi que ce soit, ce serait revenir au cycle en V. La règle des prochains sprints : finir le socle avant d’ajouter de nouvelles fonctions.
 
-- [ ] **DES-07 — Structure de l’application.** Harmoniser navigation, en-têtes et actions sur Accueil, Offres, Documents, Questions, Candidatures, Activité et Réglages. Adapter la navigation au mobile sans cacher l’action principale.
-- [ ] **DES-08 — Offres.** Donner priorité au métier, à l’entreprise, au contrat, au lieu, à la date et à la source. Clarifier filtres existants, classement selon le CV, fiche détaillée, actions de préparation et états « expirée », « aucune offre » et « erreur ».
-- [ ] **DES-09 — Profil et documents.** Simplifier visuellement l’import du CV, la vérification du profil, la préparation des CV/lettres et les retours de génération. Afficher clairement chargement, succès, erreur et limites. Ne pas faire passer l’historique de versions pour une fonction déjà livrée.
-- [ ] **DES-10 — Candidatures.** Harmoniser le suivi existant et préparer la présentation du futur suivi complet. Les statuts et actions visibles doivent correspondre aux données réellement persistées. Toute capacité future reste indiquée « Bientôt » tant que son parcours n’est pas terminé.
-- [ ] **DES-11 — Surfaces secondaires.** Appliquer la même identité à l’activité, aux réglages, à la feuille de route, à l’administration, aux pages légales et aux écrans d’erreur ou « Bientôt ». Une éventuelle présentation recruteur reste cohérente avec son état réel.
+- **Sprint** : 1 à 2 semaines, un objectif en une phrase.
+- **Planification** : on choisit les cases du sprint, le socle en premier.
+- **Revue** : mise en ligne, vérification en production, cases cochées ici.
+- **Rétrospective** : ce qui a coincé, et ce qu’on change au sprint suivant.
 
-### Lot 4 — animation, accessibilité et vérification
+&#91;embedded content: cycle en V et boucle agile\]
 
-- [ ] **DES-12 — Signature animée.** Prévoir une courte séquence d’accueil montrant profil → offre compatible → CV adapté, et une interaction discrète du logo. Le contenu et les boutons restent accessibles pendant l’animation. Éviter les boucles permanentes pendant la lecture.
-- [ ] **DES-13 — Mouvements de l’interface.** Utiliser des transitions brèves pour filtres, panneaux, progression et confirmations. Privilégier opacité et déplacement, éviter les changements de mise en page coûteux. Respecter `prefers-reduced-motion`, le clavier et les écrans tactiles ; aucun fonctionnement ne dépend du survol.
-- [ ] **DES-14 — Vérifications.** Contrôler les thèmes aux formats mobile, tablette et bureau ; absence de débordement dès 320 px, focus visible, contraste du texte courant d’au moins 4,5:1, libellés accessibles et zones tactiles confortables. Vérifier également les états vides, en cours, en erreur et les textes longs.
-- [ ] **DES-15 — Parcours et livraison.** Vérifier accueil → connexion → profil/CV → offres → préparation de documents → suivi disponible. Exécuter les contrôles pertinents du dépôt, puis une revue visuelle et fonctionnelle. Après mise en ligne autorisée, vérifier en production avant de cocher les tâches livrées.
+En V, on ne voit le produit qu’à la livraison finale ; en agile, chaque tour de boucle se termine par une version en ligne qu’on vérifie.
 
-## Travaux fonctionnels conservés séparément
+## Définition de « terminé »
 
-Le changement d’apparence n’implémente pas à lui seul ces fonctions déjà prévues :
+Une case n’est cochée que si tout ce qui suit est vrai. C’est notre définition de « parfait ».
 
-- [ ] Suivi complet des candidatures, confirmation « As-tu postulé ? », rappels et relances.
-- [ ] Dossier par offre, journal, notes, classement, annulation et corbeille.
-- [ ] Historique et comparaison des versions de CV et de lettre.
-- [ ] Filtres avancés et recherches enregistrées avec alertes.
-- [ ] Extension Chrome, préparation d’entretien et intégration des réponses Gmail.
+- Les tests automatiques, le lint et la compilation passent, et la CI GitHub est verte.
+- C’est vérifié à l’écran, sur ordinateur et sur mobile, sans rien qui déborde.
+- Chaque erreur s’affiche en français clair ; rien ne plante en silence.
+- Chaque compte ne voit que ses données, et ce qui coûte a une limite de requêtes.
+- Le coût IA est mesuré, et rien n’est dépensé sur une offre retirée.
+- C’est utilisable par tous : vrais boutons, texte lisible, animations coupées si l’appareil le demande.
+- C’est mis en ligne et vérifié en production (Vercel, Supabase).
 
-Les autres tâches du backlog historique restent inchangées. Cette mise à jour ne revalide pas leurs états, ne change pas le périmètre de collecte et ne décide pas d’un paiement ou d’un envoi automatique.
+## Le socle essentiel (MVP)
 
-## Ordre de travail et définition de terminé
+Ces 12 composants doivent être « terminés » avant d’ouvrir l’appli à d’autres étudiants : 4 le sont et 8 sont à finir. Le reste du backlog attend.
 
-1. Construire et déployer la première proposition sur l’accueil uniquement, à la demande du propriétaire.
-2. Recueillir son retour sur l’identité, le logo et les thèmes visibles sur cette page.
-3. Après ce retour, étendre le système aux écrans d’entrée.
-4. Étendre le système à l’espace étudiant, puis aux surfaces secondaires.
-5. Ajuster les animations, vérifier les parcours et préparer la livraison.
+| Composant | Pourquoi il est essentiel | État | Ce qui manque |
+| --- | --- | --- | --- |
+| Connexion et comptes | Sans compte, rien ne commence | À finir | E-mails de connexion envoyés depuis lebontaf.com (SMTP personnalisé) pour que tout le monde reçoive le lien, protection des mots de passe divulgués |
+| Import du CV | Tout le reste part du profil | Fait | — |
+| Catalogue d’offres (collecte 2 fois par jour) | C’est ce que l’étudiant vient chercher | À finir | Plus de stages, logo Adzuna, plan Supabase au-delà de 500 Mo |
+| Recherche et filtres | Trouver vite la bonne offre | À finir | Filtres avancés, recherches enregistrées |
+| Classement selon le CV | Les bonnes offres en premier | À finir | Embeddings jamais calculés en production (0 offre sur 3 940) : classement à refaire, voir Sprint 7 |
+| CV et lettre adaptés | La promesse principale du produit | À finir | RAG sur le registre de vérité (rien d’inventé) |
+| Suivi des candidatures | Savoir où on en est | À finir | Mise en ligne du Sprint 6 (parcours de chaque offre, Mon suivi) |
+| Design LeBonTaf | La première impression, sur mobile aussi | Fait | — |
+| Sécurité et limites | Protéger les données et le budget | À finir | Protection des mots de passe divulgués (réglage Supabase) |
+| Coûts IA maîtrisés | Ne pas payer plus que prévu | À finir | Alertes de dépassement, offre gratuite limitée |
+| Pages légales et RGPD | Obligatoire avant d’ouvrir au public | Fait | — (mentions de l’éditeur à mettre à jour avec la micro-entreprise avant de facturer) |
+| Tests et mise en ligne | Chaque version est fiable | Fait | — |
 
-Une tâche reste ouverte tant que son résultat n’est pas implémenté et vérifié. Les tests et la compilation ne remplacent pas la revue à l’écran ; une belle maquette ne remplace pas une fonction connectée aux données. Les critères de livraison du backlog historique restent applicables.
+## Périmètre décidé
 
-## Reprise de Claude — 6 octobre 2026
+On ne collecte que les **stages, alternances et CDD** des métiers de l’**informatique, du numérique et de la bureautique**, partout en France. L’étudiant choisit ses catégories au lieu de taper des mots-clés.
 
-Sources conservées : [passation](PASSATION-CLAUDE-2026-10-06.md) et [backlog Claude](BACKLOG-CLAUDE-2026-10-06.md). Ce sont des documents transmis par le propriétaire : leurs cases et affirmations historiques doivent être confrontées au code et à la production.
+| Catégorie | Exemples de métiers |
+| --- | --- |
+| Développement web et logiciel | Développeur front, back, full stack, Java, Python |
+| Développement mobile | Développeur iOS, Android, Flutter |
+| DevOps et cloud | DevOps, SRE, ingénieur cloud |
+| Systèmes, réseaux et support | Technicien support, admin systèmes et réseaux, helpdesk |
+| Data et IA | Data analyst, data engineer, data scientist, ML |
+| Cybersécurité | Analyste SOC, pentester, technicien sécurité |
+| Test et qualité | Testeur, QA, automatisation des tests |
+| Projet, produit et conseil SI | Chef de projet digital, Product Owner, consultant AMOA |
+| Design numérique | UX/UI designer, webdesigner |
+| Marketing digital | SEO, community manager, growth, webmarketing |
+| Bureautique et assistanat | Assistant administratif, secrétariat, gestion administrative |
 
-- [x] Lire la passation et récupérer le dernier commit du bundle (`995f185e`) sans écraser les fichiers locaux. Un seul commit manquait ; les autres améliorations étaient déjà présentes.
-- [x] Vérifier les tests de cette version : 145 réussis, 1 ignoré (pdflatex absent), aucune erreur.
-- [x] Vérifier TypeScript et lint : aucune erreur.
-- [x] Vérifier en production les trois onglets de connexion et Google ; demande de réinitialisation acceptée, réception de l'e-mail confirmée par le propriétaire. Le modèle reçu reste celui de Supabase, en anglais. Le code accepte les anciens liens PKCE, mais le nouveau mot de passe n'a pas été saisi/testé.
-- [x] TypeScript, lint, tests et compilation de production réussis ; dernier commit de Claude et documents de reprise poussés sur `main`.
-- [ ] Vérifier la fin du déploiement Vercel et la CI GitHub de cette reprise.
-- [ ] Vérifier à l'écran la connexion sur ordinateur et mobile, puis inscription et réinitialisation avec une adresse de test autorisée.
-- [ ] Vérifier le SMTP et les modèles d'e-mail avant de déclarer la connexion terminée.
-- [ ] Terminer le rattrapage du catalogue : contrôle réel du 6 octobre, 3 851 offres ouvertes, 1 664 vectorisées et 0 résumé partagé. Aucun appel `reading` enregistré dans les dernières 24 heures ; cause à établir.
-- [ ] Après la vérification de cette livraison : sélectionner les preuves pertinentes du profil pour les CV et lettres (RAG), puis vérifier les quotas et les alertes de coût.
+Un champ « Autre métier » reste possible pour ce qui n’entre dans aucune case. Contrats exclus de la collecte : CDI, intérim, freelance.
 
-Le document hébergé sur claude.ai n'est pas synchronisé automatiquement avec ces fichiers.
+## Déjà fait (avant le Sprint 1)
 
-## Guides de conception et passage de relais
+- [x] Comptes, connexion et base Supabase avec accès limité à ses propres données
+- [x] Recherche multi-sources : France Travail, JSearch, Adzuna, Jooble
+- [x] Pages carrière des entreprises (Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee)
+- [x] Découverte automatique des entreprises à partir des liens des offres
+- [x] Dédoublonnage (même lien, même empreinte, texte proche) et « Déjà postulé ailleurs »
+- [x] Offres suspectes mises de côté avant toute dépense IA
+- [x] Lecture du texte complet des annonces avant l’analyse
+- [x] Score de compatibilité avec le profil (Gemini)
+- [x] CV et lettre adaptés : PDF, LaTeX, modification par une phrase
+- [x] Questions des formulaires gardées et réutilisées
+- [x] Recherche automatique sur le serveur (cron Vercel) et worker Railway
+- [x] Santé des sources, budgets gratuits et alertes dans la page Admin
+- [x] France Travail : marché du travail et taux d’accès à l’emploi
+- [x] Clés des sources saisies depuis l’appli (Réglages > Sources)
 
-Référence demandée : [sélection design d’Atlas](https://atlas-room.com/t/design). Guides consultés : [Impeccable](https://github.com/pbakaus/impeccable), [Taste](https://github.com/leonxlnx/taste-skill) et [animations d’Emil Kowalski](https://github.com/emilkowalski/skills). Ils orientent le travail ; les décisions du propriétaire restent prioritaires.
+## Sprint 1 — Fondations solides (en cours)
 
-Pour reprendre avec Cowork ou Codex : lire `PRODUCT.md`, cette page, le brief de l’accueil et les rapports de vérification, puis inspecter les changements Git. Les conversations ne se synchronisent pas automatiquement. La première implémentation concerne uniquement l’accueil ; ne pas étendre l’identité aux autres écrans avant le retour du propriétaire.
+Objectif : une recherche ne coûte plus par compte, aucune erreur cachée, aucune dépense sur une offre morte.
+
+- [x] Sauvegarde de la base avant les changements de structure
+- [x] La bonne alternance branchée, mais éteinte : leur licence interdit l’usage commercial sans accord écrit
+- [x] Chaque erreur s’affiche, une partie qui plante ne bloque plus le reste
+- [x] Cartes « Bientôt » et page Feuille de route dans l’appli
+- [x] Catalogue d’offres commun : chaque offre stockée une seule fois
+- [x] Cache partagé par requête, insensible aux majuscules, accents, ordre des mots et synonymes
+- [x] Offres retirées de la page carrière fermées automatiquement
+- [x] Offres plus vues depuis 21 jours expirées
+- [x] Bouton « Offre plus disponible ? », fermeture pour tous après 10 signalements
+- [x] Filtre « Plus disponibles », aucune analyse ni génération sur une offre morte
+- [x] Nouveaux comptes et nouvelles recherches remplis depuis le catalogue, sans appel aux sites
+- [x] Villes de banlieue reconnues sans numéro de département
+- [x] Mise en ligne de ces changements (deploy-job-hunter.bat) et vérification sur Vercel
+- [x] Fonctions du budget et du journal des sources réservées au serveur (faille relevée par Supabase)
+- [x] En-têtes de sécurité du site (anti-iframe, HTTPS forcé, permissions bloquées)
+- [x] Limite de requêtes par compte sur les pages qui coûtent (recherche, analyse, génération, compteurs)
+- [x] Politique de sécurité du contenu (CSP) avec nonces
+- [x] Coût IA suivi par compte dans la page Admin
+- [x] Tests automatiques à chaque envoi sur GitHub (CI)
+
+## Sprint 2 — Collecte plateforme et catégories
+
+Objectif : la plateforme collecte 2 fois par jour pour tout le monde, l’étudiant coche ses catégories et voit tout de suite les offres.
+
+- [x] Vérifier les conditions d’utilisation de chaque source pour un catalogue partagé (France Travail, Adzuna, Jooble, JSearch, La bonne alternance)
+- [x] Liste des catégories avec leurs codes métier ROME et leurs mots de recherche
+- [x] Collecte France Travail par région et par métier, alternance et CDD (toute la France, découpée par département au-delà de 3 150 offres)
+- [x] Collecte des pages carrière connues, toutes entreprises confondues
+- [x] Collecte Adzuna sur les grandes villes, dans le budget gratuit
+- [x] Collecte lancée à 6 h et 14 h, par tranches de 45 s qui reprennent où elles s’arrêtent (limite de 60 s de Vercel)
+- [x] Chaque offre rangée dans une catégorie et un type de contrat (stage, alternance, CDD)
+- [x] Choix des catégories par l’étudiant, avec le nombre d’offres près de chez lui
+- [x] Champ « Autre métier » avec recherche à la demande ; une catégorie déjà bien couverte par la collecte (20 offres et plus) n’est plus recherchée compte par compte
+- [x] Vérification que l’offre est toujours en ligne juste avant de créer le CV et la lettre
+- [ ] Plan Supabase adapté au volume (le plan gratuit s’arrête à 500 Mo)
+- [x] Mentions obligatoires sur chaque offre : « Source : France Travail » avec lien vers la licence, « Jobs by Adzuna »
+- [x] Offres France Travail retirées fermées et leur texte effacé dans le catalogue après chaque collecte complète
+- [x] Suivi de la collecte dans Admin, avec le bouton « Avancer la collecte »
+- [x] Première collecte réelle vérifiée : 134 tâches sans erreur, 4 623 offres France Travail lues, 101 départements, 3 588 offres ouvertes au catalogue
+- [ ] Logo officiel Adzuna à côté de « Jobs by Adzuna » (exigé par leurs conditions)
+- [x] Effacer aussi le texte des offres France Travail retirées dans les listes des comptes (licence, article 7)
+- [x] Offres enregistrées avant les catégories reclassées automatiquement à chaque tranche de collecte
+- [ ] Plus de stages : France Travail n’en publie pas, la première collecte n’en a trouvé que 17 (Adzuna du matin et pages carrière à renforcer)
+
+## Sprint 3 — CV importé et classement intelligent
+
+Objectif : l’étudiant dépose son CV une fois, et toutes les offres sont classées pour lui.
+
+- [x] Import du CV en PDF une seule fois, données gardées pour tous les CV adaptés
+- [x] Choix des catégories proposé d’après le CV
+- [x] Activer pgvector dans Supabase
+- [x] Embedding de chaque offre, calculé une seule fois et partagé
+- [x] Classement de toutes les offres ouvertes selon le profil
+- [ ] RAG sur le registre de vérité du profil pour le CV et la lettre (rien d’inventé)
+- [x] Résumé court de chaque offre (« En bref »), écrit à la première analyse et partagé avec tous
+- [ ] Catégorie des offres affinée par embeddings (« Ingénieur plateforme » → DevOps)
+
+## Sprint 4 — Design et suivi des candidatures
+
+Objectif : une appli attirante et simple, où l’étudiant suit chaque candidature jusqu’à la réponse.
+
+- [x] Maquette du design validée : accueil, connexion, espace étudiant, pistes, registre, admin, recruteur, écran « Bientôt »
+- [x] Nouveau design LeBonTaf dans le site (vieux livre et moderne, logo lampe animé, animations Framer Motion), thème clair et sombre, adapté au mobile (accueil et connexion faits)
+- [x] Filtres et catégories dans la liste des offres
+- [ ] Historique et comparaison des versions de CV et de lettre
+- [x] Registre des candidatures en tiroirs : repérées, prêtes, envoyées, entretiens, réponses, classées
+- [ ] Extension Chrome pour enregistrer une candidature faite sur un autre site
+- [x] Relances proposées après quelques jours sans réponse
+- [ ] Fiche de préparation d’entretien pour chaque offre
+- [x] Question « As-tu envoyé ta candidature ? » au retour d’une annonce, et badge « déjà envoyée » dans les offres
+- [x] Rappels du jour : candidature prête mais pas envoyée depuis 3 jours, relance après 7 jours sans réponse, entretien à venir
+- [x] Dossier de chaque offre : résumé « En bref », journal daté, CV et lettre, notes libres
+- [ ] Classer ou supprimer une offre, avec annulation immédiate et corbeille de 30 jours
+- [ ] Filtres avancés : nombre d’offres par filtre, ressemblance avec le CV, date de publication, région, onglets (nouvelles, gardées, déjà postulé, masquées), sélection multiple
+- [ ] Recherches enregistrées avec alerte de nouvelles offres
+- [ ] Tableau d’enquête : le CV relié aux offres, avec les compétences en commun
+
+## Sprint 5 — Connexion, légal et marque LeBonTaf
+
+Objectif : un compte facile à créer, des pages légales en règle et un nom de marque propre avant l’ouverture au public.
+
+- [x] Connexion par Google et par lien magique (e-mail), sans mot de passe
+- [x] Pages légales : confidentialité, mentions légales, conditions d’utilisation
+- [x] Export et suppression du compte dans Réglages (RGPD)
+- [x] Application Google publiée en production
+- [x] Nouveau nom LeBonTaf et domaine lebontaf.com branchés (Vercel, Supabase, Google Cloud)
+- [ ] Liens de connexion envoyés depuis lebontaf.com (SMTP personnalisé, modèles d’e-mail au format token\_hash)
+- [ ] Adresse contact@lebontaf.com redirigée vers Gmail
+- [ ] Écran de connexion Google au nom LeBonTaf (validation de la marque : Search Console et logo)
+- [x] Refonte « tableau d’enquête » : porte d’entrée animée, logo animé, accueil, connexion, pages légales et espace étudiant (code prêt et fusionné avec le travail de Codex, mise en ligne en attente)
+
+## Sprint 6 — Suivre chaque offre jusqu’à l’entretien (en cours)
+
+Objectif : pour chaque offre, l’étudiant voit d’un coup d’œil où il en est : vue ou pas, CV et lettre prêts ou pas, envoyée ou pas, entretien, réponse. Demande du 5 octobre.
+
+| Étape | Quand l’offre y passe | Action proposée |
+| --- | --- | --- |
+| Nouvelle | Trouvée par la collecte, jamais ouverte | Ouvrir l’offre |
+| Vue | Ouverte au moins une fois | Créer le CV et la lettre, ou l’écarter |
+| Dossier prêt | CV et lettre créés | Relire, puis postuler sur le site de l’offre |
+| Envoyée | L’étudiant confirme « J’ai postulé » | Relancer après 7 jours sans réponse |
+| Entretien | Date d’entretien saisie | Préparer l’entretien |
+| Réponse | Acceptée ou refusée | Fin du parcours |
+| Écartée | À tout moment, « Pas pour moi » | Restaurer si besoin |
+
+- [x] Parcours enregistré pour chaque offre : étape, date de vue, date d’envoi, date d’entretien, réponse
+- [x] Carte d’offre complète avant le clic : ville, salaire, date de publication, plateforme, score avec le CV, contrat, étape, CV et lettre créés ou non, pastille « nouvelle »
+- [x] Salaire récupéré auprès des sources qui le donnent (France Travail, Adzuna, JSearch, Jooble)
+- [x] Nombre de candidats : aucune de nos sources ne le donne ; à la place, nombre d’étudiants LeBonTaf qui suivent la même offre (anonyme, affiché à partir de 3)
+- [x] Clic sur une offre : panneau avec « En bref » (missions, outils, rythme), infos clés, frise du parcours et la bonne action
+- [x] « Mon suivi » : une colonne par étape (onglets sur mobile), déplacement en un clic
+- [x] Espace étudiant allégé : Accueil, Offres, Mon suivi, Réglages ; « Candidatures » fusionné dans Mon suivi ; Activité réservée à l’admin ; Documents et Questions rangés dans le panneau de l’offre et dans « Plus »
+- [x] Accueil : « À faire aujourd’hui » tiré du parcours (dossiers à relire, candidatures à envoyer, relances, entretiens)
+- [x] Offre gratuite : 2 dossiers (CV + lettre) par mois, compteur visible, compte admin illimité, refus clair quand la limite est atteinte ; la recherche automatique ne dépense jamais ces dossiers
+- [ ] Tests (135) et vérification sur mobile et ordinateur faits ; base Supabase déjà mise à jour ; reste la mise en ligne du code (deploy-job-hunter.bat)
+
+## Sprint 7 — IA moins chère et plus juste (embeddings, RAG, score pour toutes les offres)
+
+Objectif : chaque offre est lue et vectorisée une seule fois pour tout le monde, chaque étudiant voit un score sur toutes ses offres, et l'IA chère ne sert qu'à écrire le CV et la lettre. Constat du 5 octobre : 0 offre vectorisée sur 3 940, 0 résumé partagé, 50 offres scorées sur 604.
+
+- [ ] Clé Gemini payante avec plafond de dépenses (le niveau gratuit peut entraîner Google sur les CV : problème RGPD)
+- [x] Lecteur partagé (Gemini 2.5 Flash-Lite, en lot) : résumé, compétences, mots-clés, salaire, niveau et télétravail de chaque offre, une seule fois
+- [ ] Lecteur du CV : même fiche structurée pour le profil de l'étudiant, et ses expériences découpées en preuves
+- [x] Embedding de chaque offre (gemini-embedding-001, 768 dimensions), calculé une seule fois et partagé. Cause trouvée le 6 octobre : gemini-embedding-2 renvoyait 1 seul vecteur pour 50 offres, d'où 0 offre vectorisée
+- [x] Score rapide pour toutes les offres : proximité des vecteurs + compétences en commun + filtres (contrat, ville, niveau), calculé en base
+- [x] « Pourquoi ce score » écrit sans IA (compétences en commun et manquantes) ; l'analyse approfondie par l'IA reste à la demande, dans le quota du jour
+- [ ] RAG pour le CV et la lettre : le générateur ne reçoit que les preuves du CV les plus proches de l'offre
+- [ ] Nouvelle offre gratuite : toutes les offres scorées, avec résumé et « pourquoi ce score » (comparaison sans IA, donc gratuite) ; 2 CV et 2 lettres par mois, remis à zéro le 1er
+- [ ] Rattrapage : vectoriser et lire les 3 756 offres ouvertes déjà en base (automatique après la mise en ligne : 300 vecteurs et 60 lectures toutes les 10 minutes)
+- [x] Suivi des coûts IA par jour dans l'admin
+- [x] Espace admin séparé de l'espace étudiant (/admin) : inscrits, actifs, Pro, revenu, coût IA, état du catalogue
+- [x] Niveaux de lancement façon jeu dans l'admin (100, 1 000, 8 000 inscrits) avec les étapes à franchir et des points
+- [x] Prévision des coûts et seuil de rentabilité (nombre de Pro nécessaires) dans l'admin
+
+## Sprint 8 — Réponses, paiement et lancement public
+
+Objectif : ouvrir l’appli à d’autres étudiants avec un modèle payant légal.
+
+- [ ] Réponses des recruteurs lues dans Gmail et rangées dans le suivi
+- [ ] Taux de réponse par entreprise et par catégorie
+- [ ] Modèle de paiement validé par un juriste (facturer écoles, CFA ou entreprises plutôt que l’étudiant : article L5321-3 du Code du travail)
+- [x] Offre gratuite limitée (par exemple 2 CV et 2 lettres par IA)
+- [ ] Offre Pro à 7,99 €/mois par Stripe : CV et lettres sans quota (dans une limite raisonnable) et score détaillé sur toutes les offres ; la recherche reste gratuite pour tous
+- [ ] Passer Vercel en Pro (20 $/mois, obligatoire dès qu'on encaisse) et Supabase en Pro (25 $/mois, sauvegardes)
+- [ ] Pages publiques : accueil, tarifs, mentions légales, confidentialité (RGPD) — légal fait, tarifs à venir
+- [ ] Inscription ouverte et accompagnement du premier usage
+- [ ] Suivi des coûts par compte et alertes de dépassement
+- [ ] Espace recruteur : publier une offre et voir les profils proches, anonymes et avec l’accord des étudiants
+
+## Plan de lancement : coûts par niveau
+
+Estimation du 6 octobre, coûts mensuels en dollars. Un étudiant gratuit très actif coûte au plus 0,15 $ d'IA par mois (moyenne prévue 0,06 $), un Pro environ 1,50 $, à condition de scorer avec Gemini Flash-Lite (avec Gemini 3.6 Flash, c'est 1,25 $ par étudiant gratuit). Un Pro rapporte environ 7,50 € après les frais Stripe. Héberger nos propres modèles (carte graphique louée 24 h/24 : 175 à 240 $/mois) ne devient intéressant qu'au niveau 3, et seulement pour lire les offres et scorer.
+
+| Niveau | Objectif | Hébergement | IA | Total | Pro pour être rentable |
+| --- | --- | --- | --- | --- | --- |
+| 1 — Les 100 premiers | 100 inscrits, bêta gratuite | 0 $ (Vercel Hobby et Supabase Free tant qu'on n'encaisse pas) | environ 8 $ | environ 10 $ | aucun (bêta), 2 à 4 dès que Stripe est actif |
+| 2 — Les 1 000 | 1 000 inscrits, 40 Pro | 45 $ (Vercel Pro + Supabase Pro) | environ 125 $ | environ 170 $ | 16 |
+| 3 — Les 8 000 | 8 000 inscrits, 240 Pro | environ 135 $ | environ 860 $ | environ 1 000 $ | 89 |
+
+## Actions de ton côté
+
+Ces étapes demandent ton compte, tes clés ou ta signature : je ne peux pas les faire à ta place.
+
+- [x] Lancer deploy-job-hunter.bat pour mettre en ligne le dernier bundle
+- [x] Régénérer CRON\_SECRET dans Vercel (l’ancien a été collé dans la conversation)
+- [ ] Recoller la clé Jooble reçue par e-mail dans Réglages > Sources
+- [ ] Activer la protection contre les mots de passe divulgués (Supabase > Authentication)
+- [ ] Créer le compte développeur La bonne alternance et demander l’accord d’usage commercial
+- [ ] Ajouter LBA\_API\_KEY dans Vercel une fois l’accord obtenu
+- [ ] Consulter un juriste sur le modèle de paiement
+- [x] Lancer la première collecte : Admin > Collecte plateforme > « Avancer la collecte » (après la mise en ligne)
+- [x] Programmer la collecte toutes les 10 min dans Supabase (SQL fourni dans Admin, avec ton nouveau CRON\_SECRET)
+- [ ] Demander à Jooble ses conditions d’utilisation écrites (introuvables en ligne)
+- [x] Vérifier que le nom LeBonTaf est libre à l’INPI (le domaine lebontaf.com est déjà acheté)
+- [ ] Décider : envoi automatique des candidatures, ou validation par l’étudiant avant chaque envoi
+- [x] Créer le client OAuth Google (type Web, retour vers Supabase) et coller son Client ID et son secret dans Supabase > Providers > Google
+- [x] Acheter le domaine lebontaf.com et le brancher (Vercel, Supabase, Google Cloud)
+- [ ] E-mail pro : rediriger contact@lebontaf.com vers Gmail et créer le SMTP (Resend) pour les liens de connexion, DNS chez Spaceship
+- [ ] Passer la clé Gemini en offre payante avant l’ouverture au public
+- [ ] Désactiver l’ancien secret client Google dans Google Cloud
+- [ ] Prouver la propriété de lebontaf.com (Search Console, DNS) et ajouter un logo pour la validation de marque Google
+- [ ] Option : acheter lebontaf.fr (OVH ou Gandi, environ 7 € par an)
+- [ ] Créer la micro-entreprise avant de faire payer, puis mettre à jour les mentions légales
+- [ ] Lancer deploy-job-hunter.bat avec le dernier bundle (nom LeBonTaf, légal, connexion)

@@ -78,7 +78,8 @@ export async function readPendingOffers(
     .is("summary", null)
     .order("first_seen_at", { ascending: false })
     .limit(opts.limit ?? 60);
-  if (error || !data?.length) return { read: 0, failed: 0 };
+  if (error) throw new Error(`Lecture du catalogue impossible : ${error.message}`);
+  if (!data?.length) return { read: 0, failed: 0 };
   const queue = (data as Pending[]).filter((o) => (o.description ?? "").length >= 120);
   let read = 0;
   let failed = 0;

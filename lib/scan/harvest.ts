@@ -199,13 +199,14 @@ export async function runHarvestSlice(
   const fetchImpl = opts.fetchImpl ?? fetch;
   const run = slotOf(now);
   const embed = opts.embed !== undefined ? opts.embed : geminiEmbedder(env);
-  // With the time left: vectors, then the shared reading of offers still
-  // without them (never fails the slice). Each offer is done once for all.
+  // Keep time for the shared reader: a large embedding backlog must not
+  // consume every slice and indefinitely leave the summaries empty.
   const embedSome = async () => {
+    const readerReserve = opts.reader === null ? 0 : 20_000;
     if (embed && left() >= 10_000) {
       let tokens = 0;
       try {
-        report.embedded = (report.embedded ?? 0) + (await embedPendingOffers(db, embed, { limit: 300, timeLeft: left, onUsage: (t) => (tokens += t) }));
+        report.embedded = (report.embedded ?? 0) + (await embedPendingOffers(db, embed, { limit: 300, timeLeft: () => left() - readerReserve, onUsage: (t) => (tokens += t) }));
       } catch (error) {
         report.errors.push(`embeddings : ${error instanceof Error ? error.message : "erreur"}`);
       }

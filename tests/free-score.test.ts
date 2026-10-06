@@ -63,6 +63,11 @@ test("shared reader: card parsed and normalized, nothing invented", () => {
   assert.ok(readerPrompt({ title: "Dev", description: "x".repeat(9000) }).length < 7000);
 });
 
+test("shared reader: database failures are reported instead of looking like an empty queue", async () => {
+  const { db } = fakeSupabase({}, { missingTables: ["offers"] });
+  await assert.rejects(readPendingOffers(db, { ai: async () => ({ text: "{}", model: "test" }) }), /Lecture du catalogue impossible/);
+});
+
 test("shared reader: each offer read once, newest first, platform cost recorded, short texts skipped", async () => {
   const offers = [
     { id: "a", title: "Dev Python", status: "open", summary: null, description: "Développer des services Python et SQL ".repeat(5), first_seen_at: "2026-10-06" },

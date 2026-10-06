@@ -140,6 +140,37 @@ test("a run cut by the time limit resumes where it stopped, and an error never c
   assert.equal(tables.harvest_runs[0].status, "partial");
 });
 
+test("embedding catch-up reserves time for shared summaries in the same slice", async (t) => {
+  let clock = 0;
+  t.mock.method(Date, "now", () => clock);
+  const now = new Date("2026-10-06T13:00:00Z");
+  const offers = Array.from({ length: 300 }, (_, i) => ({
+    id: String(i), title: "Développeur Python", status: "open", embedding: null, summary: null,
+    description: "Développer des services Python et SQL. ".repeat(5),
+  }));
+  const { db } = fakeSupabase({ offers, harvest_runs: [{ id: slotOf(now), status: "done" }], ai_usage: [] }, {
+    rpc: { set_offer_embeddings: (args) => (args.p_rows as unknown[]).length },
+  });
+  let batches = 0;
+  let readings = 0;
+  const report = await runHarvestSlice(db, {
+    env: {}, now, budgetMs: 45_000,
+    embed: async (texts) => {
+      batches += 1;
+      clock += 10_000;
+      return texts.map(() => Array(768).fill(0.1));
+    },
+    reader: async () => {
+      readings += 1;
+      return { text: JSON.stringify({ missions: ["Coder en Python"], skills: ["python"] }), model: "test" };
+    },
+  });
+  assert.equal(batches, 2);
+  assert.equal(report.embedded, 100);
+  assert.ok(readings > 0, "summaries must advance before the embedding backlog is finished");
+  assert.equal(report.read, readings);
+});
+
 test("ticked categories: prefs kept clean, shared queries, catalogue match by category, scope-wide relevance", async () => {
   const { configFromPrefs, normalizePrefs, isRelevant } = await import("../lib/scan/config");
   const { matchesCategories } = await import("../lib/scan/catalogue");
