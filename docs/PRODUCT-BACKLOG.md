@@ -61,7 +61,9 @@ Suivi : [intégration IA et ordre d'activation](INTEGRATION-IA-2026-10-06.md). A
 - [x] Préparer et tester localement le stockage parallèle Perplexity 1024, l'invalidation, les RPC par espace et la réservation SQL des kits.
 - [x] Appliquer/vérifier la migration sur la base cible : version distante `20261006152810`, tests de permissions réels et advisors sans nouveau problème.
 - [x] Réserver atomiquement les embeddings d'offres/profils ; tests d'appels concurrents et de libération après erreur.
-- [ ] Configurer une clé durable Gateway, rattraper les offres puis activer et vérifier les modèles en préproduction.
+- [ ] Terminer le rattrapage des offres et les vérifications des modèles sur les parcours réels.
+- [x] Clé durable Gateway configurée et plafond réel de 2 USD confirmé ; routage texte activé et redéployé en production. Contrôle de collecte : 52 lectures Qwen réussies, environ 0,002591 USD comptabilisés.
+- [ ] Terminer le rattrapage Perplexity avant bascule des profils/recherche ; vérifier un kit GPT complet avec la nouvelle clé. Gemini embeddings est encore bloqué par son crédit épuisé.
 - [ ] Calibrer la note sémantique Perplexity sur de vrais profils ; la proximité sert à classer mais ne reçoit pas encore de note numérique.
 - [ ] Réserver les révisions concurrentes ; contrôler les reformulations et les coûts au niveau global.
 

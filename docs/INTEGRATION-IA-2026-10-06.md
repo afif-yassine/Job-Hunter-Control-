@@ -1,5 +1,11 @@
 # Intégration IA et activation — 6 octobre 2026
 
+## Activation texte vérifiée en production
+
+Le propriétaire a créé une clé durable, configuré `AI_GATEWAY_API_KEY` comme secret de production et choisi un plafond de **2 USD**, sans renouvellement automatique (confirmé dans AI Gateway). Le routage `AI_PROVIDER=gateway`, Qwen3.7 Flash lecture/analyse et GPT-6 Luna rédaction a été configuré, puis redéployé : `dpl_F2Ge1j9a1KAQQq4EPBGjECEmvKhr`, READY, associé à `lebontaf.com`, commit `495a221d`.
+
+Contrôle réel de collecte : première tentative avec erreur de lecture ; deuxième tentative HTTP 200, **52 offres lues**, 52 appels Qwen enregistrés dans `ai_usage`, environ **0,002591 USD** comptabilisés. La clé et la lecture fonctionnent en production. La rédaction GPT est configurée mais un kit complet sur cette clé n'a pas encore été vérifié. L'espace Perplexity reste désactivé et sans vecteurs ; l'embedding historique Gemini échoue encore pour crédit épuisé. Le rattrapage Perplexity et la vérification d'un kit/recherche avec profil réel restent à terminer. Les constats de préparation ci-dessous décrivent l'étape précédente.
+
 Après préparation locale, le propriétaire a autorisé la suite. La migration a été appliquée explicitement sur `zisjcdjfvqcwqehwsdeo`, sous la version distante `20261006152810` (fichier local créé auparavant : `20261006145105`). Les contrôles de permissions sur la base cible passent ; les advisors ne signalent pas de nouveau problème. `AI_GENERATION_LEASES=1` est configuré dans Vercel. La clé durable `AI_GATEWAY_API_KEY` est encore absente : les nouveaux modèles et le rattrapage Perplexity ne sont pas activés. Aucun nouvel appel API payant ; le comparatif précédent reste à 0,063568 USD déclarés cumulés.
 
 État du catalogue au contrôle : 3 890 offres ouvertes, 1 922 vecteurs Gemini, zéro vecteur Perplexity et zéro résumé sauvegardé. Base : environ 49 Mo. Les tests SQL réels de refus entre comptes ont été exécutés dans une transaction annulée, sans modifier les profils.
