@@ -2,6 +2,26 @@
 
 Référence principale du projet — mise à jour du 7 octobre 2026.
 
+## Livraison MVP du 7 octobre — état courant
+
+Cette section prévaut sur les constats historiques ci-dessous. Validation locale terminée ; livraison en production et parcours connecté à confirmer séparément.
+
+- [x] Import PDF numérique par extraction locale puis un seul appel Gateway ; pas de recharge Gemini nécessaire. PDF scanné, corrompu, trop long ou mixte refusé explicitement avant consommation du quota. Brouillon à confirmer par l’utilisateur.
+- [x] Filtres ville, date de publication et télétravail explicite ; dix recherches nommées maximum, isolées par compte et conservées lors d’un changement de réglages. Tests et interface à 390/1440 px réussis.
+- [x] Comparaison standard compétences CV/offre sans appel LLM ; analyse approfondie facultative. Le classement sémantique utilise le même espace vectoriel sans transformer arbitrairement le cosinus en pourcentage. Exigences absentes = score inconnu.
+- [x] Quotas fermés en cas de panne du compteur. Réservation d’un kit par compte pour empêcher le dépassement concurrent de l’offre gratuite ; réservations des lectures partagées, contrôle de version avant sauvegarde, modèle/date/empreinte enregistrés.
+- [x] Contrôle HTTP/API partagé de disponibilité avant rédaction : cache d’une heure, cinq minutes pour résultat inconnu, invalidation logique si les liens changent. Aucun appel IA ; redirections et erreurs restent inconnues.
+- [x] Coûts agrégés dans Postgres sans troncature à 1 000 lignes, coûts fournisseur privilégiés, coût du catalogue inclus. Alerte administrateur à 80 % du seuil ; le plafond réel Gateway de 2 USD reste distinct.
+- [x] Correctif Next 16.3.6 ; audit des dépendances de production sans vulnérabilité signalée. Dépendance de développement `braces` : avis sans version corrigée, à suivre sans rétrograder Next.
+- [x] 181 tests réussis, un test LaTeX ignoré ; 42 assertions PostgreSQL/pgvector, TypeScript et lint sans erreur. Mutation d’ouverture des quotas détectée.
+- [ ] Mise en production de cette livraison et vérification des nouvelles routes.
+- [ ] Refaire l’import d’un CV et la création d’un kit avec un compte connecté sur cette version.
+- [ ] Confirmer l’expéditeur SMTP et le parcours complet de réinitialisation. SMTP déclaré configuré par le propriétaire ; protection Supabase des mots de passe divulgués encore signalée désactivée.
+
+Classement déjà contrôlé par SQL avec le profil réel : offres IA/backend et stages frontend/IA parmi les premières, compétences communes et manquantes retournées. Cela ne remplace pas la vérification du parcours connecté dans le navigateur. Le kit CV/lettre réel de la livraison précédente demeure une preuve de génération, sans valider automatiquement les nouveaux changements.
+
+Les améliorations non indispensables au premier pilote restent dans les P0/P1 détaillés : extraction typée du rythme/durée/salaire, fin du rattrapage des résumés, enrichissement du catalogue de stages et calibration des scores. Ne pas les cocher sur la seule base d’un déploiement réussi.
+
 Ce fichier reprend le backlog global fourni par le propriétaire depuis Claude. Il remplace le document centré sur le design, conservé dans [l'archive](archive/PRODUCT-BACKLOG-DESIGN-2026-10-06.md). La [copie originale](BACKLOG-CLAUDE-2026-10-06.md) et la [passation](PASSATION-CLAUDE-2026-10-06.md) sont conservées.
 
 ## Optimisation IA et automatisations — décision du 6 octobre 2026
