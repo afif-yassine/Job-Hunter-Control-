@@ -29,6 +29,15 @@ const ALIASES: Record<string, string> = {
   "amazon web services": "aws",
   anglais: "anglais",
   english: "anglais",
+  // Safe equivalences only: wider ones would inflate the free comparison.
+  ml: "machine learning",
+  "apprentissage automatique": "machine learning",
+  "apprentissage profond": "deep learning",
+  dl: "deep learning",
+  genai: "ia generative",
+  "generative ai": "ia generative",
+  "intelligence artificielle": "ia",
+  torch: "pytorch",
 };
 
 /** "  React.JS " → "react"; "" for nothing usable. */
@@ -46,6 +55,31 @@ export function normalizeSkill(raw: string): string {
   s = s.replace(/ projets$/, " projet").replace(/^outils /, "outil ");
   return ALIASES[s] ?? ALIASES[s.replace(/ /g, "")] ?? s;
 }
+
+/**
+ * Personal qualities (and the apprenticeship itself) that offers list among
+ * their "skills". They say nothing about what a CV proves, so the free
+ * comparison ignores them. Technical terms, even rare ones, are kept.
+ */
+const GENERIC_QUALITIES = new Set(
+  [
+    "autonomie",
+    "curiosite",
+    "ecoute",
+    "rigueur",
+    "motivation",
+    "dynamisme",
+    "esprit d'equipe",
+    "communication",
+    "adaptabilite",
+    "organisation",
+    "resolution de problemes",
+    "resolution de probleme",
+    "apprentissage",
+  ].map(quality => normalizeSkill(quality)),
+);
+
+export const isGenericQuality = (skill: string): boolean => GENERIC_QUALITIES.has(normalizeSkill(skill));
 
 /** Unique normalized skills, at most `max`, in their first order. */
 export function normalizeSkills(list: unknown, max = 40): string[] {

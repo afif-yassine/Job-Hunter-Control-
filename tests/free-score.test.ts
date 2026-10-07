@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { displayScore, fitScore } from "../lib/fit";
 import { parseCard, readPendingOffers, readerPrompt } from "../lib/offer-reader";
-import { normalizeSkill, normalizeSkills, profileSkills } from "../lib/skills";
+import { isGenericQuality, normalizeSkill, normalizeSkills, profileSkills } from "../lib/skills";
 import { fakeSupabase } from "./fake-supabase";
 
 test("skills: one comparable form for the offer and the CV", () => {
@@ -40,6 +40,53 @@ test("free score: meaning and skills in common, no AI; the AI's detailed score w
   assert.deepEqual(displayScore({ match_score: 72, fit: strong }), { score: 72, detailed: true });
   assert.deepEqual(displayScore({ match_score: null, fit: mid }), { score: mid.score, detailed: false });
   assert.equal(displayScore({ match_score: null, fit: null }), null);
+});
+
+test("free score is a comparison of skills, never a probability of being hired: coverage stays exact outside the calibrated space", () => {
+  const technical = ["python", "sql", "docker", "git", "linux", "java", "c#", "aws"];
+  const noise = ["autonomie", "rigueur", "curiosite", "ecoute"];
+  const model = "perplexity-pplx-embed";
+  // 12 asked skills of which 4 are personal qualities: the denominator is 8, not 12.
+  assert.equal(fitScore(0.9, technical.slice(0, 2), [...technical.slice(2), ...noise], model)!.score, 25);
+  assert.equal(fitScore(null, technical.slice(0, 2), [...technical.slice(2), ...noise], "skills-v1")!.score, 25);
+  // Without the noise it is the same: removing qualities never raises a real gap.
+  assert.equal(fitScore(null, technical.slice(0, 2), technical.slice(2), "skills-v1")!.score, 25);
+  // No cap: 6 proven of 12 technical skills stays 50, and nothing proven stays 0.
+  const twelve = [...technical, "azure", "react", "node", "typescript"];
+  assert.equal(fitScore(null, twelve.slice(0, 6), twelve.slice(6), "skills-v1")!.score, 50);
+  assert.equal(fitScore(null, [], twelve, "skills-v1")!.score, 0);
+});
+
+test("personal qualities neither count nor show as gaps; technical terms stay, even rare ones", () => {
+  const qualities = ["autonomie", "Curiosité", "écoute", "rigueur", "motivation", "dynamisme", "esprit d'équipe", "communication", "adaptabilité", "organisation", "résolution de problèmes", "apprentissage"];
+  assert.ok(qualities.every(isGenericQuality));
+  assert.ok(!["gestion de projet", "optimisation des processus", "activites commerciales", "administratif", "wsn", "v2x", "sdn"].some(isGenericQuality));
+  const fit = fitScore(null, ["python"], [...qualities, "sql", "wsn"], "skills-v1")!;
+  assert.deepEqual(fit.missing, ["sql", "wsn"]);
+  assert.deepEqual(fit.matched, ["python"]);
+  assert.equal(fit.score, 33);
+  // Only qualities asked: no skills signal, so no invented score.
+  assert.equal(fitScore(null, [], qualities, "skills-v1"), null);
+  assert.equal(fitScore(0.7, [], qualities)!.similarity, 0.7);
+});
+
+test("AI and data skills use one safe form on both sides, without wide equivalences", () => {
+  assert.equal(normalizeSkill("ML"), "machine learning");
+  assert.equal(normalizeSkill("Apprentissage automatique"), "machine learning");
+  assert.equal(normalizeSkill("Apprentissage profond"), "deep learning");
+  assert.equal(normalizeSkill("DL"), "deep learning");
+  assert.equal(normalizeSkill("GenAI"), "ia generative");
+  assert.equal(normalizeSkill("Generative AI"), "ia generative");
+  assert.equal(normalizeSkill("IA générative"), "ia generative");
+  assert.equal(normalizeSkill("Intelligence artificielle"), "ia");
+  assert.equal(normalizeSkill("Torch"), "pytorch");
+  // Neighbouring skills are not merged: a TensorFlow CV does not prove PyTorch.
+  assert.notEqual(normalizeSkill("TensorFlow"), normalizeSkill("PyTorch"));
+  assert.notEqual(normalizeSkill("Machine learning"), normalizeSkill("Deep learning"));
+});
+
+test("the shared reader asks for technical skills, not personal qualities", () => {
+  assert.match(readerPrompt({ title: "Dev", description: "x" }), /sans qualités personnelles/);
 });
 
 test("shared reader: card parsed and normalized, nothing invented", () => {

@@ -7,6 +7,8 @@
  * - skills: share of the skills the offer asks that the CV proves
  */
 
+import { isGenericQuality } from "./skills";
+
 export type Fit = {
   score: number;
   matched: string[];
@@ -20,13 +22,18 @@ export const SIMILARITY_CEIL = 0.8;
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 
-export function fitScore(similarity: number | null | undefined, matched: string[] = [], missing: string[] = [], model?: string): Fit | null {
+export function fitScore(similarity: number | null | undefined, matchedIn: string[] = [], missingIn: string[] = [], model?: string): Fit | null {
   const sim = typeof similarity === "number" && Number.isFinite(similarity) ? similarity : null;
+  // Personal qualities say nothing about what the CV proves: they neither count nor show as gaps.
+  const matched = matchedIn.filter(skill => !isGenericQuality(skill));
+  const missing = missingIn.filter(skill => !isGenericQuality(skill));
   const asked = matched.length + missing.length;
   // The new space ranks by cosine, but gets no numeric semantic grade until calibrated on real CVs.
   const calibrated = !model || model === "gemini-embedding-001";
   const meaning = sim === null || !calibrated ? null : clamp01((sim - SIMILARITY_FLOOR) / (SIMILARITY_CEIL - SIMILARITY_FLOOR));
-  // A long wish list should not sink a good match: 6 proven skills is a full mark.
+  // Calibrated space: a long wish list should not sink a good match, so 6 proven skills is a full mark.
+  // Otherwise coverage stays exact (proven ÷ asked, qualities already removed): a cap would only hide a real gap.
+  // This is a comparison of skills, never a probability of being hired.
   const skills = asked ? clamp01(matched.length / (calibrated ? Math.min(asked, 6) : asked)) : null;
   if (meaning === null && skills === null) return null;
   const raw = meaning !== null && skills !== null ? 0.55 * meaning + 0.45 * skills : (meaning ?? skills ?? 0);

@@ -31,7 +31,7 @@ export function readerPrompt(o: { title: string; company?: string | null; locati
  "missions": 3 phrases courtes max sur ce que la personne fera,
  "stack": outils et technologies cités (8 max, leur nom usuel),
  "conditions": une ligne avec contrat, durée, rythme, lieu, télétravail et salaire SEULEMENT s'ils sont écrits,
- "skills": 12 compétences demandées max, en minuscules, forme courte usuelle (ex : "python", "sql", "excel", "gestion de projet", "anglais", "comptabilité"),
+ "skills": 12 compétences techniques demandées max (outils, technologies, méthodes, métiers, langues), en minuscules, forme courte usuelle (ex : "python", "sql", "excel", "gestion de projet", "anglais", "comptabilité"), sans qualités personnelles (autonomie, rigueur, curiosité, écoute…),
  "level": niveau d'études demandé ("bac", "bac+2", "bac+3", "bac+5") ou null,
  "remote": "non", "partiel", "total" ou null s'il n'est pas indiqué
 }
