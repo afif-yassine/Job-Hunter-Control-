@@ -78,7 +78,8 @@ export async function signUpWithPassword(_prev: PasswordState, formData: FormDat
   if (data.user && data.user.identities?.length === 0) {
     return {
       status: "error",
-      message: "Un compte existe déjà avec cette adresse. Connecte-toi avec ton mot de passe, Google ou un lien par e-mail.",
+      message:
+        "Un compte existe déjà avec cette adresse. Connecte-toi avec Google, ton mot de passe ou un lien par e-mail — ou passe par « Mot de passe oublié » si tu veux en choisir un.",
       email,
     };
   }
