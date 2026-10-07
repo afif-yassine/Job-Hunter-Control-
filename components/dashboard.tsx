@@ -29,6 +29,7 @@ import { openQuestionCount, QuestionsPanel } from "@/components/questions-panel"
 import { usePipeline } from "@/components/use-pipeline";
 import { useDashboardData, type Data } from "@/components/use-dashboard-data";
 import { useSystemStatus, type SystemStatus } from "@/components/use-status";
+import { useProfileState } from "@/components/use-profile";
 import { Callout, Progress } from "@/components/ui";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { RoadmapView } from "@/components/views/roadmap-view";
@@ -114,6 +115,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
   const isDemo = Boolean(demo);
   const { status, failed: statusFailed, refresh: refreshStatus } = useSystemStatus(Boolean(supabase), demo?.status);
   const pipeline = usePipeline({ supabase, status, reload, refreshStatus });
+  const { hasProfile, refresh: refreshProfile } = useProfileState(Boolean(supabase), isDemo);
 
   const [view, setView] = useState<View>("home");
   const [jobFilter, setJobFilter] = useState<JobFilter>("new");
@@ -395,6 +397,8 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
     go,
     notify,
     reload,
+    hasProfile,
+    refreshProfile,
     jobFilter,
     setJobFilter,
     openOffer,

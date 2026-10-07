@@ -41,6 +41,9 @@ export type Ctx = {
   reload: () => Promise<void>;
   /** Fixed admin data for the /demo page. */
   adminDemo?: AdminOverview;
+  /** Whether a CV profile is saved (undefined while unknown: nothing is blocked). */
+  hasProfile: boolean | undefined;
+  refreshProfile: () => Promise<void>;
   jobFilter: JobFilter;
   setJobFilter: (filter: JobFilter) => void;
   /** Opens the offer panel (and marks the offer as seen). */

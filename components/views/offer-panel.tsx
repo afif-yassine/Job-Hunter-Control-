@@ -370,6 +370,19 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                     <button className="btn" disabled={disabled} onClick={() => act.pasteDescription(job)}>
                       Coller le texte de l’annonce
                     </button>
+                  ) : ctx.hasProfile === false ? (
+                    <>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          onClose();
+                          ctx.go("settings");
+                        }}
+                      >
+                        <FileText size={16} aria-hidden /> Importer mon CV d’abord
+                      </button>
+                      <span className="muted small-text">Ton CV sert de base à ton dossier : rien n’est écrit sans lui.</span>
+                    </>
                   ) : (
                     <button className="btn" disabled={disabled} onClick={() => void act.prepareKit(job)}>
                       {working ? <LoaderCircle size={16} className="spin" aria-hidden /> : <Sparkles size={16} aria-hidden />} Créer mon CV et ma lettre

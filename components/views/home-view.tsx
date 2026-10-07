@@ -35,6 +35,8 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
   const openQuestions = openQuestionCount(questions);
   const toReview = jobs.filter((j) => j.review_flag && j.status !== "SKIPPED").length;
 
+  // Known to have no CV yet: the CV comes first. Unknown (undefined) changes nothing.
+  const noProfile = ctx.hasProfile === false;
   const noSource = status ? !status.scanConfigured : false;
   const lastRun = runs.find((r) => r.run_type === "PIPELINE");
   const last = status?.lastScanAt ?? lastRun?.created_at ?? null;
@@ -104,6 +106,20 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
   return (
     <>
       <PageHead title="Accueil" subtitle="Où en est chacune de tes candidatures, et ce qui t’attend aujourd’hui." />
+      {noProfile && (
+        <section className="card cv-cta cv-first" aria-label="Importer mon CV">
+          <div>
+            <strong>Commence par ton CV</strong>
+            <p className="muted small-text">
+              Dépose ton CV en PDF une seule fois : on classe les offres selon ton profil et on prépare ton CV et ta lettre à partir de lui.
+              Rien n’est inventé, et tu vérifies tout avant d’enregistrer.
+            </p>
+          </div>
+          <button className="btn big" onClick={() => go("settings")}>
+            Importer mon CV
+          </button>
+        </section>
+      )}
       <section className="journey-strip" aria-label="Où en sont tes candidatures">
         {TRACK.map((c) => (
           <button key={c.id} className="journey-count card" onClick={() => go("track")}>
@@ -131,6 +147,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
         </div>
       )}
 
+      {(!noProfile || tasks.length > 0 || extras.length > 0) && (
       <section aria-label="À faire aujourd’hui">
         <h2 className="section-title">À faire aujourd’hui</h2>
         {tasks.length || extras.length ? (
@@ -169,6 +186,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
           </div>
         )}
       </section>
+      )}
 
       {freshTop.length > 0 && (
         <section aria-label="Nouvelles offres">
@@ -186,15 +204,17 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
         </section>
       )}
       <h2 className="section-title">Ta recherche</h2>
-      <div className="card cv-cta">
-        <div>
-          <strong>Ton CV</strong>
-          <p className="muted small-text">Importé une fois en PDF : tous tes CV et lettres partent de lui, rien n’est inventé.</p>
+      {!noProfile && (
+        <div className="card cv-cta">
+          <div>
+            <strong>Ton CV</strong>
+            <p className="muted small-text">Importé une fois en PDF : tous tes CV et lettres partent de lui, rien n’est inventé.</p>
+          </div>
+          <button className="btn secondary" onClick={() => go("settings")}>
+            Importer ou mettre à jour
+          </button>
         </div>
-        <button className="btn secondary" onClick={() => go("settings")}>
-          Importer ou mettre à jour
-        </button>
-      </div>
+      )}
 
       <section className="hero card">
         {running ? (

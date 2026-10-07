@@ -644,6 +644,8 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
   const [answer, setAnswer] = useState<ImportAnswer | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [busy, setBusy] = useState<"" | "read" | "save">("");
+  /** The profile was just saved: the next step is the offers. */
+  const [justSaved, setJustSaved] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -666,6 +668,7 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
 
   async function read(file: File) {
     setBusy("read");
+    setJustSaved(false);
     notify("Lecture de ton CV… (jusqu’à 30 secondes)");
     try {
       const form = new FormData();
@@ -713,6 +716,8 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
         );
       } else notify("Profil enregistré : tes prochains CV et lettres partiront de lui.", "good");
       setAnswer(null);
+      setJustSaved(true);
+      void ctx.refreshProfile();
     } catch (e) {
       notify(e instanceof Error ? e.message : "Enregistrement impossible", "bad");
     } finally {
@@ -741,6 +746,13 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
           <Callout tone="info" title="Aucun profil encore">
             Sans profil, l’appli ne peut ni noter les offres ni écrire tes CV.
           </Callout>
+        )}
+        {justSaved && summary && (
+          <div className="wide toolbar">
+            <button className="btn" onClick={() => ctx.go("jobs", "new")}>
+              Voir mes offres
+            </button>
+          </div>
         )}
         <label className="wide upload">
           {summary ? "Remplacer par un nouveau CV (PDF, 5 Mo max)" : "Importer mon CV (PDF, 5 Mo max)"}
