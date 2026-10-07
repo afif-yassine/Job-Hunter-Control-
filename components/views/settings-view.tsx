@@ -433,6 +433,11 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
         </fieldset>
         <fieldset className="wide">
           <legend>Métiers</legend>
+          {loaded && !(prefs.categories ?? []).length && !split(keywords).length && (
+            <Callout tone="info" title="Choisis au moins un métier">
+              Sans métier coché, on ne peut pas te proposer d’offres. Coche ceux qui t’intéressent ci-dessous.
+            </Callout>
+          )}
           <small className="muted">
             Coche les métiers qui t’intéressent. Le nombre indique les offres déjà connues autour de toi
             {counts ? ` (${counts.total} au total)` : ""}, ajoutées tout de suite à ta liste.
@@ -460,7 +465,7 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
         </label>
         <label>
           Ville
-          <input value={prefs.city} onChange={(e) => setPrefs({ ...prefs, city: e.target.value })} />
+          <input value={prefs.city ?? ""} onChange={(e) => setPrefs({ ...prefs, city: e.target.value })} placeholder="ex. Lyon" />
         </label>
         <label>
           Départements (France Travail)
