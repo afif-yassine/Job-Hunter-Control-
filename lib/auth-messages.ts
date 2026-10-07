@@ -71,6 +71,8 @@ export function passwordError(error: { message?: string; status?: number; code?:
   if (/weak_password|pwned|compromised|breach|leaked|known to be weak/.test(text))
     return "Ce mot de passe est apparu dans une fuite de données connue ou est trop simple. Choisis-en un autre.";
   if (/same_password|different from the old/.test(text)) return "Choisis un mot de passe différent de l’ancien.";
+  if (/user_already_exists|email_exists|already been registered|already registered/.test(text))
+    return "Un compte existe déjà avec cette adresse. Connecte-toi avec ton mot de passe, Google ou un lien par e-mail.";
   if (/signups? not allowed|signup_disabled/.test(text)) return "Les inscriptions par e-mail ouvrent bientôt. En attendant, connecte-toi avec Google.";
   if (/invalid|validate|email_address_invalid/.test(text)) return "Cette adresse e-mail ne semble pas valide.";
   return "L’opération n’a pas pu aboutir. Réessaie dans un instant.";

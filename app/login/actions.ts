@@ -54,8 +54,9 @@ function confirmUrl(origin: string, next: string) {
 /**
  * Creates an account with an e-mail and a password. The account only works
  * once the address is confirmed (link in the e-mail), so nobody can open an
- * account with somebody else's address. An address that already has an account
- * gets the same answer: the page never says who is registered.
+ * account with somebody else's address. Owner decision (2026-10-07): an
+ * address that already has an account gets a clear "already exists" message —
+ * clarity for the student chosen over enumeration protection.
  */
 export async function signUpWithPassword(_prev: PasswordState, formData: FormData): Promise<PasswordState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -72,6 +73,15 @@ export async function signUpWithPassword(_prev: PasswordState, formData: FormDat
     options: { emailRedirectTo: confirmUrl(await siteOrigin(), next).toString() },
   });
   if (error) return { status: "error", message: passwordError(error), email };
+  // Supabase hides "already registered" behind a fake user with no identities.
+  // The owner chose clarity over enumeration protection: say it and stop here.
+  if (data.user && data.user.identities?.length === 0) {
+    return {
+      status: "error",
+      message: "Un compte existe déjà avec cette adresse. Connecte-toi avec ton mot de passe, Google ou un lien par e-mail.",
+      email,
+    };
+  }
   // Confirmation switched off in Supabase: the account is already signed in.
   if (data.session) redirect(next);
   return { status: "confirm", email, at: Date.now() };
