@@ -1,6 +1,7 @@
 "use client";
-import { compareFits, scoreOf } from "@/lib/fit";
+import { compareFits } from "@/lib/fit";
 import { useEffect, useMemo, useState } from "react";
+import { closestJobIds } from "./closest";
 import { matchesAdvancedFilters, searchFilters, type SavedSearch, type SearchFilters } from "@/lib/saved-searches";
 import { Plus, Search } from "lucide-react";
 import { Empty, PageHead } from "@/components/ui";
@@ -62,18 +63,8 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
   }
   const kits = useMemo(() => kitsByJob(data.documents), [data.documents]);
 
-  // The closest offers to the profile (top 25 by score: the AI's or the free comparison).
-  const closest = useMemo(
-    () =>
-      new Set(
-        [...data.jobs]
-          .filter((j) => scoreOf(j) >= 0 || typeof j.similarity === "number")
-          .sort(compareFits)
-          .slice(0, 25)
-          .map((j) => j.id),
-      ),
-    [data.jobs],
-  );
+  // The 25 offers closest in meaning to the profile (a rank, not a grade).
+  const closest = useMemo(() => closestJobIds(data.jobs), [data.jobs]);
   const hasSimilarity = closest.size > 0;
 
   const match = useMemo<Record<JobFilter, (j: Job) => boolean>>(

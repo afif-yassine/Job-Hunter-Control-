@@ -31,7 +31,7 @@ export function ScoreRing({ job, size = 54 }: { job: Job; size?: number }) {
   const r = 22;
   const c = 2 * Math.PI * r;
   return (
-    <span className={`ring is-${tone}`} style={{ width: size, height: size }} title={shown.detailed ? `Compatibilité avec ton CV (analyse IA) : ${score}/100` : `Compatibilité avec ton CV : ${score}/100, comparaison de l’offre et de ton CV`}>
+    <span className={`ring is-${tone}`} style={{ width: size, height: size }} title={shown.detailed ? `Compatibilité avec ton CV (analyse IA) : ${score}/100` : `Compétences en commun avec ton CV : ${score}/100 (comparaison gratuite, indicative)`}>
       <svg viewBox="0 0 54 54" aria-hidden="true">
         <circle cx="27" cy="27" r={r} className="ring-track" />
         <circle cx="27" cy="27" r={r} className="ring-value" strokeDasharray={`${(c * score) / 100} ${c}`} />
@@ -115,7 +115,7 @@ export function OfferCard({
       </span>
       <span className="offer-tags">
         {job.contract_type && <span className="tag">{job.contract_type.split(" · ")[0]}</span>}
-        {closest && <span className="tag is-good">Très proche de ton CV</span>}
+        {closest && <span className="tag is-good" title="Parmi les 25 offres dont le sens est le plus proche de ton CV">Dans le top 25 de ton CV</span>}
         {job.review_flag && !gone && <span className="tag is-warn">À vérifier</span>}
         {gone && <span className="tag is-bad">Plus disponible</span>}
       </span>

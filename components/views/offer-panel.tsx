@@ -17,12 +17,13 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { displayScore } from "@/lib/fit";
 import { followUpDue, isSent, stageOf, type Stage } from "@/lib/journey";
 import { Soon } from "@/components/ui";
 import { DOCUMENT_KIND, platformsOf, REVIEW } from "@/lib/labels";
 import type { DocumentRecord, Job, OfferSummary } from "@/lib/types";
+import { closestJobIds, CLOSEST_COUNT } from "./closest";
 import { offerAge, salaryOf, ScoreRing, StageChip } from "./offer-card";
 import type { Ctx } from "./types";
 
@@ -111,6 +112,10 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   const summary = summaryOf(job);
   const shown = displayScore(job);
   const insight = insightOf(job);
+  // Same rank as the "Dans le top 25 de ton CV" tag of the list.
+  const inClosest = useMemo(() => closestJobIds(data.jobs).has(job.id), [data.jobs, job.id]);
+  const matchedCount = job.fit?.matched.length ?? 0;
+  const askedCount = matchedCount + (job.fit?.missing.length ?? 0);
   const docs = latestDocs(data.documents, job.id);
   const salary = salaryOf(job);
   const platforms = platformsOf(job);
@@ -226,15 +231,20 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
           <div className="panel-score">
             <ScoreRing job={job} size={64} />
             <div>
-              <strong>{shown ? "Compatibilité avec ton CV" : "Pas encore comparée"}</strong>
+              <strong>{shown ? (shown.detailed ? "Compatibilité avec ton CV" : "Compétences en commun avec ton CV") : "Pas encore comparée"}</strong>
               <p className="muted small-text">
-                {shown
-                  ? shown.score >= 80
-                    ? "Très proche de ton profil : fonce."
-                    : shown.score >= 60
-                      ? "Une bonne piste, avec quelques écarts."
-                      : "Assez loin de ton profil."
-                  : "Le score arrive dès que l’offre et ton CV sont lus."}
+                {!shown
+                  ? "Le score arrive dès que l’offre et ton CV sont lus."
+                  : shown.detailed
+                    ? shown.score >= 80
+                      ? "Très proche de ton profil : fonce."
+                      : shown.score >= 60
+                        ? "Une bonne piste, avec quelques écarts."
+                        : "Assez loin de ton profil."
+                    : askedCount
+                      ? `${matchedCount} sur ${askedCount} compétence${askedCount > 1 ? "s" : ""} demandée${askedCount > 1 ? "s" : ""} figure${matchedCount > 1 ? "nt" : ""} dans ton CV.`
+                      : "L’offre ne liste pas encore de compétences à comparer."}
+                {shown && !shown.detailed && inClosest ? ` Par le sens, elle fait partie des ${CLOSEST_COUNT} offres les plus proches de ton CV.` : ""}
               </p>
             </div>
           </div>
@@ -242,10 +252,10 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
             <details className="why">
               <summary>Pourquoi ce score ?</summary>
               <p className="muted small-text">
-                Comparaison de l’offre et de ton CV
-                {job.fit.similarity !== null ? ` : sens proche à ${Math.round(Math.max(0, Math.min(1, (job.fit.similarity - 0.5) / 0.3)) * 100)} %` : ""}
-                {job.fit.matched.length + job.fit.missing.length ? `, ${job.fit.matched.length} compétence${job.fit.matched.length > 1 ? "s" : ""} sur ${job.fit.matched.length + job.fit.missing.length} demandée${job.fit.matched.length + job.fit.missing.length > 1 ? "s" : ""}` : ""}.
+                Comparaison gratuite des compétences demandées par l’offre avec celles que ton CV prouve.
+                {inClosest ? ` Par le sens, l’offre fait partie des ${CLOSEST_COUNT} plus proches de ton CV.` : ""}
               </p>
+              <p className="muted small-text">Indicatif : ce score ne mesure pas tes chances d’être retenu(e).</p>
               {job.fit.matched.length ? (
                 <>
                   <h4>Ce que tu as déjà</h4>
@@ -280,6 +290,7 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
           {insight && (
             <details className="why">
               <summary>Pourquoi ce score ?</summary>
+              <p className="muted small-text">Indicatif : ce score ne mesure pas tes chances d’être retenu(e).</p>
               {insight.verified_strengths?.length ? (
                 <>
                   <h4>Ce qui colle</h4>
