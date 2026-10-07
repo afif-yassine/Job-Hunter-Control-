@@ -57,9 +57,15 @@ export async function embedSemanticOffers(db: SupabaseClient, env: Env, opts: { 
 }
 
 export async function ensureSemanticProfile(db: SupabaseClient, userId: string, env: Env, embed?: Embedder): Promise<boolean> {
-  const { data, error } = await db.from("candidate_profiles").select("profile,semantic_hash,semantic_model,semantic_embedding").eq("user_id", userId).maybeSingle();
+  const { data, error } = await db.from("candidate_profiles").select("profile,skills,semantic_hash,semantic_model,semantic_embedding").eq("user_id", userId).maybeSingle();
   if (error) throw new Error(`Migration des vecteurs indisponible : ${error.message}`);
   if (!data?.profile) return false;
+  // Skills in common are compared even when the vector is current: keep that column in step (and only it).
+  // The vector and its state are untouched, and nothing is written when the skills are already right.
+  const skills = profileSkills(data.profile);
+  const stored = Array.isArray(data.skills) ? (data.skills as string[]) : null;
+  if (stored && (stored.length !== skills.length || stored.some((s, i) => s !== skills[i])))
+    await db.from("candidate_profiles").update({ skills }).eq("user_id", userId);
   const text = profileText(data.profile);
   const version = hash(text);
   if (data.semantic_embedding && data.semantic_hash === version && data.semantic_model === SEMANTIC_SPACE) return true;

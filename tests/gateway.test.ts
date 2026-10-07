@@ -3,7 +3,10 @@ import { afterEach, test } from "node:test";
 import { aiConfigured, generateJson, generateJsonFromPdf, modelFor } from "../lib/ai";
 import { perplexityEmbedder, SEMANTIC_DIM } from "../lib/semantic-embeddings";
 import { fitScore } from "../lib/fit";
-import { embedSemanticOffers, ensureSemanticProfile } from "../lib/semantic-embeddings";
+import { embedSemanticOffers, ensureSemanticProfile, SEMANTIC_SPACE } from "../lib/semantic-embeddings";
+import { profileText } from "../lib/embeddings";
+import { fakeSupabase } from "./fake-supabase";
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 const realFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = realFetch; });
@@ -79,4 +82,39 @@ test("Concurrent embedding reservations skip paid calls and release failed batch
   await assert.rejects(embedSemanticOffers(failedDb, env, { embed }), /provider unavailable/);
   assert.equal(calls, 1);
   assert.deepEqual(operations, ["claim_semantic_offers", "release_semantic_offers"]);
+});
+
+test("A current profile vector keeps the skills column in step without calling the provider or touching the vector", async () => {
+  const profile = { skills: { ai: ["ML", "Python"] } };
+  const version = createHash("sha256").update(`${SEMANTIC_SPACE}\n${profileText(profile)}`).digest("hex");
+  const row = (skills: string[]) => ({ user_id: "owner", profile, skills, semantic_embedding: "kept", semantic_hash: version, semantic_model: SEMANTIC_SPACE });
+  let calls = 0;
+  const embed = async () => { calls++; throw new Error("provider must not be called"); };
+  const counted = (tables: Record<string, Record<string, unknown>[]>) => {
+    const { db } = fakeSupabase(tables);
+    const writes: Record<string, unknown>[] = [];
+    const watched = { rpc: db.rpc, from: (name: string) => {
+      const query = db.from(name) as unknown as { update: (p: Record<string, unknown>) => unknown };
+      const update = query.update;
+      query.update = (payload) => (writes.push(payload), update(payload));
+      return query;
+    } } as unknown as SupabaseClient;
+    return { watched, writes };
+  };
+
+  // Old forms stored before the aliases existed: only the skills column is rewritten.
+  const stale = { candidate_profiles: [row(["ml", "python"])] };
+  const first = counted(stale);
+  assert.equal(await ensureSemanticProfile(first.watched, "owner", env, embed), true);
+  assert.deepEqual(stale.candidate_profiles[0].skills, ["machine learning", "python"]);
+  assert.deepEqual(first.writes, [{ skills: ["machine learning", "python"] }]);
+  assert.equal(stale.candidate_profiles[0].semantic_embedding, "kept");
+  assert.equal(stale.candidate_profiles[0].semantic_hash, version);
+
+  // Already right: no write at all, so no loop of useless updates.
+  const current = { candidate_profiles: [row(["machine learning", "python"])] };
+  const second = counted(current);
+  assert.equal(await ensureSemanticProfile(second.watched, "owner", env, embed), true);
+  assert.deepEqual(second.writes, []);
+  assert.equal(calls, 0);
 });
