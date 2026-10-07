@@ -1,5 +1,6 @@
 import { Readable } from "node:stream";
 import { google } from "googleapis";
+import { adminRefusal } from "@/lib/admin";
 import { authenticatedClient } from "@/lib/api";
 import { renderContextFor } from "@/lib/documents";
 import { renderDocumentPdf } from "@/lib/pdf";
@@ -20,6 +21,9 @@ export async function POST(
 ) {
   const auth = await authenticatedClient();
   if ("error" in auth) return auth.error;
+  // The platform's Drive is not for students: they open their documents from the offer.
+  const refused = await adminRefusal(auth.supabase);
+  if (refused) return refused;
   const account = credentials();
   if (!account)
     return Response.json(
