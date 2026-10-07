@@ -14,3 +14,9 @@ test("password errors from Supabase become French sentences, leaked passwords in
   assert.match(passwordError({ code: "same_password" }), /différent/);
   assert.match(passwordError({ message: "boom" }), /Réessaie/);
 });
+
+test("an address that already has an account gets a clear message (owner chose clarity over enumeration protection, 2026-10-07)", () => {
+  assert.match(passwordError({ code: "user_already_exists" }), /compte existe déjà/);
+  assert.match(passwordError({ code: "email_exists" }), /compte existe déjà/);
+  assert.match(passwordError({ message: "User already registered" }), /compte existe déjà/);
+});
