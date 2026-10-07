@@ -61,7 +61,7 @@ export function Filature() {
         <div className="jj-kicker">Pièce n° 1 · La filature</div>
         <h2 className="jj-h2">Une offre te plaît ? <em>On monte ton dossier.</em></h2>
         <p className="jj-lead" style={{ maxWidth: 760 }}>
-          Un CV réécrit pour l’offre, une lettre de motivation sur mesure, les questions du formulaire déjà remplies. Uniquement avec ce qui est vrai dans ton profil. Toi, tu relis et tu valides.
+          Un CV réécrit pour l’offre et une lettre de motivation sur mesure, uniquement avec ce qui est vrai dans ton profil confirmé. Offre gratuite : 2 dossiers par mois. Toi, tu relis et tu valides.
         </p>
       </motion.div>
 
@@ -284,7 +284,7 @@ const CHAPTERS = [
   ["Dépose ton CV.", "On le lit et on en tire ton profil : expériences, projets, diplômes. Rien n’est inventé, tu corriges ce que tu veux."],
   ["Épingle tes pistes.", "Choisis tes métiers, ton contrat et ta ville. Pas de mots-clés à deviner : tu coches, c’est tout."],
   ["On mène l’enquête.", "Tôt le matin et en début d’après-midi, on lit les nouvelles offres et on te montre d’abord celles qui ressemblent à ton CV."],
-  ["Tu relis, tu envoies.", "Un CV et une lettre écrits pour chaque offre, avec ce qui est vrai dans ton profil. Tu relis, tu valides, tu postules."],
+  ["Tu relis, tu envoies.", "Quand une offre te plaît, on écrit ton CV et ta lettre à partir de ton profil confirmé. Offre gratuite : 2 dossiers par mois. Tu relis, tu valides, tu postules."],
 ];
 
 export function Chapters() {
@@ -322,7 +322,7 @@ const FEATURES: { icon: string; title: string; text: string }[] = [
   { icon: "M10 4 A6 6 0 1 1 10 16 A6 6 0 1 1 10 4 Z|M14.5 14.5 L20 20", title: "On trie par ressemblance.", text: "Les offres les plus proches de ton CV passent en premier, même sans mot en commun." },
   { icon: "M5 5 H19 M5 10 H19 M5 15 H12|M15 18 L17 20 L21 15", title: "On résume chaque offre.", text: "« En bref » : missions, outils et rythme, en trois lignes." },
   { icon: "M6 3 H18 V21 H6 Z|M9 13 H15 M9 16 H15|M12 6 A2 2 0 1 1 12 10 A2 2 0 1 1 12 6 Z", title: "On réécrit ton CV.", text: "Une page, lisible par les logiciels de recrutement, en trois styles : classique, moderne, sobre." },
-  { icon: "M4 20 L16 8 C18 6 20 7 18 9 L6 21 Z|M14 4 L20 4", title: "On écrit ta lettre.", text: "Une lettre pour chaque offre, avec des faits vrais de ton parcours." },
+  { icon: "M4 20 L16 8 C18 6 20 7 18 9 L6 21 Z|M14 4 L20 4", title: "On écrit ta lettre.", text: "Une lettre quand une offre te plaît, avec des faits vrais de ton parcours." },
   { icon: "M5 6 L7 8 L10 5 M5 12 L7 14 L10 11 M5 18 L7 20 L10 17|M13 7 H20 M13 13 H20 M13 19 H20", title: "On retient tes réponses.", text: "Nationalité, permis, disponibilité : tu réponds une fois, on reprend partout." },
   { icon: "M12 3 L19 6 V11 C19 16 15.5 19.5 12 21 C8.5 19.5 5 16 5 11 V6 Z|M9 9 L15 15 M15 9 L9 15", title: "On écarte les fausses pistes.", text: "Offre retirée ? On s’arrête avant d’écrire. Signalée dix fois, elle disparaît pour tous." },
   { icon: "M3 7 H9 L11 9 H21 V19 H3 Z|M7 13 H17", title: "On range tes candidatures.", text: "À relire, envoyées, entretiens : tout ton suivi au même endroit." },
@@ -382,7 +382,7 @@ export function Features({ onSoon }: { onSoon: (feature: string) => void }) {
 }
 
 const BEFORE = ["Quarante onglets ouverts, les mêmes annonces partout.", "La même lettre, le nom de l’entreprise à changer.", "Des candidatures pour des offres déjà fermées.", "Un tableur pour se rappeler qui a répondu."];
-const AFTER = ["Un seul catalogue, trié pour toi.", "Une lettre écrite pour chaque offre.", "Les offres fermées disparaissent.", "Tout ton suivi au même endroit."];
+const AFTER = ["Un seul catalogue, trié pour toi.", "Une lettre écrite quand une offre te plaît.", "Les offres fermées disparaissent.", "Tout ton suivi au même endroit."];
 
 export function Ledger() {
   return (

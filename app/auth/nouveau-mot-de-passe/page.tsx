@@ -20,7 +20,7 @@ export default async function NewPasswordPage() {
               <span aria-hidden="true">←</span> Retour à l’accueil
             </Link>
             <h1 className="jj-fell" style={{ fontSize: 48, lineHeight: 1 }}>Nouveau mot de passe.</h1>
-            <p style={{ fontSize: 18, lineHeight: 1.55, color: "#4a4136" }}>Choisis un mot de passe de 8 caractères au moins. Les mots de passe déjà apparus dans une fuite de données sont refusés.</p>
+            <p style={{ fontSize: 18, lineHeight: 1.55, color: "#4a4136" }}>Choisis un mot de passe de 8 caractères au moins.</p>
             <NewPasswordForm />
           </div>
         </div>

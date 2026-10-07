@@ -198,7 +198,7 @@ function Hero({ start }: { start: number }) {
           ))}
         </h1>
         <motion.p className="jj-lead" {...fade(0.9)}>
-          On mène l’enquête pour toi : LeBonTaf fouille toute la France deux fois par jour, relie chaque offre à ton CV, puis écrit ton CV et ta lettre de motivation pour celles qui te ressemblent. Toi, tu relis et tu postules.
+          On mène l’enquête pour toi : LeBonTaf fouille toute la France deux fois par jour et relie chaque offre à ton CV. Quand une offre te plaît, on écrit ton CV et ta lettre de motivation à partir de ton profil confirmé. Toi, tu relis et tu postules.
         </motion.p>
         <motion.div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 28 }} {...fade(1.05)}>
           <Magnetic>
@@ -207,7 +207,7 @@ function Hero({ start }: { start: number }) {
           <a className="jj-quill" href="#filature">Voir l’enquête en action</a>
         </motion.div>
         <motion.ul className="jj-ticks" {...fade(1.2)}>
-          {["CV adapté à chaque offre", "Lettre de motivation", "Suivi des candidatures"].map((t) => (
+          {["CV adapté à l’offre", "Lettre de motivation", "Suivi des candidatures"].map((t) => (
             <li key={t}>
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path className="jj-ic" d="M5 12 L10 17 L19 7" style={{ strokeWidth: 2.4, color: "#2c8a5a" }} /></svg>
               {t}

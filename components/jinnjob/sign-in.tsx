@@ -183,7 +183,7 @@ function SignUpForm({ next }: { next: string }) {
     <form ref={form} action={(fd) => { setEditing(false); return action(fd); }} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <input type="hidden" name="next" value={next} />
       <EmailField state={state} />
-      <PasswordField label="Mot de passe" autoComplete="new-password" hint="8 caractères au moins. Les mots de passe déjà apparus dans une fuite de données sont refusés." />
+      <PasswordField label="Mot de passe" autoComplete="new-password" hint="8 caractères au moins." />
       {state.status === "error" && <p id="jj-mail-error" className="jj-error" role="alert">{state.message}</p>}
       <Submit>Créer mon compte</Submit>
     </form>
