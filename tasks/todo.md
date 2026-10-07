@@ -8,4 +8,4 @@
 - [ ] IA : limiter les analyses répétées, résumés partagés et embeddings compatibles ; CV/lettre avec preuves et validation utilisateur.
 - [ ] Suivi : parcours complet, documents téléchargeables et absence d'envoi automatique.
 - [ ] Budget : quota gratuit, plafond existant 2 $, alertes et comportement en cas d'épuisement.
-- [ ] Livraison : tests, typecheck, lint, build, CI, déploiement, vérification de production et backlog actualisé.
+- [x] Livraison : tests, typecheck, lint, build, CI, migration, déploiement READY et backlog actualisé. Recherche et admin vérifiés en production ; import et réinitialisation complète restent explicitement ouverts.

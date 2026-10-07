@@ -580,11 +580,11 @@ function SystemSection({ status, ctx }: { status: SystemStatus | null; ctx: Ctx 
         : { tone: "good" as const, label: "Prêt", hint: "" };
   const rows: { name: string; text: string; tone: "good" | "bad" | "warn"; label: string; hint?: string }[] = [
     {
-      name: "IA Gemini",
-      text: "Scores, CV et lettres",
-      tone: status.gemini ? "good" : "bad",
-      label: status.gemini ? "Prête" : "Clé manquante",
-      hint: status.gemini ? "" : "GEMINI_API_KEY dans Vercel",
+      name: status.aiProvider === "gateway" ? "IA Gateway" : "IA Gemini",
+      text: "Lecture des offres, CV et lettres",
+      tone: (status.aiConfigured ?? status.gemini) ? "good" : "bad",
+      label: (status.aiConfigured ?? status.gemini) ? "Configurée" : "Clé manquante",
+      hint: (status.aiConfigured ?? status.gemini) ? "" : "Configure le fournisseur IA dans Vercel",
     },
     {
       name: "Google Drive",

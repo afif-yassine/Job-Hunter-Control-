@@ -9,6 +9,8 @@ export type SystemStatus = {
   safeMode: boolean;
   explicitModeVariable: boolean;
   gemini: boolean;
+  aiConfigured?: boolean;
+  aiProvider?: string;
   drive: boolean;
   worker: boolean;
   workerOnline: boolean;

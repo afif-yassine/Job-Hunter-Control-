@@ -5,6 +5,7 @@ import { planUsage } from "@/lib/plan";
 import { usageToday } from "@/lib/quota";
 import { workerState } from "@/lib/worker-status";
 import { loadUserSettings } from "@/lib/settings";
+import { aiConfigured } from "@/lib/ai";
 
 /**
  * Tells the (authenticated) dashboard which integrations are configured.
@@ -27,6 +28,8 @@ export async function GET() {
     safeMode: isSafeMode(),
     explicitModeVariable: has("APPLICATION_MODE"),
     gemini: has("GEMINI_API_KEY"),
+    aiConfigured: aiConfigured(),
+    aiProvider: (process.env.AI_PROVIDER || "gemini").trim().toLowerCase(),
     drive:
       has("GOOGLE_SERVICE_ACCOUNT_JSON") &&
       has("GOOGLE_DRIVE_CVS_FOLDER_ID") &&
