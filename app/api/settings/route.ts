@@ -4,6 +4,7 @@ import { normalizePrefs } from "@/lib/scan/config";
 import { loadDiscovered } from "@/lib/scan/discover";
 import { seedFromCatalogue } from "@/lib/scan";
 import { loadUserSettings, saveUserSettings } from "@/lib/settings";
+import { loadSearches } from "@/lib/saved-searches";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Settings + the companies found automatically (empty before the migration). */
@@ -31,8 +32,13 @@ export async function PUT(req: Request) {
   if ("error" in auth) return auth.error;
   const parsed = body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Requête invalide." }, { status: 400 });
+  let searches;
+  if (parsed.data.prefs !== undefined) {
+    try { searches = (await loadSearches(auth.supabase, auth.userId)).searches; }
+    catch { return Response.json({ error: "Réglages indisponibles : aucune recherche enregistrée n’a été modifiée." }, { status: 503 }); }
+  }
   const { error } = await saveUserSettings(auth.supabase, auth.userId, {
-    prefs: parsed.data.prefs === undefined ? undefined : normalizePrefs(parsed.data.prefs),
+    prefs: parsed.data.prefs === undefined ? undefined : { ...normalizePrefs(parsed.data.prefs), savedSearches: searches },
     autoScan: parsed.data.autoScan,
   });
   if (error)

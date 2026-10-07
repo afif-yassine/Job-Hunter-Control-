@@ -194,7 +194,7 @@ export async function buildAdminOverview(ctx: {
   // What the admin has to do by hand, most important first.
   const actions: AdminAction[] = [];
   const api = sources.filter((s) => s.kind === "api");
-  if (!aiConfigured(env)) actions.push({ level: "required", text: "Ajoute GEMINI_API_KEY dans Vercel : sans elle, ni score ni CV." });
+  if (!aiConfigured(env)) actions.push({ level: "required", text: "Configure le fournisseur IA dans Vercel pour lire les offres et rédiger les CV et lettres. La comparaison des compétences reste disponible sans appel IA." });
   if (!api.some((s) => s.keyOrigin !== "none") && !sources.some((s) => s.kind === "careers" && s.companies))
     actions.push({ level: "required", text: "Aucune source d’offres active : ajoute au moins France Travail (gratuit) dans Vercel." });
   for (const s of sources) {

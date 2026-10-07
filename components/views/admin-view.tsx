@@ -536,6 +536,7 @@ type AiCostsState = {
   prices: { input: number; output: number };
   total: { calls: number; input: number; output: number; usd: number };
   accounts: { userId: string; email: string | null; calls: number; input: number; output: number; usd: number }[];
+  alert: { thresholdUsd: number; level: "normal" | "warning" | "exceeded" };
 };
 
 const usd = (n: number) => (n < 0.01 && n > 0 ? "< 0,01 $" : `${n.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} $`);
@@ -574,6 +575,9 @@ function AiCostSection({ ctx }: { ctx: AdminCtx }) {
         )}
         {state && (
           <>
+            {state.alert?.level !== "normal" && state.alert && <Callout tone="bad" title={state.alert.level === "exceeded" ? "Seuil de dépenses IA atteint" : "Dépenses IA à surveiller"}>
+              {usd(state.total.usd)} comptabilisés sur 30 jours, pour un seuil d’alerte de {usd(state.alert.thresholdUsd)}. Vérifie le plafond et le crédit restant dans AI Gateway avant de poursuivre.
+            </Callout>}
             <div>
               <span>Total</span>
               <strong>
@@ -591,7 +595,7 @@ function AiCostSection({ ctx }: { ctx: AdminCtx }) {
                     <th>Appels</th>
                     <th>Jetons lus</th>
                     <th>Jetons écrits</th>
-                    <th>Coût estimé</th>
+                    <th>Coût comptabilisé</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -608,8 +612,7 @@ function AiCostSection({ ctx }: { ctx: AdminCtx }) {
               </table>
             )}
             <p className="muted small-text">
-              Estimation à {state.prices.input} $ / million de jetons lus et {state.prices.output} $ / million écrits. Mets les
-              prix réels de ton modèle dans Vercel : AI_PRICE_INPUT_PER_M et AI_PRICE_OUTPUT_PER_M.
+              Coût retourné par le fournisseur quand disponible ; sinon estimation au tarif du modèle. Catalogue et embeddings partagés inclus. Le seuil d’alerte (AI_SPEND_ALERT_USD, 2 $ par défaut) n’est pas le plafond de la clé Gateway.
             </p>
           </>
         )}

@@ -14,7 +14,7 @@ export function isPublicHttpsUrl(raw: string): boolean {
   try {
     const u = new URL(raw);
     const h = u.hostname.toLowerCase();
-    return u.protocol === "https:" && h !== "localhost" && !h.endsWith(".local") && !isIP(h);
+    return u.protocol === "https:" && !u.username && !u.password && (!u.port || u.port === "443") && h !== "localhost" && !h.endsWith(".localhost") && !h.endsWith(".local") && !isIP(h.replace(/^\[|\]$/g, ""));
   } catch {
     return false;
   }

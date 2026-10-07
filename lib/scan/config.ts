@@ -1,5 +1,6 @@
 import { CATEGORY_IDS, SCOPE_CONTRACTS, categorize, category, contractKind } from "./categories";
 import { parseAtsTarget, targetKey, type AtsTarget } from "./sources/ats";
+import { storedSearches, type SavedSearch } from "../saved-searches";
 
 export type SearchQuery = {
   keywords: string;
@@ -26,6 +27,7 @@ export type ScanConfig = {
 
 /** What the user edits in Réglages > Recherche. */
 export type ScanPrefs = {
+  savedSearches?: SavedSearch[];
   contracts: string[];
   /** Job categories ticked instead of (or on top of) typed keywords. */
   categories: string[];
@@ -64,6 +66,7 @@ export function normalizePrefs(value: unknown): ScanPrefs {
     .map((d) => d.padStart(2, "0"))
     .filter((d) => d.length <= 3 && d !== "00");
   return {
+    ...(Array.isArray(v.savedSearches) ? { savedSearches: storedSearches(v.savedSearches) } : {}),
     contracts: list(v.contracts, 4).filter((c) => SCOPE_CONTRACTS.includes(c as never)).length
       ? list(v.contracts, 4).filter((c) => SCOPE_CONTRACTS.includes(c as never))
       : DEFAULT_PREFS.contracts,

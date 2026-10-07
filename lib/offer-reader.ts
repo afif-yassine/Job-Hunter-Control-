@@ -58,7 +58,7 @@ export function parseCard(text: string): (OfferSummary & { skills: string[]; lev
   }
 }
 
-type Pending = { id: string; title: string; company: string | null; location: string | null; contract_type: string | null; description: string | null };
+type Pending = { id: string; title: string; company: string | null; location: string | null; contract_type: string | null; description: string | null; reader_token?: string };
 
 /**
  * Reads open offers that have no summary yet, newest first (service client).
@@ -71,7 +71,9 @@ export async function readPendingOffers(
   const env = opts.env ?? process.env;
   if (!opts.ai && !aiConfigured(env)) return { read: 0, failed: 0 };
   const ai: AiCall = opts.ai ?? ((prompt, task) => generateJson(prompt, task, env));
-  const { data, error } = await db
+  const leased = env.AI_READER_LEASES === "1";
+  if (opts.timeLeft && opts.timeLeft() < 8_000) return { read: 0, failed: 0 };
+  const { data, error } = leased ? await db.rpc("claim_offer_readings", { p_limit: opts.limit ?? 60 }) : await db
     .from("offers")
     .select("id,title,company,location,contract_type,description")
     .eq("status", "open")
@@ -81,29 +83,42 @@ export async function readPendingOffers(
   if (error) throw new Error(`Lecture du catalogue impossible : ${error.message}`);
   if (!data?.length) return { read: 0, failed: 0 };
   const queue = (data as Pending[]).filter((o) => (o.description ?? "").length >= 120);
+  const reservations = queue.map(o => ({ id: o.id, token: o.reader_token }));
   let read = 0;
   let failed = 0;
+  let stopped: unknown;
   const worker = async () => {
     for (let o = queue.shift(); o; o = queue.shift()) {
-      if (opts.timeLeft && opts.timeLeft() < 8_000) return;
+      if (stopped || (opts.timeLeft && opts.timeLeft() < 8_000)) return;
       try {
         const result = await ai(readerPrompt({ ...o, description: o.description ?? "" }), "reading");
         await recordAiUsage(db, null, "reading", result);
-        const summary = parseCard(result.text);
-        if (!summary) {
+        const parsed = parseCard(result.text);
+        if (!parsed) {
           failed += 1;
           continue;
         }
-        const { error: e } = await db.from("offers").update({ summary }).eq("id", o.id).is("summary", null);
-        if (e) failed += 1;
+        const summary = { ...parsed, model: result.model, processed_at: new Date().toISOString() };
+        const saved = leased
+          ? await db.rpc("finish_offer_reading", { p_id: o.id, p_token: o.reader_token, p_summary: summary })
+          : await db.from("offers").update({ summary }).eq("id", o.id).is("summary", null);
+        if (saved.error || (leased && saved.data !== true)) failed += 1;
         else read += 1;
       } catch (err) {
         failed += 1;
         // A provider problem (credit, key) stops the round instead of repeating it 60 times.
-        if (err instanceof AiUnavailable || /crédit|clé|Crédit|Clé/.test(err instanceof Error ? err.message : "")) throw err;
+        if (err instanceof AiUnavailable || /crédit|clé|Crédit|Clé/.test(err instanceof Error ? err.message : "")) { stopped = err; return; }
       }
     }
   };
-  await Promise.all(Array.from({ length: Math.max(1, opts.concurrency ?? 6) }, worker));
+  try {
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(6, opts.concurrency ?? 6)) }, worker));
+    if (stopped) throw stopped;
+  } finally {
+    if (leased) {
+      const released = await db.rpc("release_offer_readings", { p_rows: reservations });
+      if (released.error && !stopped) throw new Error("Libération des lectures impossible ; les réservations expirent sous deux minutes.");
+    }
+  }
   return { read, failed };
 }
