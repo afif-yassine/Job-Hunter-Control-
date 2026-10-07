@@ -43,7 +43,7 @@ Cette liste reprend les fonctionnalités cochées dans l’ancien backlog, regro
 
 - [x] Comptes et accès limité aux données de son propre compte.
 - [x] Connexion Google et lien magique par e-mail ; application Google publiée en production.
-- [x] SMTP personnalisé Resend activé dans Supabase ; vérification du parcours e-mail restante dans MVP-02.
+- [x] SMTP personnalisé Resend activé dans Supabase ; parcours e-mail vérifié en production le 7 octobre (MVP-02).
 - [x] Import d’un CV PDF numérique, conservation du profil et proposition des catégories depuis le CV.
 - [x] Extraction locale du PDF puis structuration via Gateway ; brouillon à confirmer, PDF scannés refusés explicitement.
 - [x] Profil et expériences utilisables comme preuves pour adapter les documents.
