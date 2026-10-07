@@ -1,6 +1,6 @@
 # LeBonTaf — Product backlog
 
-Référence principale du projet — 6 octobre 2026.
+Référence principale du projet — mise à jour du 7 octobre 2026.
 
 Ce fichier reprend le backlog global fourni par le propriétaire depuis Claude. Il remplace le document centré sur le design, conservé dans [l'archive](archive/PRODUCT-BACKLOG-DESIGN-2026-10-06.md). La [copie originale](BACKLOG-CLAUDE-2026-10-06.md) et la [passation](PASSATION-CLAUDE-2026-10-06.md) sont conservées.
 
@@ -11,20 +11,21 @@ Objectif : lancer le MVP pour les 100 premiers utilisateurs avec des traitements
 ### Base déjà présente dans le code
 
 - Lecture partagée d'une offre : un appel LLM extrait résumé, missions, outils, conditions, compétences, niveau et télétravail, puis sauvegarde le résultat.
-- Embeddings sauvegardés des offres et du profil ; classement par similarité et compétences sans nouvel appel LLM pour chaque résultat. Le rattrapage de production reste incomplet.
+- Catalogue Perplexity entièrement vectorisé : 3 890 offres ouvertes, 1 024 dimensions, espace versionné. Les profils sont vectorisés à leur prochaine recherche ; vérification du classement réel encore à terminer.
 - Détection de doublons par liens normalisés, empreinte entreprise/titre/ville/contrat et comparaison de textes dans les parcours prévus.
 - Fermeture des offres absentes de certains tableaux d'entreprises lus complètement, expiration des offres anciennes et contrôle HTTP/API avant génération des documents.
 - Génération du CV et de la lettre en un appel ; suivi des tokens et contrôles de quotas présents, à compléter et vérifier.
 
 ### P0 — catalogue partagé et suppression des répétitions
 
-- [ ] Terminer le rattrapage des embeddings et des résumés, après résolution du crédit Gemini épuisé ; contrôler les résultats en production.
+- [x] Rattraper les embeddings du catalogue en production : 3 890/3 890 offres, 78 appels par lots, 0,006257 USD. Une relance ne lance aucun nouvel appel pour les offres inchangées.
+- [ ] Terminer les résumés partagés : 2 788/3 890 au dernier contrôle ; le cron Qwen progresse et ne signale plus d'erreur fournisseur.
 - [ ] Compléter l'extraction structurée unique avec durée, rythme, dates et salaire lorsqu'ils figurent dans la source. Conserver les faits de la source et laisser les informations absentes inconnues ; valider les formats sans nouvel appel LLM.
 - [ ] Sauvegarder l'empreinte du contenu pertinent, la version de l'extracteur, le modèle et la date de traitement. Une collecte identique ne relance ni lecture ni embedding ; un changement pertinent invalide les résultats concernés.
 - [ ] Garantir qu'une même offre collectée sur plusieurs sources réutilise ses traitements partagés ; vérifier les faux rapprochements pour ne pas fusionner des postes différents.
 - [ ] Réserver atomiquement les traitements en cours pour éviter deux appels simultanés sur la même offre ; prévoir expiration du verrou, reprises bornées et erreurs visibles.
-- [ ] Éviter l'embedding forcé à chaque sauvegarde du profil : le recalculer uniquement après changement pertinent ou changement de version du modèle.
-- [ ] Conserver la compatibilité des modèles et versions d'embeddings entre profils et offres ; prévoir un rattrapage explicite avant tout changement de modèle.
+- [x] Éviter l'embedding forcé à chaque sauvegarde du profil : cache par source et version, présence du vecteur vérifiée, réservation SQL avant calcul.
+- [x] Conserver la compatibilité des modèles et versions d'embeddings entre profils et offres : colonnes parallèles et RPC par espace ; catalogue rattrapé avant activation de Perplexity.
 
 ### P0 — classement et rédaction à la demande
 
@@ -32,9 +33,9 @@ Objectif : lancer le MVP pour les 100 premiers utilisateurs avec des traitements
 - [ ] Produire les explications simples (compétences communes/manquantes, critères incompatibles ou inconnus) par calcul et règles, sans appel LLM.
 - [ ] Retirer l'analyse LLM détaillée obligatoire avant la génération, dans les parcours manuel et automatique ; utiliser les faits structurés et le classement existant. Garder le conseil approfondi comme action facultative et limitée.
 - [ ] Terminer le RAG de rédaction : sélectionner les preuves pertinentes du profil et du registre de vérité pour l'offre choisie, sans envoyer tout le catalogue ou tout l'historique et sans inventer de faits.
-- [ ] Brancher la sélection de preuves testée au pipeline : faits confirmés avec source et version, utilisateur issu de l'authentification serveur, RLS vérifiée, références et reformulations contrôlées avant affichage. Le prototype local n'est pas encore intégré à la production.
-- [ ] Avant remplacement de Gemini : versionner l'espace vectoriel des offres et profils, migrer les deux ensembles et adapter stockage/index aux 1024 dimensions Perplexity testées. Recalibrer les seuils du classement : les bonnes correspondances observées sont sous le seuil Gemini actuel de 0,50.
-- [ ] Sauvegarder les générations avec utilisateur, versions du profil et de l'offre, consignes et version du traitement ; une réouverture réaffiche le résultat, une révision explicite peut relancer l'IA. Isoler les données et résultats personnels entre comptes.
+- [x] Brancher la sélection déterministe de preuves au pipeline : un kit réel GPT-6 Luna a été créé avec 24 preuves et versions conservées, compétences explicites contrôlées. Les reformulations restent à relire et leur validation complète reste à faire.
+- [x] Versionner l'espace vectoriel et adapter stockage/index aux 1 024 dimensions Perplexity ; catalogue migré avant activation, profils calculés à la demande. La calibration de la note sémantique reste une tâche séparée.
+- [x] Sauvegarder les générations avec utilisateur et versions ; le kit réel se réaffiche avec les mêmes documents. Cache et isolation couverts par les tests, révisions explicites distinctes.
 
 ### P0 — disponibilité des offres sans LLM
 
@@ -53,7 +54,7 @@ Objectif : lancer le MVP pour les 100 premiers utilisateurs avec des traitements
 
 ### P1 — choix des modèles après validation du MVP
 
-Suivi : [intégration IA et ordre d'activation](INTEGRATION-IA-2026-10-06.md). Après les tests, le propriétaire a autorisé la suite : migration appliquée et contrôlée en production ; activation Gateway en attente de clé durable.
+Suivi : [intégration IA et ordre d'activation](INTEGRATION-IA-2026-10-06.md). Gateway texte et embeddings activés en production avec la clé durable du propriétaire ; plafond de 2 USD conservé.
 
 - [x] Préparer le routage texte Gateway par tâche, les sorties bornées et l'enregistrement du coût retourné.
 - [x] Brancher une sélection déterministe des preuves du profil au kit et aux révisions ; vérifier les compétences explicites avant sauvegarde. Les reformulations restent à relire.
@@ -63,7 +64,8 @@ Suivi : [intégration IA et ordre d'activation](INTEGRATION-IA-2026-10-06.md). A
 - [x] Réserver atomiquement les embeddings d'offres/profils ; tests d'appels concurrents et de libération après erreur.
 - [ ] Terminer le rattrapage des offres et les vérifications des modèles sur les parcours réels.
 - [x] Clé durable Gateway configurée et plafond réel de 2 USD confirmé ; routage texte activé et redéployé en production. Contrôle de collecte : 52 lectures Qwen réussies, environ 0,002591 USD comptabilisés.
-- [ ] Terminer le rattrapage Perplexity avant bascule des profils/recherche ; vérifier un kit GPT complet avec la nouvelle clé. Gemini embeddings est encore bloqué par son crédit épuisé.
+- [x] Terminer le rattrapage Perplexity avant bascule des profils/recherche ; vérifier un kit GPT complet avec la nouvelle clé : CV et lettre sauvegardés, deux PDF d'une page ouverts dans Chrome, coût de rédaction 0,001082 USD. Déploiement Perplexity `dpl_9vxtwW7stxYSyLejKuZQPxUYZQ8J` READY.
+- [ ] Vérifier la recherche Perplexity avec le profil réel : Chrome a cessé de répondre avant le lancement. Le profil n'a pas encore de vecteur Perplexity au dernier contrôle ; action « Lancer la recherche » demandée au propriétaire.
 - [ ] Calibrer la note sémantique Perplexity sur de vrais profils ; la proximité sert à classer mais ne reçoit pas encore de note numérique.
 - [ ] Réserver les révisions concurrentes ; contrôler les reformulations et les coûts au niveau global.
 
@@ -79,6 +81,15 @@ Suivi : [intégration IA et ordre d'activation](INTEGRATION-IA-2026-10-06.md). A
 - [ ] Étudier le traitement différé Batch pour le catalogue lorsque le délai est acceptable ; mesurer le gain avant adoption.
 
 ## Vérifications récentes : ces constats priment sur les états historiques ci-dessous
+
+### Activation Gateway et catalogue — contrôle du 7 octobre 2026
+
+- [x] Livraison du rattrapage protégé : [PR #2](https://github.com/afif-yassine/Job-Hunter-Control-/pull/2), CI et build Vercel réussis. Lots bornés, authentification avant accès à la base, pas de reprise IA automatique ; test de mutation du contrôle d'accès détecté puis code restauré.
+- [x] Tous les vecteurs du catalogue présents dans le même espace Perplexity ; relance HTTP 200, `embedded: 0`, compteur d'appels inchangé à 78.
+- [x] `EMBEDDING_PROVIDER=gateway` activé après rattrapage et redéploiement READY ; les deux dernières réponses du cron sont HTTP 200 sans erreur, avec 58 résumés lus par exécution.
+- [ ] Import d'un nouveau CV PDF : reste sur Gemini, dont le crédit est épuisé. Ne pas présenter la génération PDF des documents comme une validation de l'import PDF/OCR.
+
+Les constats de rattrapage Gemini ci-dessous sont historiques et sont remplacés par l'activation Gateway ci-dessus. Le crédit Gemini n'a pas été rechargé ; il reste requis par l'import PDF actuel.
 
 ### Correction du rattrapage — 6 octobre 2026
 
@@ -156,7 +167,7 @@ Ces 12 composants doivent être « terminés » avant d’ouvrir l’appli à d�
 | Import du CV | Tout le reste part du profil | Fait | — |
 | Catalogue d’offres (collecte 2 fois par jour) | C’est ce que l’étudiant vient chercher | À finir | Plus de stages, logo Adzuna, plan Supabase au-delà de 500 Mo |
 | Recherche et filtres | Trouver vite la bonne offre | À finir | Filtres avancés, recherches enregistrées |
-| Classement selon le CV | Les bonnes offres en premier | À finir | Embeddings jamais calculés en production (0 offre sur 3 940) : classement à refaire, voir Sprint 7 |
+| Classement selon le CV | Les bonnes offres en premier | À finir | 3 890 offres vectorisées avec Perplexity ; vérifier la recherche avec de vrais profils et calibrer la note sémantique, voir Sprint 7 |
 | CV et lettre adaptés | La promesse principale du produit | À finir | RAG sur le registre de vérité (rien d’inventé) |
 | Suivi des candidatures | Savoir où on en est | À finir | Mise en ligne du Sprint 6 (parcours de chaque offre, Mon suivi) |
 | Design LeBonTaf | La première impression, sur mobile aussi | Fait | — |

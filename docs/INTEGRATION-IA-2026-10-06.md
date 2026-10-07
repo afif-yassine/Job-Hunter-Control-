@@ -1,5 +1,20 @@
 # Intégration IA et activation — 6 octobre 2026
 
+## État vérifié au 7 octobre 2026 — référence actuelle
+
+- Catalogue : **3 890/3 890 offres ouvertes vectorisées**, espace `perplexity/pplx-embed-v1-0.6b@retrieval-v1`, **1 024 dimensions** vérifiées en base. Rattrapage protégé livré dans la [PR #2](https://github.com/afif-yassine/Job-Hunter-Control-/pull/2), commit de fusion `1bdf142c`. **78 appels, 1 564 031 tokens, 0,006257 USD** comptabilisés. Relance terminée avec `embedded: 0`, aucun appel supplémentaire.
+- `EMBEDDING_PROVIDER=gateway` activé après le rattrapage ; redéploiement de production **`dpl_9vxtwW7stxYSyLejKuZQPxUYZQ8J` READY**. Le cron utilise Perplexity et Qwen, les dernières réponses sont HTTP 200 sans erreur. **2 788 résumés sur 3 890** au dernier contrôle, progression automatique en cours.
+- Kit réel créé depuis le compte connecté : **un appel GPT-6 Luna, 3 402 tokens d'entrée et 1 313 de sortie, coût 0,001082 USD**. CV et lettre sauvegardés avec 24 preuves et la même version ; non approuvés et à relire. Les deux PDF d'une page s'ouvrent dans Chrome. Réouverture du dossier : mêmes documents, sans nouvelle génération.
+- Plafond de la clé durable maintenu à **2 USD**, sans renouvellement automatique. Aucun achat ni changement de ce plafond.
+- Vérification de recherche avec le profil réel **en attente** : Chrome ne répond plus aux commandes de l'extension ; le profil n'a pas encore de vecteur Perplexity. Le propriétaire est invité à lancer une recherche. La calibration de la note sémantique et la validation complète des reformulations restent ouvertes.
+- **Import CV PDF non validé** : ce parcours reste sur Gemini, dont le crédit est épuisé. Le succès du rendu PDF des documents générés ne valide pas l'import/OCR.
+
+Le rattrapage se lance par POST `/api/cron/embeddings`, avec l'Authorization CRON_SECRET déjà configurée côté serveur. Maximum 300 offres par exécution, 40 secondes de travail, délai de requête ajusté au temps restant, réservations SQL et libération après erreur. Ne pas ajouter la clé ou le secret aux journaux. Le rattrapage ne lance ni lecture LLM d'offre ni génération de profil.
+
+Validation : CI GitHub et build Vercel réussis ; tests ciblés du contrôle d'accès, du délai, des erreurs masquées et de l'absence de reprise automatique réussis. Supprimer temporairement le contrôle d'accès fait échouer le test attendu ; code restauré avant livraison.
+
+**Historique de préparation et première activation** : les sections suivantes décrivent les étapes antérieures et ne remplacent pas l'état actuel ci-dessus.
+
 ## Activation texte vérifiée en production
 
 Le propriétaire a créé une clé durable, configuré `AI_GATEWAY_API_KEY` comme secret de production et choisi un plafond de **2 USD**, sans renouvellement automatique (confirmé dans AI Gateway). Le routage `AI_PROVIDER=gateway`, Qwen3.7 Flash lecture/analyse et GPT-6 Luna rédaction a été configuré, puis redéployé : `dpl_F2Ge1j9a1KAQQq4EPBGjECEmvKhr`, READY, associé à `lebontaf.com`, commit `495a221d`.
