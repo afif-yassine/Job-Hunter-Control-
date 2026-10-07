@@ -203,12 +203,12 @@ test("review: already applied elsewhere is remembered; a duplicate's links move 
   assert.equal(tables.jobs.find((j) => j.id === "orig")!.status, "SUBMITTED");
 });
 
-test("quota: defaults, overrides, and a missing counter never blocks", async () => {
+test("quota: defaults, overrides, and a missing counter blocks paid work", async () => {
   assert.equal(quotaLimit("analysis", {}), 20);
   assert.equal(quotaLimit("generation", { QUOTA_GENERATIONS_PER_DAY: "4" }), 4);
   assert.equal(quotaLimit("scan", { QUOTA_SCANS_PER_DAY: "0" }), 0);
   const { db } = fakeSupabase({});
-  assert.deepEqual(await consumeQuota(db, "u1", "analysis", {}), { ok: true, limit: 20 });
+  assert.deepEqual(await consumeQuota(db, "u1", "analysis", {}), { ok: false, limit: 20, unavailable: true });
 });
 
 test("server run: searches due accounts, scores, writes documents, logs and notifies — without a browser", async () => {

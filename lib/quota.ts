@@ -40,15 +40,15 @@ export function quotaMessage(kind: QuotaKind, limit: number): string {
 
 /**
  * Records one use if the account is under today's limit.
- * If the counter itself is unavailable (migration missing), the action is
- * allowed: a broken counter must never block the user.
+ * A missing counter must not enable unlimited paid calls. Only an explicit
+ * true authorises work; outages are reported separately from exhausted quotas.
  */
 export async function consumeQuota(
   supabase: SupabaseClient,
   userId: string,
   kind: QuotaKind,
   env: Env = process.env,
-): Promise<{ ok: boolean; limit: number }> {
+): Promise<{ ok: boolean; limit: number; unavailable?: boolean }> {
   const limit = quotaLimit(kind, env);
   if (limit <= 0) return { ok: true, limit };
   const { data, error } = await supabase.rpc("consume_quota", {
@@ -56,11 +56,15 @@ export async function consumeQuota(
     p_kind: kind,
     p_limit: limit,
   });
-  if (error) return { ok: true, limit };
-  return { ok: data !== false, limit };
+  if (error || typeof data !== "boolean") return { ok: false, limit, unavailable: true };
+  return { ok: data === true, limit };
 }
 
-export function quotaRefusal(kind: QuotaKind, limit: number) {
+export function quotaRefusal(kind: QuotaKind, limit: number, unavailable = false) {
+  if (unavailable) return {
+    status: 503,
+    body: { error: "La vérification des limites est indisponible. Réessaie dans quelques instants ; aucun appel IA n’a été lancé.", code: "QUOTA_UNAVAILABLE", kind },
+  };
   return { status: 429, body: { error: quotaMessage(kind, limit), code: QUOTA_CODE, kind } };
 }
 

@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
   const quota = await consumeQuota(auth.supabase, auth.userId, "generation");
   if (!quota.ok) {
-    const refusal = quotaRefusal("generation", quota.limit);
+    const refusal = quotaRefusal("generation", quota.limit, quota.unavailable);
     return Response.json(refusal.body, { status: refusal.status });
   }
   try {

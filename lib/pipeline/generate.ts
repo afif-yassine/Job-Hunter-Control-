@@ -109,7 +109,7 @@ async function generateKit(ctx: Ctx): Promise<StepResult> {
   if (!plan.ok) return { status: plan.status, body: plan.body };
 
   const quota = await consumeQuota(supabase, userId, "generation", env);
-  if (!quota.ok) return quotaRefusal("generation", quota.limit);
+  if (!quota.ok) return quotaRefusal("generation", quota.limit, quota.unavailable);
 
   let parsed: Generated | null = null;
   let model = "";
