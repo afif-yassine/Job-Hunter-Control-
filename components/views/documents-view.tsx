@@ -79,7 +79,14 @@ export function DocumentsView({ ctx }: { ctx: Ctx }) {
 
   return (
     <>
-      <PageHead title="Documents" subtitle="Relis, modifie si besoin, puis approuve. L’envoi vers Drive se fait après approbation." />
+      <PageHead
+        title="Documents"
+        subtitle={
+          ctx.status?.isAdmin
+            ? "Relis, modifie si besoin, puis approuve. L’envoi vers Drive se fait après approbation."
+            : "Relis tes CV et lettres, modifie-les si besoin, puis postule sur le site de l’offre."
+        }
+      />
       <Soon id="versions" />
       <div className="cards">
         {groups.map((group) => {
@@ -127,6 +134,8 @@ export function DocumentsView({ ctx }: { ctx: Ctx }) {
 function DocRow({ doc, ctx, working }: { doc: DocumentRecord; ctx: Ctx; working: boolean }) {
   const { act, busy } = ctx;
   const disabled = Boolean(busy);
+  // Approval and the Drive folder belong to the platform administrator; a student keeps and reads documents here.
+  const admin = ctx.status?.isAdmin === true;
   const state = doc.storage_path
     ? { tone: "good" as const, label: "Sur Drive" }
     : doc.approved
@@ -137,7 +146,7 @@ function DocRow({ doc, ctx, working }: { doc: DocumentRecord; ctx: Ctx; working:
       <div className="docinfo">
         <strong>{DOCUMENT_KIND[doc.kind] || doc.kind}</strong>
         <Chip>v{doc.version}</Chip>
-        <Chip tone={state.tone}>{state.label}</Chip>
+        {admin && <Chip tone={state.tone}>{state.label}</Chip>}
       </div>
       <div className="docactions">
         <a className="btn secondary small" href={`/api/documents/${doc.id}/pdf`} target="_blank" rel="noreferrer">
@@ -162,17 +171,17 @@ function DocRow({ doc, ctx, working }: { doc: DocumentRecord; ctx: Ctx; working:
             </a>
           </div>
         </details>
-        {!doc.approved && (
+        {admin && !doc.approved && (
           <button className="btn small" disabled={disabled} onClick={() => void act.approve(doc)}>
             {working ? "…" : "Approuver"}
           </button>
         )}
-        {doc.approved && !doc.storage_path && (
+        {admin && doc.approved && !doc.storage_path && (
           <button className="btn small" disabled={disabled} onClick={() => void act.upload(doc)}>
             <CloudUpload size={14} aria-hidden /> {working ? "Envoi…" : "Envoyer sur Drive"}
           </button>
         )}
-        {doc.storage_path && (
+        {admin && doc.storage_path && (
           <a className="btn secondary small" href={doc.storage_path} target="_blank" rel="noreferrer">
             Ouvrir sur Drive
           </a>

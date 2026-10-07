@@ -81,10 +81,10 @@ const MOVED: Record<Stage, string> = {
   dismissed: "Offre écartée : elle ne reviendra plus.",
 };
 
-/** Server error → one readable sentence. */
-function readable(raw: unknown): string {
+/** Server error → one readable sentence; only the administrator reads platform details. */
+function readableError(raw: unknown, admin: boolean): string {
   const text = cleanRaw(String(raw || "Erreur inconnue"));
-  const e = explainError(text);
+  const e = explainError(text, admin ? "admin" : "student");
   return e ? `${e.title}${e.hint ? ` — ${e.hint}` : ""}` : text;
 }
 
@@ -147,8 +147,11 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
   const notify = useCallback((text: string, tone: Tone = "info") => {
     window.clearTimeout(toastTimer.current);
     setToast(text ? { text, tone } : null);
-    if (text && tone !== "bad") toastTimer.current = window.setTimeout(() => setToast(null), 7000);
+    // An error stays a little longer to be read, but it closes by itself too.
+    if (text) toastTimer.current = window.setTimeout(() => setToast(null), tone === "bad" ? 12000 : 7000);
   }, []);
+  const isAdmin = status?.isAdmin === true;
+  const readable = useCallback((raw: unknown) => readableError(raw, isAdmin), [isAdmin]);
 
   // Nothing fails silently: any error the page did not handle is shown.
   useEffect(() => {
@@ -231,6 +234,8 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
         }),
       upload: (doc) =>
         run(doc.id, async () => {
+          // The platform's Drive folder is for the administrator; the route refuses anybody else.
+          if (!isAdmin) return;
           notify("Envoi vers Google Drive…");
           const r = await post(`/api/documents/${doc.id}/drive`);
           notify(r.ok ? "Document envoyé sur Google Drive." : readable(r.body.error), r.ok ? "good" : "bad");
@@ -317,7 +322,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
         notify(error ? readable(error.message) : "Notes enregistrées.", error ? "bad" : "info");
       },
     }),
-    [notify, reload, run, supabase, patchJob, refreshStatus, data.documents],
+    [notify, readable, isAdmin, reload, run, supabase, patchJob, refreshStatus, data.documents],
   );
 
   const closeOffer = useCallback(() => setOpenId(null), []);
@@ -429,10 +434,10 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
   const activeTab: View = MORE_VIEWS.has(view) ? "more" : view;
 
   const p = pipeline.progress;
-  const phases = ["scan", "analyze", "generate", "prepare"] as const;
-  const percent = p
-    ? ((phases.indexOf(p.phase) + (p.total ? p.done / p.total : 0)) / phases.length) * 100
-    : 0;
+  // A free account never writes documents or reads forms by itself: its search has two steps.
+  const phases = status?.plan?.plan === "free" ? (["scan", "analyze"] as const) : (["scan", "analyze", "generate", "prepare"] as const);
+  const phaseAt = p ? Math.min(Math.max(phases.findIndex((x) => x === p.phase), 0), phases.length - 1) : 0;
+  const percent = p ? ((phaseAt + (p.total ? p.done / p.total : 0)) / phases.length) * 100 : 0;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -521,9 +526,8 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
         <main className="content">
           {statusFailed && !status && view !== "settings" && (
             <div style={{ marginBottom: 16 }}>
-              <Callout tone="warn" title="État des connexions illisible">
-                Le serveur n’a pas répondu à /api/status : les sources et l’IA peuvent ne pas fonctionner. Recharge la page ;
-                si ça continue, regarde les journaux Vercel.
+              <Callout tone="warn" title="On n’a pas pu vérifier l’état de ton espace">
+                Certaines fonctions peuvent ne pas répondre. Recharge la page ; si ça continue, réessaie dans quelques minutes.
               </Callout>
             </div>
           )}

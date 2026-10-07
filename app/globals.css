@@ -485,6 +485,8 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 /* CV import (Réglages > Ton CV, Accueil) */
 .cv-cta { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .cv-cta p { margin: 4px 0 0; }
+.refresh-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.refresh-card p { margin: 4px 0 0; }
 .cv-first { border-color: var(--brand); }
 .cv-first > div { flex: 1 1 280px; }
 .upload input[type="file"] { margin-top: 8px; color: var(--muted); }

@@ -74,8 +74,14 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
 
   const running = pipeline.running;
   const p = pipeline.progress;
-  const phaseIndex = p ? STEPS.findIndex((s) => s.id === p.phase) : -1;
+  const isAdmin = status?.isAdmin === true;
+  // A free account never writes documents or reads forms by itself: only the steps that really happen are shown.
+  const steps = status?.plan?.plan === "free" ? STEPS.slice(0, 2) : STEPS;
+  const phaseAt = p ? steps.findIndex((s) => s.id === p.phase) : -1;
+  const phaseIndex = p && phaseAt < 0 ? steps.length - 1 : phaseAt;
   const report = pipeline.report;
+  // A student gets one discreet card; the full search block (counters, steps, explanations) is for the administrator.
+  const showStudentCard = !running && Boolean(status) && !isAdmin && !noSource;
 
   const tasks = todayTasks(jobs);
   const kits = kitsByJob(documents);
@@ -216,6 +222,21 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
         </div>
       )}
 
+      {showStudentCard && (
+        <section className="card refresh-card" aria-label="Mise à jour des offres">
+          <div>
+            <strong>Tes offres</strong>
+            <p className="muted small-text">
+              {last ? `Dernière mise à jour : ${timeAgo(last)}.` : "Pas encore de mise à jour."} Rien n’est jamais envoyé sans toi.
+            </p>
+          </div>
+          <button className="btn secondary" disabled={Boolean(ctx.busy)} onClick={() => void pipeline.start()}>
+            <Play size={16} aria-hidden /> Mettre à jour mes offres
+          </button>
+        </section>
+      )}
+
+      {!showStudentCard && (
       <section className="hero card">
         {running ? (
           <>
@@ -230,7 +251,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
               </button>
             </div>
             <ol className="steps">
-              {STEPS.map((step, i) => {
+              {steps.map((step, i) => {
                 const state = i < phaseIndex ? "done" : i === phaseIndex ? "active" : "todo";
                 return (
                   <li key={step.id} className={state}>
@@ -249,7 +270,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
               })}
             </ol>
             <Progress
-              value={p ? ((Math.max(phaseIndex, 0) + (p.total ? p.done / p.total : 0)) / STEPS.length) * 100 : 0}
+              value={p ? ((Math.max(phaseIndex, 0) + (p.total ? p.done / p.total : 0)) / steps.length) * 100 : 0}
             />
           </>
         ) : (
@@ -287,7 +308,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
                 </button>
               )}
             </div>
-            {status?.usage && (
+            {isAdmin && status?.usage && (
               <p className="usage" aria-label="Utilisation aujourd’hui">
                 Aujourd’hui :
                 {(
@@ -310,14 +331,17 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
                 })}
               </p>
             )}
-            <p className="muted small-text">
-              Ce que fait « Lancer la recherche » : cherche les nouvelles offres et calcule ton score
-              {status?.plan?.plan === "free" ? ". Tu choisis ensuite les offres pour lesquelles écrire ton CV et ta lettre." : ", puis écrit CV + lettre pour celles ≥ 80."}{" "}
-              <strong>Rien n’est jamais envoyé sans toi.</strong>
-            </p>
+            {isAdmin && (
+              <p className="muted small-text">
+                Ce que fait « Lancer la recherche » : cherche les nouvelles offres et calcule ton score
+                {status?.plan?.plan === "free" ? ". Tu choisis ensuite les offres pour lesquelles écrire ton CV et ta lettre." : ", puis écrit CV + lettre pour celles ≥ 80."}{" "}
+                <strong>Rien n’est jamais envoyé sans toi.</strong>
+              </p>
+            )}
           </>
         )}
       </section>
+      )}
 
       {report && !running && (
         <section className="card result">
@@ -344,7 +368,10 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
               Ces annonces sont protégées : ouvre-les et colle leur texte pour les analyser.
             </Callout>
           )}
-          {report.issues.length > 0 && (
+          {report.issues.length > 0 && !isAdmin && (
+            <p className="muted small-text">Quelques offres n’ont pas pu être traitées cette fois. Réessaie dans quelques minutes.</p>
+          )}
+          {report.issues.length > 0 && isAdmin && (
             <div className="issues">
               <h3>
                 <TriangleAlert size={16} aria-hidden /> {report.issues.length} problème{report.issues.length > 1 ? "s" : ""}

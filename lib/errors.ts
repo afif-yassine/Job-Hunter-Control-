@@ -9,9 +9,11 @@ export type Explained = {
   retry: boolean;
 };
 
-const RULES: { test: RegExp; out: Explained }[] = [
+/** `technical`: the cause names the platform (worker, keys, hosting): only the administrator sees it. */
+const RULES: { test: RegExp; out: Explained; technical?: true }[] = [
   {
     test: /Executable doesn't exist|Please update docker image|browserType\.launch/i,
+    technical: true,
     out: {
       title: "Le navigateur du worker n’est pas prêt",
       hint: "Le worker Railway se met à jour. Réessaie dans 2 à 3 minutes.",
@@ -20,6 +22,7 @@ const RULES: { test: RegExp; out: Explained }[] = [
   },
   {
     test: /injoignable|ECONNREFUSED|ENOTFOUND|fetch failed|502|503|Bad Gateway/i,
+    technical: true,
     out: {
       title: "Le worker Playwright ne répond pas",
       hint: "Vérifie que le service Railway est démarré, puis réessaie.",
@@ -44,6 +47,7 @@ const RULES: { test: RegExp; out: Explained }[] = [
   },
   {
     test: /Worker Playwright non configur/i,
+    technical: true,
     out: {
       title: "Le worker Playwright n’est pas configuré",
       hint: "Ajoute WORKER_BASE_URL et WORKER_SHARED_SECRET dans Vercel.",
@@ -60,6 +64,7 @@ const RULES: { test: RegExp; out: Explained }[] = [
   },
   {
     test: /Gemini|GEMINI/i,
+    technical: true,
     out: {
       title: "Gemini n’a pas pu répondre",
       hint: "Réessaie dans un instant. Si ça continue, vérifie la clé Gemini.",
@@ -68,6 +73,7 @@ const RULES: { test: RegExp; out: Explained }[] = [
   },
   {
     test: /Unauthorized|401|refus/i,
+    technical: true,
     out: {
       title: "Accès refusé",
       hint: "Vérifie la clé ou reconnecte-toi.",
@@ -76,9 +82,24 @@ const RULES: { test: RegExp; out: Explained }[] = [
   },
 ];
 
-export function explainError(raw: string | null | undefined): Explained | null {
+/** What a student reads when the cause is on our side. */
+export const NEUTRAL_ERROR: Explained = {
+  title: "Ça n’a pas marché de notre côté",
+  hint: "Réessaie dans quelques minutes.",
+  retry: true,
+};
+
+/** Words of the platform that no student should have to read. */
+const PLATFORM_WORDS = /railway|vercel|playwright|gemini|gateway|supabase|WORKER_|\/api\/|HTTP \d{3}|Connexion impossible|Réponse vide|\bRPC\b|\bJWT\b|TypeError|undefined/i;
+
+export type Audience = "admin" | "student";
+
+/** The administrator keeps every technical detail; a student gets one neutral sentence for platform causes. */
+export function explainError(raw: string | null | undefined, audience: Audience = "admin"): Explained | null {
   if (!raw) return null;
-  for (const rule of RULES) if (rule.test.test(raw)) return rule.out;
+  const rule = RULES.find((r) => r.test.test(raw));
+  if (audience === "student" && (rule?.technical || (!rule && PLATFORM_WORDS.test(raw)))) return NEUTRAL_ERROR;
+  if (rule) return rule.out;
   return { title: raw.length > 140 ? `${raw.slice(0, 137)}…` : raw, hint: null, retry: false };
 }
 
