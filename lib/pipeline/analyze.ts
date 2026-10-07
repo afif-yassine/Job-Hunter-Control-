@@ -186,7 +186,7 @@ export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
   if (!profile) return { status: 409, body: { error: "Le profil vérifié n’est pas encore synchronisé." } };
 
   const quota = await consumeQuota(ctx.supabase, ctx.userId, "analysis", env);
-  if (!quota.ok) return quotaRefusal("analysis", quota.limit);
+  if (!quota.ok) return quotaRefusal("analysis", quota.limit, quota.unavailable);
 
   const hints = signals.reasons.length ? `\nSIGNAUX_A_VERIFIER=${JSON.stringify(signals.reasons)}` : "";
   const prompt = `Analyse cette offre uniquement avec le profil et le registre de vérité. N'invente jamais une compétence, une expérience, une date, un statut légal ou un diplôme. Réponds en JSON: score_breakdown avec contract/20, mission/20, technical/25, education/15, experience/10, location/10; total sur 100; verified_strengths; gaps; questions; cv_summary; summary {missions: 3 phrases courtes max sur ce que la personne fera, stack: outils et technologies cités (8 max), conditions: une ligne avec contrat, durée, rythme, lieu, télétravail et salaire SEULEMENT s'ils sont écrits} — résumé tiré uniquement du texte de l'offre, sans rien ajouter; suspicion {level: "none"|"low"|"high", reasons: string[]} — "high" seulement pour une offre qui ressemble à une arnaque (paiement demandé au candidat, entreprise invérifiable, contact uniquement par messagerie ou e-mail personnel, promesse de gains, mission sans rapport avec l'intitulé), jamais pour une simple offre peu adaptée au profil.\nPROFIL=${JSON.stringify(profile.profile)}\nREGISTRE=${JSON.stringify(profile.truth_ledger)}\nOFFRE=${JSON.stringify({

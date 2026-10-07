@@ -5,7 +5,8 @@ import { QUOTA_CODE } from "@/lib/quota";
 import { runScan } from "@/lib/scan";
 import type { ScanSummary } from "@/lib/scan/types";
 import { analyzeJob } from "./analyze";
-import { stillOnline } from "./availability";
+import { compareJob } from "./compare";
+import { stillOnlineCached } from "./availability";
 import { generateForJob } from "./generate";
 
 /**
@@ -27,6 +28,8 @@ export type TickOptions = {
   budgetMs?: number;
   now?: () => number;
   ai?: AiCall;
+  /** Tests or an explicit detailed-analysis job can inject the optional paid step. */
+  analyze?: typeof analyzeJob;
   fetchPage?: (url: string) => Promise<string | null>;
   scan?: (supabase: SupabaseClient, userId: string) => Promise<ScanSummary>;
 };
@@ -138,7 +141,7 @@ export async function runServerTick(options: TickOptions): Promise<TickReport> {
       }
       if (blocked.has(job.user_id)) continue;
       const t = tally(job.user_id);
-      const result = await analyzeJob({
+      const result = await (options.analyze ?? compareJob)({
         supabase,
         userId: job.user_id,
         jobId: job.id,
@@ -187,7 +190,7 @@ export async function runServerTick(options: TickOptions): Promise<TickReport> {
         env,
         ai: options.ai,
         // Real runs check the offer is still online; injected test runs do not.
-        checkOnline: options.ai ? undefined : (j) => stillOnline(j, env),
+        checkOnline: options.ai ? undefined : (j) => stillOnlineCached(j, supabase, env),
         service: supabase,
         automatic: true,
       });

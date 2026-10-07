@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getFranceTravailToken } from "@/lib/france-travail/client";
 import { FT_OFFERS_SCOPE } from "@/lib/scan/sources/francetravail";
+import { isPublicHttpsUrl } from "@/lib/scan/enrich";
 
 /**
  * Is the offer still online? Checked just before writing a CV and a letter
@@ -10,7 +11,7 @@ import { FT_OFFERS_SCOPE } from "@/lib/scan/sources/francetravail";
 
 type Env = Record<string, string | undefined>;
 export type OnlineCheck = { online: boolean | null; reason?: string };
-export type OnlineJob = { source_platform?: string | null; source_url?: string | null; official_url?: string | null };
+export type OnlineJob = { offer_id?: string | null; source_platform?: string | null; source_url?: string | null; official_url?: string | null };
 
 const FT_DETAIL = /francetravail\.fr\/offres\/recherche\/detail\/([A-Za-z0-9]+)/;
 const FT_API = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/";
@@ -30,9 +31,9 @@ export async function stillOnline(job: OnlineJob, env: Env = process.env, fetchI
       return { online: r.ok ? true : null };
     }
     const url = job.official_url || job.source_url;
-    if (!url || !/^https:\/\//.test(url)) return { online: null };
+    if (!url || !isPublicHttpsUrl(url)) return { online: null };
     const r = await fetchImpl(url, {
-      redirect: "follow",
+      redirect: "manual",
       headers: { "user-agent": "Mozilla/5.0 (compatible; JobHunterControl/1.0; personal job assistant)", accept: "text/html" },
       signal: AbortSignal.timeout(8_000),
     });
@@ -41,6 +42,21 @@ export async function stillOnline(job: OnlineJob, env: Env = process.env, fetchI
   } catch {
     return { online: null };
   }
+}
+
+/** Shared HTTP/API checks, never a LLM call. Uncertain results have a short TTL. */
+export async function stillOnlineCached(job: OnlineJob, service: SupabaseClient | null, env: Env = process.env, fetchImpl: typeof fetch = fetch, now = Date.now()): Promise<OnlineCheck> {
+  if (!service || !job.offer_id) return stillOnline(job, env, fetchImpl);
+  const { data, error } = await service.from("offers").select("availability_check").eq("id", job.offer_id).maybeSingle();
+  const cached = data?.availability_check;
+  if (!error && cached && [true, false, null].includes(cached.online) && cached.source_url === (job.source_url ?? null) && cached.official_url === (job.official_url ?? null)) {
+    const age = now - Date.parse(cached.checked_at);
+    if (age >= 0 && age < (cached.online === null ? 300_000 : 3_600_000)) return { online: cached.online, reason: cached.reason };
+  }
+  const result = await stillOnline(job, env, fetchImpl);
+  // Cache storage is best effort: a database outage never means that an offer is gone.
+  await service.from("offers").update({ availability_check: { ...result, checked_at: new Date(now).toISOString(), source_url: job.source_url ?? null, official_url: job.official_url ?? null } }).eq("id", job.offer_id);
+  return result;
 }
 
 /** The account's copy leaves its lists; the shared offer is closed for everybody (service client). */

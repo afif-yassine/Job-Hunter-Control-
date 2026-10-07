@@ -1,4 +1,5 @@
-import { generateJsonFromPdf } from "@/lib/ai";
+import { generateJsonFromPdf, generateJsonFromCvText } from "@/lib/ai";
+import { readCvPdf } from "@/lib/cv-pdf";
 import { recordAiUsage } from "@/lib/ai-usage";
 import { authenticatedClient } from "@/lib/api";
 import { parseJson } from "@/lib/generated";
@@ -23,13 +24,22 @@ export async function POST(req: Request) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") return Response.json({ error: "Ce fichier n’est pas un PDF." }, { status: 415 });
 
+  let text: string | undefined;
+  if (process.env.AI_PROVIDER?.trim().toLowerCase() === "gateway") {
+    try { text = await readCvPdf(bytes); }
+    catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : "PDF illisible." }, { status: 422 });
+    }
+  }
   const quota = await consumeQuota(auth.supabase, auth.userId, "generation");
   if (!quota.ok) {
-    const refusal = quotaRefusal("generation", quota.limit);
+    const refusal = quotaRefusal("generation", quota.limit, quota.unavailable);
     return Response.json(refusal.body, { status: refusal.status });
   }
   try {
-    const result = await generateJsonFromPdf(IMPORT_PROMPT, bytes, "writing");
+    const result = text === undefined
+      ? await generateJsonFromPdf(IMPORT_PROMPT, bytes, "writing")
+      : await generateJsonFromCvText(IMPORT_PROMPT, text, "writing");
     await recordAiUsage(auth.supabase, auth.userId, "writing", result);
     const draft = normalizeImported(parseJson(result.text || ""));
     return Response.json({ draft, problems: importProblems(draft), suggestions: suggestCategories(draft), filename: file.name });

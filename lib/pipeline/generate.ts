@@ -40,13 +40,14 @@ export function namePart(fullName: string | null | undefined): string {
 export async function generateForJob(ctx: Ctx): Promise<StepResult> {
   const env = ctx.env ?? process.env;
   if (env.AI_GENERATION_LEASES !== "1") return generateKit(ctx);
-  const lease = await ctx.supabase.rpc("claim_document_generation", { p_job_id: ctx.jobId, p_user_id: ctx.userId });
+  const leaseDb = ctx.service ?? ctx.supabase;
+  const lease = await leaseDb.rpc("claim_document_generation", { p_job_id: ctx.jobId, p_user_id: ctx.userId });
   if (lease.error) return { status: 503, body: { error: "La réservation de génération est indisponible : aucun appel IA lancé." } };
-  if (!lease.data) return { status: 409, body: { error: "Ce dossier est déjà en cours de préparation.", code: "GENERATION_IN_PROGRESS" } };
+  if (!lease.data) return { status: 409, body: { error: "Un dossier est déjà en cours de préparation sur ton compte. Attends sa fin avant d’en créer un autre.", code: "GENERATION_IN_PROGRESS" } };
   try {
     return await generateKit(ctx);
   } finally {
-    await ctx.supabase.rpc("release_document_generation", { p_job_id: ctx.jobId, p_user_id: ctx.userId, p_token: lease.data });
+    await leaseDb.rpc("release_document_generation", { p_job_id: ctx.jobId, p_user_id: ctx.userId, p_token: lease.data });
   }
 }
 
@@ -109,7 +110,7 @@ async function generateKit(ctx: Ctx): Promise<StepResult> {
   if (!plan.ok) return { status: plan.status, body: plan.body };
 
   const quota = await consumeQuota(supabase, userId, "generation", env);
-  if (!quota.ok) return quotaRefusal("generation", quota.limit);
+  if (!quota.ok) return quotaRefusal("generation", quota.limit, quota.unavailable);
 
   let parsed: Generated | null = null;
   let model = "";

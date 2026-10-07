@@ -29,7 +29,12 @@ export async function authenticatedClient(bucket: RateBucket = "api") {
     p_limit: limit,
     p_window_seconds: window,
   });
-  // A broken counter never blocks anyone.
+  if (error || typeof allowed !== "boolean") return {
+    error: Response.json(
+      { error: "La vérification des limites est indisponible. Réessaie dans quelques instants.", code: "RATE_LIMIT_UNAVAILABLE" },
+      { status: 503, headers: { "retry-after": "30" } },
+    ),
+  };
   if (!error && allowed === false)
     return {
       error: Response.json(

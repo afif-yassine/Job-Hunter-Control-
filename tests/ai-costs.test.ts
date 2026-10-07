@@ -8,7 +8,7 @@ import { fakeSupabase } from "./fake-supabase";
 test("AI cost: tokens recorded per account at each call, priced and ranked in Admin", async () => {
   assert.deepEqual(aiPrices({}), { input: 0.3, output: 2.5 });
   assert.equal(aiCost({ input: 1_000_000, output: 1_000_000 }, { AI_PRICE_INPUT_PER_M: "1", AI_PRICE_OUTPUT_PER_M: "4" }), 5);
-  const { db, tables } = fakeSupabase({ ai_usage: [] });
+  const { db, tables } = fakeSupabase({ ai_usage: [] }, { rpc: { admin_ai_usage_by_model: () => tables.ai_usage } });
   await recordAiUsage(db, "u1", "analysis", { text: "{}", model: "m", usage: { input: 4000, output: 600 } });
   await recordAiUsage(db, "u1", "writing", { text: "{}", model: "m", usage: { input: 9000, output: 3000 } });
   await recordAiUsage(db, "u2", "analysis", { text: "{}", model: "m", usage: { input: 1000, output: 100 } });
@@ -31,4 +31,21 @@ test("AI provider errors are explained in plain French (no raw JSON)", async () 
   assert.match(explainAiError(new Error('{"error":{"code":429,"status":"RESOURCE_EXHAUSTED"}}')), /^Limite de l’IA/);
   assert.match(explainAiError(new Error("API key not valid. Please pass a valid API key.")), /^Clé IA refusée/);
   assert.match(explainAiError(new Error("503 UNAVAILABLE: The model is overloaded")), /momentanément indisponible/);
+});
+
+test("admin honours provider costs, zero-cost calls and shared embeddings, and alerts at 80%", async () => {
+  const now = new Date();
+  const rows = [
+    { user_id: "u1", model: "openai/gpt-6-luna", input_tokens: 1000, output_tokens: 100, cost_usd: "1.6", created_at: now.toISOString() },
+    { user_id: "u1", model: "openai/gpt-6-luna", input_tokens: 9000, output_tokens: 5000, cost_usd: 0, created_at: now.toISOString() },
+    { user_id: null, model: "perplexity/pplx-embed-v1-0.6b", input_tokens: 1000, output_tokens: 0, cost_usd: null, created_at: now.toISOString() },
+  ];
+  const { db } = fakeSupabase({ ai_usage: rows }, { rpc: { admin_ai_usage_by_model: () => rows } });
+  const costs = await aiCostsByAccount(db, 30, { AI_SPEND_ALERT_USD: "2" }, now);
+  assert.equal(costs.accounts.find(a => a.userId === "u1")?.usd, 1.6);
+  assert.equal(costs.accounts.find(a => a.userId === "platform")?.usd, 0.000004);
+  assert.equal(costs.alert.level, "warning");
+  assert.ok(costs.total.usd < 2);
+  const exceeded = await aiCostsByAccount(db, 30, { AI_SPEND_ALERT_USD: "1" }, now);
+  assert.equal(exceeded.alert.level, "exceeded");
 });

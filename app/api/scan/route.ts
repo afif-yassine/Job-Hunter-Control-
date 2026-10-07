@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   // Scheduled server scans are free; scans started from the dashboard are counted.
   const quota = await consumeQuota(auth.supabase, auth.userId, "scan");
   if (!quota.ok) {
-    const refusal = quotaRefusal("scan", quota.limit);
+    const refusal = quotaRefusal("scan", quota.limit, quota.unavailable);
     return Response.json(refusal.body, { status: refusal.status });
   }
   const summary = await runScan({

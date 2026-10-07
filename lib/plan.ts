@@ -17,7 +17,8 @@ export const PLAN_MANUAL_CODE = "PLAN_MANUAL_ONLY";
 type Env = Record<string, string | undefined>;
 
 export function freeKitsPerMonth(env: Env = process.env): number {
-  const raw = Number(env.FREE_KITS_PER_MONTH?.trim());
+  const value = env.FREE_KITS_PER_MONTH?.trim();
+  const raw = value ? Number(value) : NaN;
   return Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : FREE_KITS_DEFAULT;
 }
 
@@ -69,8 +70,8 @@ export async function planUsage(supabase: SupabaseClient, userId: string, env: E
 }
 
 /**
- * May this account write the kit of `jobId` now? A counter that cannot be
- * read never blocks the student.
+ * May this account write the kit of `jobId` now? Unavailable counters stop
+ * paid work rather than treating missing information as an unused allowance.
  */
 export async function checkPlan(
   supabase: SupabaseClient,
@@ -91,7 +92,11 @@ export async function checkPlan(
   const limit = freeKitsPerMonth(env);
   if (limit <= 0) return { ok: true };
   const used = await kitsThisMonth(supabase, userId, jobId, now);
-  if (used === null || used < limit) return { ok: true };
+  if (used === null) return {
+    ok: false, status: 503,
+    body: { code: "PLAN_UNAVAILABLE", error: "La vérification de ton offre est indisponible. Réessaie dans quelques instants ; aucun dossier n’a été facturé." },
+  };
+  if (used < limit) return { ok: true };
   return {
     ok: false,
     status: 402,

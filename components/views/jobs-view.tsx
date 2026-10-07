@@ -1,6 +1,7 @@
 "use client";
-import { scoreOf } from "@/lib/fit";
-import { useMemo, useState } from "react";
+import { compareFits, scoreOf } from "@/lib/fit";
+import { useEffect, useMemo, useState } from "react";
+import { matchesAdvancedFilters, searchFilters, type SavedSearch, type SearchFilters } from "@/lib/saved-searches";
 import { Plus, Search } from "lucide-react";
 import { Empty, PageHead } from "@/components/ui";
 import { CATEGORIES, categorize, contractKind, type ContractKind } from "@/lib/scan/categories";
@@ -31,6 +32,34 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
   const [metier, setMetier] = useState("");
   const [contract, setContract] = useState("");
   const [sort, setSort] = useState<"recent" | "score">("recent");
+  const [city, setCity] = useState("");
+  const [maxAgeDays, setMaxAgeDays] = useState<SearchFilters["maxAgeDays"]>(0);
+  const [remote, setRemote] = useState(false);
+  const [saved, setSaved] = useState<SavedSearch[]>([]);
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [searchesReady, setSearchesReady] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  useEffect(() => {
+    if (!ctx.supabase) return;
+    const controller = new AbortController();
+    fetch("/api/searches", { signal: controller.signal }).then(async response => {
+      if (!response.ok) throw new Error("Recherches enregistrées indisponibles. Recharge la page pour réessayer.");
+      const result = await response.json();
+      setSaved(result.searches); setSearchesReady(true);
+    }).catch(error => { if (!controller.signal.aborted) setSearchError(error.message); });
+    return () => controller.abort();
+  }, [ctx.supabase]);
+  async function persistSearches(next: SavedSearch[]) {
+    setSaving(true); setSearchError("");
+    try {
+      const response = await fetch("/api/searches", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Sauvegarde impossible.");
+      setSaved(result.searches); setName(""); ctx.notify("Recherches enregistrées mises à jour.");
+    } catch (error) { setSearchError(error instanceof Error ? error.message : "Sauvegarde impossible."); }
+    finally { setSaving(false); }
+  }
   const kits = useMemo(() => kitsByJob(data.documents), [data.documents]);
 
   // The closest offers to the profile (top 25 by score: the AI's or the free comparison).
@@ -38,8 +67,8 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
     () =>
       new Set(
         [...data.jobs]
-          .filter((j) => scoreOf(j) >= 0)
-          .sort((a, b) => scoreOf(b) - scoreOf(a))
+          .filter((j) => scoreOf(j) >= 0 || typeof j.similarity === "number")
+          .sort(compareFits)
           .slice(0, 25)
           .map((j) => j.id),
       ),
@@ -87,9 +116,10 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
       .filter((j) => (q ? `${j.title} ${j.company} ${j.location || ""}`.toLowerCase().includes(q) : true))
       .filter((j) => !metier || (facets.get(j.id)?.cats ?? []).includes(metier as never))
       .filter((j) => !contract || facets.get(j.id)?.kind === contract);
-    if (sort === "score" || (jobFilter === "best" && sort === "recent")) return [...list].sort((a, b) => scoreOf(b) - scoreOf(a));
-    return list;
-  }, [inTab, jobFilter, query, metier, contract, facets, sort]);
+    const filtered = list.filter(j => matchesAdvancedFilters(j, { city, maxAgeDays, remote }));
+    if (sort === "score" || (jobFilter === "best" && sort === "recent")) return [...filtered].sort(compareFits);
+    return [...filtered].sort((a, b) => Date.parse(b.publication_date || b.created_at || "1970-01-01") - Date.parse(a.publication_date || a.created_at || "1970-01-01"));
+  }, [inTab, jobFilter, query, metier, contract, facets, sort, city, maxAgeDays, remote]);
 
   // Long lists render in pages so the phone stays fast.
   const [shown, setShown] = useState(30);
@@ -160,6 +190,29 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
           </select>
         </label>
       </div>
+
+      <div className="facets">
+        <label>Ville<input value={city} maxLength={80} onChange={e => { setCity(e.target.value); setShown(30); }} placeholder="Toutes les villes" /></label>
+        <label>Publication<select value={maxAgeDays} onChange={e => { setMaxAgeDays(Number(e.target.value) as SearchFilters["maxAgeDays"]); setShown(30); }}>
+          <option value={0}>Toutes les dates</option><option value={7}>Depuis 7 jours</option><option value={14}>Depuis 14 jours</option><option value={30}>Depuis 30 jours</option>
+        </select></label>
+        <label><input type="checkbox" checked={remote} onChange={e => { setRemote(e.target.checked); setShown(30); }} /> Télétravail explicitement proposé</label>
+      </div>
+      {ctx.supabase && <div className="facets">
+        <label>Nom de la recherche<input value={name} maxLength={60} onChange={e => setName(e.target.value)} placeholder="Ex. Stage data à Lyon" /></label>
+        <button className="btn secondary" disabled={saving || !searchesReady || !name.trim() || (saved.length >= 10 && !saved.some(s => s.name.toLowerCase() === name.trim().toLowerCase()))} onClick={() => {
+          const filters = searchFilters.parse({ query, metier, contract, sort, city, maxAgeDays, remote });
+          void persistSearches([...saved.filter(s => s.name.toLowerCase() !== name.trim().toLowerCase()), { name: name.trim(), filters }]);
+        }}>Enregistrer ces filtres</button>
+        {saved.map(search => <div className="inline" key={search.name}>
+          <button className="btn secondary" onClick={() => {
+            const f = search.filters;
+            setQuery(f.query); setMetier(f.metier); setContract(f.contract); setSort(f.sort); setCity(f.city); setMaxAgeDays(f.maxAgeDays); setRemote(f.remote); setName(search.name); setJobFilter("all"); setShown(30);
+          }}>{search.name}</button>
+          <button className="btn secondary" disabled={saving} aria-label={`Supprimer la recherche ${search.name}`} onClick={() => void persistSearches(saved.filter(s => s.name !== search.name))}>×</button>
+        </div>)}
+      </div>}
+      {searchError && <p role="alert">{searchError}</p>}
 
       {rows.length === 0 ? (
         data.jobs.length === 0 ? (
