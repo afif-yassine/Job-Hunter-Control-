@@ -161,11 +161,11 @@ export const NOT_CONNECTED = [
 
 export const AI_ADVICE = {
   writing:
-    "Garder Gemini Flash pour les CV et lettres : n°1 du classement Hemingway-bench (rédacteurs professionnels, à l’aveugle). Alternative moins chère à tester sur le français : Mistral Large 3 (0,50 $ / 1,50 $ par million de tokens).",
+    "Utiliser le modèle de rédaction affiché ci-dessus et vérifier les faits sur les preuves du profil. Comparer les alternatives sur les mêmes CV et lettres avant de changer la configuration.",
   scoring:
-    "Pour le score (gros volume, peu d’écriture) : Gemini Flash-Lite (0,30 $ / 2,50 $) ou DeepSeek V3.2 (0,28 $ / 0,42 $). Éviter Qwen pour les CV : jugé enclin aux erreurs factuelles.",
+    "La comparaison standard des compétences et le classement vectoriel ne font pas d’appel LLM par offre et par étudiant. L’analyse approfondie reste facultative et limitée.",
   savings:
-    "Économies sans changer de modèle : Batch API Gemini (−50 %) pour les analyses du serveur, et cache du profil (−90 % sur la partie répétée). Attention : prix de Gemini Flash ×2 au 1er janvier 2027.",
+    "Réutiliser résumés, vecteurs et kits inchangés. Les réservations évitent les traitements simultanés ; les quotas et le plafond de la clé Gateway limitent les dépenses.",
 };
 
 export const EMBEDDINGS_PLAN = {

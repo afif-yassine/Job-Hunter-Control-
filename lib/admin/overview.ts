@@ -239,7 +239,14 @@ export async function buildAdminOverview(ctx: {
       usageToday: usage,
       advice: AI_ADVICE,
     },
-    embeddings: EMBEDDINGS_PLAN,
+    embeddings: env.EMBEDDING_PROVIDER === "gateway" ? {
+      status: has("AI_GATEWAY_API_KEY") ? "Perplexity configuré" : "Clé Gateway manquante",
+      what: "Classement par proximité sémantique et compétences. Les vecteurs du catalogue sont partagés ; le profil est recalculé seulement lorsque ses faits changent.",
+      tools: "Supabase pgvector + perplexity/pplx-embed-v1-0.6b, 1 024 dimensions. Le contrôle du rattrapage reste visible dans les rapports du catalogue.",
+    } : {
+      ...EMBEDDINGS_PLAN,
+      status: has("GEMINI_API_KEY") ? "Gemini historique configuré" : "Fournisseur non configuré",
+    },
     sources,
     enrichment,
     notConnected: NOT_CONNECTED,

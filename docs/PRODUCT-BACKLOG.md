@@ -4,7 +4,7 @@ Référence principale du projet — mise à jour du 7 octobre 2026.
 
 ## Livraison MVP du 7 octobre — état courant
 
-Cette section prévaut sur les constats historiques ci-dessous. Validation locale terminée ; livraison en production et parcours connecté à confirmer séparément.
+Cette section prévaut sur les constats historiques ci-dessous. Livraison fusionnée par la PR #3, commit `b41a3253`, déploiement Vercel `dpl_6FoMCJy2JuntD4S5GWBR5b45Agaf` READY sur lebontaf.com. Migration appliquée ; lecteur réservé activé. Les vérifications restantes sont distinguées ci-dessous.
 
 - [x] Import PDF numérique par extraction locale puis un seul appel Gateway ; pas de recharge Gemini nécessaire. PDF scanné, corrompu, trop long ou mixte refusé explicitement avant consommation du quota. Brouillon à confirmer par l’utilisateur.
 - [x] Filtres ville, date de publication et télétravail explicite ; dix recherches nommées maximum, isolées par compte et conservées lors d’un changement de réglages. Tests et interface à 390/1440 px réussis.
@@ -14,9 +14,13 @@ Cette section prévaut sur les constats historiques ci-dessous. Validation local
 - [x] Coûts agrégés dans Postgres sans troncature à 1 000 lignes, coûts fournisseur privilégiés, coût du catalogue inclus. Alerte administrateur à 80 % du seuil ; le plafond réel Gateway de 2 USD reste distinct.
 - [x] Correctif Next 16.3.6 ; audit des dépendances de production sans vulnérabilité signalée. Dépendance de développement `braces` : avis sans version corrigée, à suivre sans rétrograder Next.
 - [x] 181 tests réussis, un test LaTeX ignoré ; 42 assertions PostgreSQL/pgvector, TypeScript et lint sans erreur. Mutation d’ouverture des quotas détectée.
-- [ ] Mise en production de cette livraison et vérification des nouvelles routes.
+- [x] Mise en production : CI réussie, migration appliquée, permissions service/client contrôlées. Recherche nommée créée depuis le compte connecté puis retrouvée et réappliquée après rechargement. Tableau des coûts en production : catalogue partagé inclus, 0,37 USD comptabilisés sur 30 jours (dont des estimations historiques).
 - [ ] Refaire l’import d’un CV et la création d’un kit avec un compte connecté sur cette version.
-- [ ] Confirmer l’expéditeur SMTP et le parcours complet de réinitialisation. SMTP déclaré configuré par le propriétaire ; protection Supabase des mots de passe divulgués encore signalée désactivée.
+- [ ] Confirmer l’expéditeur SMTP et le parcours complet de réinitialisation. SMTP personnalisé vérifié activé via Resend dans Chrome. Protection Supabase des mots de passe divulgués désactivée : l’interface confirme qu’elle nécessite le forfait Pro. Aucun abonnement ajouté.
+
+Le test d’import d’un PDF fictif en production reste bloqué par la permission de l’extension Chrome « Autoriser l’accès aux URL de fichier ». Aucun brouillon fictif enregistré et profil confirmé conservé.
+
+Catalogue au contrôle du 7 octobre 11:47 UTC : 3 923 offres ouvertes vectorisées, 3 921 résumés ; deux textes trop courts, zéro résumé admissible en attente. Collecte du matin terminée sans erreur (134 tâches) ; collecte suivante démarrée à 12:00 UTC, résultat final à contrôler. Les chiffres évoluent avec la collecte ; ne pas garder un pourcentage figé comme contrôle d’exploitation.
 
 Classement déjà contrôlé par SQL avec le profil réel : offres IA/backend et stages frontend/IA parmi les premières, compétences communes et manquantes retournées. Cela ne remplace pas la vérification du parcours connecté dans le navigateur. Le kit CV/lettre réel de la livraison précédente demeure une preuve de génération, sans valider automatiquement les nouveaux changements.
 
