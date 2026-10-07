@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fitScore } from "../fit";
+import { PROFILE_REQUIRED, PROFILE_REQUIRED_MESSAGE } from "../profile-store";
 import { normalizeSkills, profileSkills } from "../skills";
 import { detectSuspicion } from "../scan/suspicion";
 import type { StepResult } from "./analyze";
@@ -16,7 +17,7 @@ export async function compareJob(ctx: { supabase: SupabaseClient; userId: string
   if (!job) return { status: 404, body: { error: "Offre introuvable." } };
   if (job.gone_reason) return { status: 410, body: { error: "Cette offre n’est plus disponible.", code: "GONE" } };
   if (job.review_flag) return { status: 409, body: { error: "Confirme d’abord cette offre dans « À vérifier ».", code: "TO_REVIEW" } };
-  if (!profile?.profile) return { status: 409, body: { error: "Confirme ton profil avant de comparer les offres." } };
+  if (!profile?.profile) return { status: 409, body: { error: PROFILE_REQUIRED_MESSAGE, code: PROFILE_REQUIRED } };
   const suspicion = detectSuspicion(job);
   if (suspicion.level === "high") {
     const { error } = await ctx.supabase.from("jobs").update({ review_flag: "SUSPECTED", review_reason: suspicion.reasons.join(" · "), last_checked_at: new Date().toISOString() }).eq("id", ctx.jobId).eq("user_id", ctx.userId);

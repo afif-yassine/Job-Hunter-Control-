@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_LEDGER, normalizeImported, type ImportedProfile } from "@/lib/profile-import";
 
+/** Stable code the app uses to send a student without a confirmed profile to the CV import. */
+export const PROFILE_REQUIRED = "PROFILE_REQUIRED";
+export const PROFILE_REQUIRED_MESSAGE = "Importe ton CV dans Réglages avant de créer un dossier.";
+
 export type ProfileSummary = {
   full_name: string | null;
   updated_at: string | null;

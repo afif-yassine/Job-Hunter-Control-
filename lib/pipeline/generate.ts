@@ -5,6 +5,7 @@ import { generated, parseJson, type Generated } from "@/lib/generated";
 import { selectWritingProofs, unsupportedWritingSkills, writingVersion, WRITING_RULES } from "@/lib/writing-context";
 import { queueQuestions, type QueueResult } from "@/lib/question-store";
 import { checkPlan } from "@/lib/plan";
+import { PROFILE_REQUIRED, PROFILE_REQUIRED_MESSAGE } from "@/lib/profile-store";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
 import type { StepResult } from "./analyze";
 import { markGone, type OnlineCheck, type OnlineJob } from "./availability";
@@ -58,7 +59,8 @@ async function generateKit(ctx: Ctx): Promise<StepResult> {
     supabase.from("jobs").select("*").eq("id", id).eq("user_id", userId).single(),
     supabase.from("candidate_profiles").select("*").eq("user_id", userId).maybeSingle(),
   ]);
-  if (!job || !profile) return { status: 404, body: { error: "Offre ou profil vérifié introuvable" } };
+  if (!job) return { status: 404, body: { error: "Offre introuvable." } };
+  if (!profile) return { status: 409, body: { error: PROFILE_REQUIRED_MESSAGE, code: PROFILE_REQUIRED } };
   if (!["ANALYZED", "WAITING_APPROVAL"].includes(job.status))
     return { status: 409, body: { error: "Analysez l’offre avant de générer les documents." } };
   if (job.gone_reason)
