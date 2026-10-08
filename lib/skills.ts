@@ -40,13 +40,23 @@ const ALIASES: Record<string, string> = {
   torch: "pytorch",
 };
 
-/** Names whose final number is part of their identity ("Industrie 4.0", "Web 3"). */
-const NUMBER_IS_IDENTITY = new Set(["industrie", "industry", "web", "office", "microsoft"]);
+/**
+ * Names whose final number is part of their identity: "ISO 27001" is not "ISO 9001", "Bac 5" is
+ * not "Bac 2", "Industrie 4.0" is not "Industrie". Standards, levels, diplomas. A short list on
+ * purpose: "Excel 2019" and "Windows Server 2019" still match their plain name on both sides.
+ */
+const NUMBER_IS_IDENTITY = new Set([
+  "industrie", "industry", "web", "office", "microsoft",
+  "iso", "iec", "en", "nf", "do", "as", "ieee", "rfc", "pci dss", "owasp top", "cmmi",
+  "bac", "niveau", "level", "n", "rgpd article", "article",
+]);
 
 /** "java 17/21" → "java": only a purely numeric tail (digits, dots, slashes), after a separate word. */
 function withoutVersion(s: string): string {
   const m = /^(.*\S)\s+v?\d+(?:[./,-]\d+)*\+?$/.exec(s);
-  if (!m || NUMBER_IS_IDENTITY.has(m[1])) return s;
+  if (!m) return s;
+  const lastWord = m[1].split(/[\s/-]+/).pop() ?? "";
+  if (NUMBER_IS_IDENTITY.has(m[1]) || NUMBER_IS_IDENTITY.has(lastWord)) return s;
   return m[1];
 }
 

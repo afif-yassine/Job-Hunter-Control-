@@ -94,6 +94,13 @@ test("AI and data skills use one safe form on both sides, without wide equivalen
   assert.equal(normalizeSkill("S3"), "s3");
   assert.equal(normalizeSkill("C++"), "c++");
   assert.notEqual(normalizeSkill("Java 17"), normalizeSkill("JavaScript"));
+  // Standards and levels: the number is the identity, two of them never match.
+  const different: [string, string][] = [["ISO 27001", "ISO 9001"], ["ISO/IEC 27001", "ISO/IEC 9001"], ["Bac 5", "Bac 2"], ["Bac+5", "Bac+3"], ["Niveau 7", "Niveau 6"], ["IEEE 802.11", "IEEE 802.3"], ["PCI DSS 4", "PCI DSS 3"], ["OWASP Top 10", "OWASP Top 5"], ["AS 9100", "AS 9120"], ["DO 178", "DO 254"]];
+  for (const [a, b] of different) assert.notEqual(normalizeSkill(a), normalizeSkill(b), `${a} / ${b}`);
+  assert.equal(normalizeSkill("ISO 27001"), "iso 27001");
+  // Coherent on both sides: a versioned product still meets its plain name.
+  assert.equal(normalizeSkill("Windows Server 2019"), normalizeSkill("Windows Server"));
+  assert.equal(normalizeSkill("Excel 2019"), "excel");
   // Neighbouring skills are not merged: a TensorFlow CV does not prove PyTorch.
   assert.notEqual(normalizeSkill("TensorFlow"), normalizeSkill("PyTorch"));
   assert.notEqual(normalizeSkill("Machine learning"), normalizeSkill("Deep learning"));
