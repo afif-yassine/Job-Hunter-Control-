@@ -8,7 +8,7 @@ import { fetchJobText } from "@/lib/scan/enrich";
 import { serviceClient } from "@/lib/supabase/admin";
 import { recordSourceRun } from "@/lib/scan/health";
 import { detectSuspicion } from "@/lib/scan/suspicion";
-import { closedInCatalogue } from "./availability";
+import { closedInCatalogue, markGoneForStudent } from "./availability";
 
 const output = z.object({
   score_breakdown: z.record(z.string(), z.number()),
@@ -144,12 +144,13 @@ export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
     ctx.supabase.from("candidate_profiles").select("profile,truth_ledger").eq("user_id", ctx.userId).maybeSingle(),
   ]);
   if (error || !job) return { status: 404, body: { error: "Offer not found" } };
+  const goneBody = { error: "Cette offre n’est plus disponible : rien n’a été dépensé dessus.", code: "GONE" };
+  if (job.gone_reason) return { status: 410, body: goneBody };
   // The marker on the student's own row can be cleared by the student: the catalogue has the last word.
-  if (job.gone_reason || (await closedInCatalogue(ctx.supabase, job)))
-    return {
-      status: 410,
-      body: { error: "Cette offre n’est plus disponible : rien n’a été dépensé dessus.", code: "GONE" },
-    };
+  if (await closedInCatalogue(ctx.supabase, job)) {
+    await markGoneForStudent(ctx.supabase, job.id, ctx.userId);
+    return { status: 410, body: goneBody };
+  }
   if (job.review_flag)
     return {
       status: 409,

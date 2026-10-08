@@ -72,6 +72,24 @@ export async function closedInCatalogue(supabase: SupabaseClient, job: { offer_i
   return data.status === "closed" || data.status === "expired";
 }
 
+/**
+ * Records on THIS student's own row that the catalogue closed the offer, so their lists stop showing it.
+ * Not a report and not a closure for anybody else: nothing is written to the shared catalogue.
+ * Idempotent (the first date is kept) and never fatal: the refusal stands even if the write fails.
+ */
+export async function markGoneForStudent(
+  supabase: SupabaseClient,
+  jobId: string,
+  userId: string,
+  reason = "Offre fermée sur le catalogue commun.",
+): Promise<void> {
+  try {
+    await supabase.from("jobs").update({ gone_reason: reason, gone_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", userId).is("gone_at", null);
+  } catch {
+    /* the 410 is still returned */
+  }
+}
+
 export async function markGone(
   supabase: SupabaseClient,
   service: SupabaseClient | null,

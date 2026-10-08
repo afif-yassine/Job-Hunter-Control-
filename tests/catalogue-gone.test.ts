@@ -11,7 +11,7 @@ const ai = async () => { throw new Error("no AI call expected"); };
 const job = { id: "j1", user_id: "u1", offer_id: "o1", status: "ANALYZED", gone_reason: null, review_flag: null, title: "Stage dev", company: "Acme", description: "Développer des outils." };
 const profile = { user_id: "u1", profile: { skills: ["sql"] }, truth_ledger: {} };
 const world = (status: string | null) =>
-  fakeSupabase({ jobs: [job], candidate_profiles: [profile], offers: status === null ? [] : [{ id: "o1", status }], documents: [], ai_usage: [], usage_events: [] });
+  fakeSupabase({ jobs: [{ ...job }], candidate_profiles: [profile], offers: status === null ? [] : [{ id: "o1", status }], documents: [], ai_usage: [], usage_events: [] });
 
 test("an offer closed in the shared catalogue stays closed even if the student cleared the marker on their own row", async () => {
   for (const status of ["closed", "expired"]) {
@@ -48,4 +48,29 @@ test("« Elle est toujours en ligne » cannot put back an offer the catalogue ha
   assert.ok(check > 0, "the route must ask the catalogue");
   assert.ok(check < route.indexOf("gone_reason: null"), "the catalogue is asked before the marker is cleared");
   assert.match(route, /status: 409/);
+});
+
+test("when the catalogue refuses, the student's own copy is marked gone: once, without touching the shared catalogue, and never as a 500", async () => {
+  for (const step of ["generate", "analyze"] as const) {
+    const { db, tables } = world("closed");
+    const offersBefore = JSON.stringify(tables.offers);
+    const run = () => (step === "generate" ? generateForJob({ supabase: db, userId: "u1", jobId: "j1", ai }) : analyzeJob({ supabase: db, userId: "u1", jobId: "j1", ai }));
+    assert.equal((await run()).status, 410);
+    const first = { reason: tables.jobs[0].gone_reason, at: tables.jobs[0].gone_at };
+    assert.match(String(first.reason), /catalogue commun/);
+    assert.ok(first.at, `${step}: the date is written`);
+    // A second refusal changes nothing, and the shared catalogue is never written.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.equal((await run()).status, 410);
+    assert.deepEqual({ reason: tables.jobs[0].gone_reason, at: tables.jobs[0].gone_at }, first);
+    assert.equal(JSON.stringify(tables.offers), offersBefore);
+
+    // A failing write is not an error for the student: still a clean 410.
+    const failing = fakeSupabase({ jobs: [{ ...job }], candidate_profiles: [profile], offers: [{ id: "o1", status: "closed" }] }, { missingColumns: ["gone_reason"] });
+    const again = step === "generate"
+      ? await generateForJob({ supabase: failing.db, userId: "u1", jobId: "j1", ai })
+      : await analyzeJob({ supabase: failing.db, userId: "u1", jobId: "j1", ai });
+    assert.equal(again.status, 410);
+    assert.equal(again.body.code, "GONE");
+  }
 });
