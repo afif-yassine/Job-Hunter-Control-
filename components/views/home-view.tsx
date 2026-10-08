@@ -373,8 +373,13 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
           <div className="result-head">
             <CircleCheck className={report.issues.length ? "warn-ico" : "ok-ico"} aria-hidden />
             <div>
-              <h2>{report.cancelled ? "Recherche arrêtée" : "Recherche terminée"}</h2>
+              <h2>{report.noSearch ? "Rien à chercher pour l’instant" : report.cancelled ? "Recherche arrêtée" : "Recherche terminée"}</h2>
               <p>{summarize(report)}</p>
+              {report.noSearch && (
+                <button className="btn small" onClick={() => go("settings")}>
+                  Choisir mes métiers
+                </button>
+              )}
             </div>
             <button className="btn ghost small" onClick={pipeline.dismiss}>
               Fermer

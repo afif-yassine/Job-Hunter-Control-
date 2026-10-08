@@ -34,6 +34,8 @@ export type PipelineReport = {
   cancelled: boolean;
   /** No job source is connected yet. */
   noSource: boolean;
+  /** The server's sentence when the account has chosen no job yet (nothing was searched); null when a search ran. */
+  noSearch: string | null;
   scanned: boolean;
   found: number;
   inserted: number;
@@ -103,6 +105,15 @@ function issue(where: string, raw: unknown): PipelineIssue {
   return { where, title: explained?.title ?? text, hint: explained?.hint ?? null, raw: text };
 }
 
+/**
+ * The answer of /api/scan for an account that chose no job: the server says so (noSearch) and gives its own
+ * sentence in `message`, which is read here and not copied. The fallback is generic, not a copy of it.
+ */
+export function noSearchOf(body: Record<string, unknown>): string | null {
+  if (body.noSearch !== true) return null;
+  return typeof body.message === "string" && body.message.trim() ? body.message : "Aucune recherche n’a été lancée : aucun métier n’est choisi.";
+}
+
 export function emptyReport(): PipelineReport {
   const now = new Date().toISOString();
   return {
@@ -110,6 +121,7 @@ export function emptyReport(): PipelineReport {
     finishedAt: now,
     cancelled: false,
     noSource: false,
+    noSearch: null,
     scanned: false,
     found: 0,
     inserted: 0,
@@ -169,6 +181,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRep
       const scan = await call("/api/scan", signal, { log: false });
       if (scan.ok) {
         report.scanned = true;
+        report.noSearch = noSearchOf(scan.body);
         report.found = Number(scan.body.found) || 0;
         report.inserted = Number(scan.body.inserted) || 0;
         report.duplicates = Number(scan.body.duplicates) || 0;
@@ -351,6 +364,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRep
 
 /** One friendly sentence describing what a run did. */
 export function summarize(report: PipelineReport): string {
+  if (report.noSearch) return report.noSearch;
   if (report.noSource && !report.analyzed && !report.generated)
     return "Aucune source d’offres n’est connectée : ajoute une clé dans Réglages > Sources.";
   const parts: string[] = [];
