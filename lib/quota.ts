@@ -4,17 +4,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Daily limits per account, so that one very active account cannot blow the
  * AI or browser budget before billing exists. Days follow Paris time.
  * Override with QUOTA_SCANS_PER_DAY / QUOTA_ANALYSES_PER_DAY /
- * QUOTA_GENERATIONS_PER_DAY (0 = unlimited).
+ * QUOTA_GENERATIONS_PER_DAY / QUOTA_REVISIONS_PER_DAY (0 = unlimited).
  */
 
-export type QuotaKind = "scan" | "analysis" | "generation";
+export type QuotaKind = "scan" | "analysis" | "generation" | "revision";
 
-export const QUOTA_DEFAULTS: Record<QuotaKind, number> = { scan: 3, analysis: 20, generation: 10 };
+export const QUOTA_DEFAULTS: Record<QuotaKind, number> = { scan: 3, analysis: 20, generation: 10, revision: 15 };
 
 const VARIABLE: Record<QuotaKind, string> = {
   scan: "QUOTA_SCANS_PER_DAY",
   analysis: "QUOTA_ANALYSES_PER_DAY",
   generation: "QUOTA_GENERATIONS_PER_DAY",
+  revision: "QUOTA_REVISIONS_PER_DAY",
 };
 
 type Env = Record<string, string | undefined>;
@@ -32,6 +33,7 @@ const WHAT: Record<QuotaKind, string> = {
   scan: "recherches manuelles",
   analysis: "analyses d’offres",
   generation: "rédactions de CV et lettre",
+  revision: "modifications de CV et de lettre",
 };
 
 export function quotaMessage(kind: QuotaKind, limit: number): string {
@@ -58,6 +60,29 @@ export async function consumeQuota(
   });
   if (error || typeof data !== "boolean") return { ok: false, limit, unavailable: true };
   return { ok: data === true, limit };
+}
+
+/**
+ * One more AI revision of an existing CV or letter. Revisions are free for the
+ * student but capped per day, because each one is a paid model call.
+ * Until migration 20261008090000 lets usage_events hold the "revision" kind, the
+ * database refuses it (check violation): the revision then counts against the
+ * daily writing quota instead, so it is never unlimited and never blocked.
+ */
+export async function consumeRevisionQuota(
+  supabase: SupabaseClient,
+  userId: string,
+  env: Env = process.env,
+): Promise<{ ok: boolean; limit: number; unavailable?: boolean; kind: QuotaKind }> {
+  const limit = quotaLimit("revision", env);
+  if (limit <= 0) return { ok: true, limit, kind: "revision" };
+  const { data, error } = await supabase.rpc("consume_quota", { p_user_id: userId, p_kind: "revision", p_limit: limit });
+  if (!error && typeof data === "boolean") return { ok: data === true, limit, kind: "revision" };
+  if (error?.code === "23514" || /usage_events_kind_check|violates check constraint/i.test(error?.message ?? "")) {
+    const fallback = await consumeQuota(supabase, userId, "generation", env);
+    return { ...fallback, kind: "generation" };
+  }
+  return { ok: false, limit, unavailable: true, kind: "revision" };
 }
 
 export function quotaRefusal(kind: QuotaKind, limit: number, unavailable = false) {
@@ -89,5 +114,6 @@ export async function usageToday(supabase: SupabaseClient, userId: string, env: 
     scan: { used: count("scan"), limit: quotaLimit("scan", env) },
     analysis: { used: count("analysis"), limit: quotaLimit("analysis", env) },
     generation: { used: count("generation"), limit: quotaLimit("generation", env) },
+    revision: { used: count("revision"), limit: quotaLimit("revision", env) },
   };
 }

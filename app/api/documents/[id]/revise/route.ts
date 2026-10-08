@@ -14,6 +14,7 @@ import {
 import { parseContent, versionedFilename } from "@/lib/documents";
 import { normaliseGenerated, parseJson, asRecord, asText } from "@/lib/generated";
 import { queueQuestions } from "@/lib/question-store";
+import { consumeRevisionQuota, quotaRefusal } from "@/lib/quota";
 
 const input = z.object({ instruction: z.string().trim().min(3).max(2000) });
 
@@ -87,6 +88,13 @@ CONTENU_ACTUEL=${JSON.stringify(currentContent)}
 DESIGN_ACTUEL=${JSON.stringify(currentDesign)}
 PREUVES=${JSON.stringify(proofs)}
 OFFRE=${JSON.stringify({ title: job?.title, company: job?.company, description: job?.description })}`;
+
+  // Free for the student but capped per day: each revision is a paid model call, taken before it and not given back.
+  const quota = await consumeRevisionQuota(supabase, userId);
+  if (!quota.ok) {
+    const refusal = quotaRefusal(quota.kind, quota.limit, quota.unavailable);
+    return Response.json(refusal.body, { status: refusal.status });
+  }
 
   let root: Record<string, unknown>;
   try {

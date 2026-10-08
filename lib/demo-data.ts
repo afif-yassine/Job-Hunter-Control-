@@ -89,6 +89,7 @@ export const demoStatus: SystemStatus = {
     scan: { used: 1, limit: 3 },
     analysis: { used: 12, limit: 20 },
     generation: { used: 2, limit: 10 },
+    revision: { used: 2, limit: 15 },
   },
 };
 
