@@ -8,7 +8,7 @@ import { checkPlan } from "@/lib/plan";
 import { PROFILE_REQUIRED, PROFILE_REQUIRED_MESSAGE } from "@/lib/profile-store";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
 import type { StepResult } from "./analyze";
-import { markGone, type OnlineCheck, type OnlineJob } from "./availability";
+import { closedInCatalogue, markGone, type OnlineCheck, type OnlineJob } from "./availability";
 
 type Ctx = {
   supabase: SupabaseClient;
@@ -63,7 +63,8 @@ async function generateKit(ctx: Ctx): Promise<StepResult> {
   if (!profile) return { status: 409, body: { error: PROFILE_REQUIRED_MESSAGE, code: PROFILE_REQUIRED } };
   if (!["ANALYZED", "WAITING_APPROVAL"].includes(job.status))
     return { status: 409, body: { error: "Analysez l’offre avant de générer les documents." } };
-  if (job.gone_reason)
+  // The marker on the student's own row can be cleared by the student: the catalogue has the last word.
+  if (job.gone_reason || (await closedInCatalogue(supabase, job)))
     return {
       status: 410,
       body: { error: "Cette offre n’est plus disponible : pas de CV ni de lettre à créer.", code: "GONE" },

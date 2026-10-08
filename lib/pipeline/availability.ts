@@ -60,6 +60,18 @@ export async function stillOnlineCached(job: OnlineJob, service: SupabaseClient 
 }
 
 /** The account's copy leaves its lists; the shared offer is closed for everybody (service client). */
+/**
+ * The shared catalogue's own word. An offer closed or expired there is gone for
+ * everybody, whatever the student's own row says (a student can edit it). An
+ * unreadable or missing catalogue row decides nothing: the other checks still apply.
+ */
+export async function closedInCatalogue(supabase: SupabaseClient, job: { offer_id?: string | null }): Promise<boolean> {
+  if (!job.offer_id) return false;
+  const { data, error } = await supabase.from("offers").select("status").eq("id", job.offer_id).maybeSingle();
+  if (error || !data) return false;
+  return data.status === "closed" || data.status === "expired";
+}
+
 export async function markGone(
   supabase: SupabaseClient,
   service: SupabaseClient | null,

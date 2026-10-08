@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { authenticatedClient } from "@/lib/api";
+import { closedInCatalogue } from "@/lib/pipeline/availability";
 
 const input = z.object({ available: z.boolean() });
 
@@ -32,6 +33,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
   }
 
+  // An offer closed in the shared catalogue cannot be put back: it is gone for everybody.
+  const { data: own } = await auth.supabase.from("jobs").select("offer_id").eq("id", id).eq("user_id", auth.userId).maybeSingle();
+  if (own && (await closedInCatalogue(auth.supabase, own)))
+    return Response.json({ error: "Cette offre est fermée pour tout le monde : elle ne peut pas être remise dans ta liste.", code: "GONE" }, { status: 409 });
   const { data, error } = await auth.supabase
     .from("jobs")
     .update({ gone_reason: null, gone_at: null })
