@@ -55,6 +55,8 @@ export type Ctx = {
     undoStage: (job: Job) => Promise<void>;
     saveNotes: (job: Job, notes: string) => Promise<void>;
     analyze: (job: Job) => Promise<void>;
+    /** Writes the short summary when an offer is opened: no toast and no global lock. Resolves false when it could not be done. */
+    summarize: (job: Job) => Promise<boolean>;
     generate: (job: Job) => Promise<void>;
     review: (job: Job, action: ReviewAction, platform?: string) => Promise<void>;
     /** "Offre plus disponible" (false) or "Toujours en ligne" (true). */

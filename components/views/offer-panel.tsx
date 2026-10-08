@@ -17,7 +17,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { displayScore } from "@/lib/fit";
 import { followUpDue, isSent, stageOf, type Stage } from "@/lib/journey";
 import { Soon } from "@/components/ui";
@@ -25,10 +25,8 @@ import { DOCUMENT_KIND, platformsOf, REVIEW } from "@/lib/labels";
 import type { DocumentRecord, Job, OfferSummary } from "@/lib/types";
 import { closestJobIds, CLOSEST_COUNT } from "./closest";
 import { offerAge, salaryOf, ScoreRing, StageChip } from "./offer-card";
+import { summaryState } from "./summary-state";
 import type { Ctx } from "./types";
-
-/** The shared reader only summarises an announcement of at least this many characters (lib/offer-reader.ts, migration 20261007111753). */
-const READER_MIN_CHARS = 120;
 
 const FT_LICENCE = "https://francetravail.io/produits-partages/documentation/conditions-dutilisation-api/licence-offres-emploi";
 
@@ -125,8 +123,14 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   const gone = Boolean(job.gone_reason) && !isSent(stage);
   const review = job.review_flag && !gone ? REVIEW[job.review_flag] : null;
   const missingText = job.status === "DISCOVERED" && !job.description;
-  // A text exists but is too short for the reader: the summary will never come, so do not promise it.
-  const shortText = !summary && Boolean(job.description) && (job.description?.trim().length ?? 0) < READER_MIN_CHARS;
+  // The short summary is written quietly when the offer is opened: no toast, no lock on the other buttons.
+  const [summarising, setSummarising] = useState(false);
+  const [summaryFailed, setSummaryFailed] = useState(false);
+  // A text too short for the reader never gets a summary, so the block must not promise one.
+  const brief = summaryState({ hasSummary: Boolean(summary), status: job.status, description: job.description, summarising, failed: summaryFailed });
+  const shortText = brief === "short-text";
+  // Only the paid or heavy actions wait for the summary; leaving or discarding the offer never does.
+  const waiting = disabled || summarising;
   const plan = status?.plan;
   // A comfort only (the server still decides): unknown plan or limit keeps the button active.
   const monthFull = plan && plan.limit !== null && plan.used >= plan.limit ? { limit: plan.limit, resetsOn: plan.resetsOn } : null;
@@ -154,11 +158,18 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   // The short summary is what the student needs first: written on opening when it is missing.
   const canSummarise = !summary && job.status === "DISCOVERED" && Boolean(job.description) && !job.review_flag && !gone;
   const asked = useRef(false);
+  const summarise = useCallback(async () => {
+    setSummarising(true);
+    setSummaryFailed(false);
+    const ok = await act.summarize(job);
+    setSummarising(false);
+    if (!ok) setSummaryFailed(true);
+  }, [act, job]);
   useEffect(() => {
     if (!canSummarise || asked.current || busy) return;
     asked.current = true;
-    void act.analyze(job);
-  }, [canSummarise, busy, act, job]);
+    void summarise();
+  }, [canSummarise, busy, summarise]);
 
   return (
     <>
@@ -288,7 +299,7 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                 </>
               ) : null}
               {job.description && !job.review_flag && !gone && (
-                <button className="btn ghost small" onClick={() => void act.analyze(job)} disabled={disabled}>
+                <button className="btn ghost small" onClick={() => void act.analyze(job)} disabled={waiting}>
                   <Sparkles size={15} aria-hidden /> Analyse approfondie par l’IA
                 </button>
               )}
@@ -345,7 +356,7 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
               {summary.conditions ? <p className="muted small-text">{summary.conditions}</p> : null}
             </div>
           ) : (
-            working && canSummarise ? (
+            brief === "loading" ? (
               <div className="brief-loading" role="status">
                 <LoaderCircle size={16} className="spin" aria-hidden /> Résumé de l’offre en cours…
                 <span className="skeleton" />
@@ -358,11 +369,18 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                     ? "L’annonce n’a pas pu être lue automatiquement : colle son texte pour la résumer."
                     : shortText
                       ? "Le texte de cette annonce est trop court pour être résumé. Ouvre l’annonce d’origine, ou colle son texte complet."
-                      : "Le résumé (missions, outils, rythme) arrive dès que l’offre est lue, quelques minutes après son arrivée."}
+                      : brief === "failed"
+                        ? "Résumé indisponible pour l’instant."
+                        : "Le résumé (missions, outils, rythme) arrive dès que l’offre est lue, quelques minutes après son arrivée."}
                 </p>
                 {shortText && !gone && !job.review_flag && (
                   <button className="btn secondary small" disabled={disabled} onClick={() => act.pasteDescription(job)}>
                     Coller le texte de l’annonce
+                  </button>
+                )}
+                {brief === "failed" && (
+                  <button className="btn secondary small" disabled={waiting} onClick={() => void summarise()}>
+                    Réessayer
                   </button>
                 )}
               </>
@@ -404,7 +422,7 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                       Tes {monthFull.limit} dossiers du mois sont utilisés. Les prochains arrivent le {monthFull.resetsOn}. Tu peux toujours chercher, garder et suivre tes offres.
                     </p>
                   ) : (
-                    <button className="btn" disabled={disabled} onClick={() => void act.prepareKit(job)}>
+                    <button className="btn" disabled={waiting} onClick={() => void act.prepareKit(job)}>
                       {working ? <LoaderCircle size={16} className="spin" aria-hidden /> : <Sparkles size={16} aria-hidden />} Créer mon CV et ma lettre
                     </button>
                   )}

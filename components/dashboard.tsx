@@ -209,6 +209,12 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
           if (!r.ok) return notify(readable(r.body.error), "bad");
           notify(`${job.company} : compatibilité ${r.body.total}/100.`, "good");
         }),
+      summarize: async (job) => {
+        // Opening an offer is not a request: no toast, and no `busy` lock that would freeze the panel buttons.
+        const r = await post(`/api/jobs/${job.id}/analyze`);
+        if (r.ok) await reload();
+        return r.ok;
+      },
       generate: (job) =>
         run(job.id, async () => {
           notify(`Rédaction du CV et de la lettre pour « ${job.company} »…`);
