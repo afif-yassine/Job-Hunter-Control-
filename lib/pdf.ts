@@ -31,12 +31,21 @@ export type RenderContext = {
   now?: Date;
 };
 
-const DEFAULT_IDENTITY: Identity = {
-  name: "Yassine AFIF",
-  city: "Paris 20e",
-  email: "yassine.afif.ma@gmail.com",
-  links: ["linkedin.com/in/yassine-afif", "github.com/afif-yassine"],
-};
+/**
+ * Shown only when the account has no name on its profile. Nobody's real details
+ * are ever a default: a missing field is left out of the document, never filled in.
+ */
+const NEUTRAL_NAME = "Candidat";
+
+/** The account's own details; every missing field is empty, so it is simply not printed. */
+function identityOf(given: Partial<Identity> | undefined): Identity {
+  return {
+    name: given?.name?.trim() || NEUTRAL_NAME,
+    city: given?.city?.trim() || "",
+    email: given?.email?.trim() || "",
+    links: (given?.links ?? []).filter(Boolean),
+  };
+}
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -377,7 +386,8 @@ function drawLetter(
   if (ctx.company) w.text(ctx.company, { size: 10.5, x: colX, width: colW });
   if (ctx.location) w.text(ctx.location, { size: 10.5, x: colX, width: colW, color: MUTED });
   w.space(8);
-  w.text(`${id.city.replace(/\s+\d+\w*$/, "")}, le ${frenchDate(ctx.now ?? new Date())}`, {
+  const place = id.city.replace(/\s+\d+\w*$/, "").trim();
+  w.text(place ? `${place}, le ${frenchDate(ctx.now ?? new Date())}` : `Le ${frenchDate(ctx.now ?? new Date())}`, {
     size: 10.5,
     x: colX,
     width: colW,
@@ -424,7 +434,7 @@ export async function renderContentPdf({ kind, content, ctx = {} }: RenderInput)
   const data =
     content && typeof content === "object" ? (content as Record<string, unknown>) : {};
   const design = normalizeDesign(data.design);
-  const id: Identity = { ...DEFAULT_IDENTITY, ...(ctx.identity ?? {}) } as Identity;
+  const id = identityOf(ctx.identity);
 
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);

@@ -72,7 +72,7 @@ export async function POST(
   const { design: _ignored, provenance: _provenance, ...currentContent } = currentRecord;
   void _ignored;
   void _provenance;
-  const prompt = `Tu révises un ${isLetter ? "lettre de motivation" : "CV ATS d'une page"} déjà généré, selon la demande de Yassine.
+  const prompt = `Tu révises un ${isLetter ? "lettre de motivation" : "CV ATS d'une page"} déjà généré, selon la demande du candidat.
 RÈGLES STRICTES :
 - Applique uniquement la demande. Tout le reste doit rester identique.
 - Une demande de style (« professionnalise », « plus percutant », « plus direct ») change réellement le texte : formulations plus concises, verbes d'action, phrases plus nettes, sans ajouter aucun fait.
