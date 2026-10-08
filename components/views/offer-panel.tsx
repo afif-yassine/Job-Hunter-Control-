@@ -27,7 +27,10 @@ import { closestJobIds, CLOSEST_COUNT } from "./closest";
 import { offerAge, salaryOf, ScoreRing, StageChip } from "./offer-card";
 import type { Ctx } from "./types";
 
-const FT_LICENCE = "https://francetravail.io/produits-partages/documentation/conditions-dutilisation-api/licence-offres-emploi";
+/** The shared reader only summarises an announcement of at least this many characters (lib/offer-reader.ts, migration 20261007111753). */
+const READER_MIN_CHARS = 120;
+
+const FT_LICENCE ="https://francetravail.io/produits-partages/documentation/conditions-dutilisation-api/licence-offres-emploi";
 
 /** "En bref": from this account's analysis, or shared by the first account that analysed the offer. */
 export function summaryOf(job: Job): OfferSummary | null {
@@ -122,6 +125,8 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   const gone = Boolean(job.gone_reason) && !isSent(stage);
   const review = job.review_flag && !gone ? REVIEW[job.review_flag] : null;
   const missingText = job.status === "DISCOVERED" && !job.description;
+  // A text exists but is too short for the reader: the summary will never come, so do not promise it.
+  const shortText = !summary && Boolean(job.description) && (job.description?.trim().length ?? 0) < READER_MIN_CHARS;
   const plan = status?.plan;
 
   // "As-tu postulé ?" when the student comes back from the ad.
@@ -345,11 +350,20 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                 <span className="skeleton is-short" />
               </div>
             ) : (
-              <p className="muted small-text">
-                {missingText
-                  ? "L’annonce n’a pas pu être lue automatiquement : colle son texte pour la résumer."
-                  : "Le résumé (missions, outils, rythme) arrive dès que l’offre est lue, quelques minutes après son arrivée."}
-              </p>
+              <>
+                <p className="muted small-text">
+                  {missingText
+                    ? "L’annonce n’a pas pu être lue automatiquement : colle son texte pour la résumer."
+                    : shortText
+                      ? "Le texte de cette annonce est trop court pour être résumé. Ouvre l’annonce d’origine, ou colle son texte complet."
+                      : "Le résumé (missions, outils, rythme) arrive dès que l’offre est lue, quelques minutes après son arrivée."}
+                </p>
+                {shortText && !gone && !job.review_flag && (
+                  <button className="btn secondary small" disabled={disabled} onClick={() => act.pasteDescription(job)}>
+                    Coller le texte de l’annonce
+                  </button>
+                )}
+              </>
             )
           )}
         </section>
@@ -418,10 +432,14 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
             <JourneyStep done={isSent(stage)} current={stage === "ready"} title="Candidature envoyée" when={isSent(stage) ? day(job.applied_at) : null}>
               {stage === "ready" && (
                 <div className="journey-actions">
-                  {url && (
-                    <a className="btn" href={url} target="_blank" rel="noreferrer" onClick={() => (leftForAd.current = true)}>
-                      <ExternalLink size={15} aria-hidden /> Postuler sur le site
-                    </a>
+                  {gone ? (
+                    <p className="hint">Cette offre n’est plus disponible : tu ne peux plus postuler dessus.</p>
+                  ) : (
+                    url && (
+                      <a className="btn" href={url} target="_blank" rel="noreferrer" onClick={() => (leftForAd.current = true)}>
+                        <ExternalLink size={15} aria-hidden /> Postuler sur le site
+                      </a>
+                    )
                   )}
                   <button className="btn secondary" disabled={disabled} onClick={() => move("applied")}>
                     <CheckCheck size={15} aria-hidden /> J’ai postulé

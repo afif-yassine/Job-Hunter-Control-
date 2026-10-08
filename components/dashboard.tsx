@@ -69,6 +69,9 @@ const ADMIN_NAV = [
 const VIEWS = new Set<string>(["home", "jobs", "track", "documents", "questions", "more", "admin", "activity", "settings", "roadmap"]);
 const MORE_VIEWS = new Set<View>(["more", "documents", "questions", "activity", "settings", "admin", "roadmap"]);
 
+/** A pasted announcement shorter than this is never summarised by the shared reader (lib/offer-reader.ts, migration 20261007111753). */
+const DESCRIPTION_MIN_CHARS = 120;
+
 /** What the student hears after moving an offer. */
 const MOVED: Record<Stage, string> = {
   new: "Remise dans les nouvelles offres.",
@@ -340,7 +343,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
   );
 
   async function saveDescription() {
-    if (!supabase || !descJob || descText.trim().length < 50) return;
+    if (!supabase || !descJob || descText.trim().length < DESCRIPTION_MIN_CHARS) return;
     const { error } = await supabase
       .from("jobs")
       .update({ description: descText.trim(), last_checked_at: null })
@@ -632,8 +635,10 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
             <button type="button" className="btn secondary" onClick={() => descModal.current?.close()}>
               Annuler
             </button>
-            <button type="button" className="btn" disabled={descText.trim().length < 50} onClick={() => void saveDescription()}>
-              Enregistrer
+            <button type="button" className="btn" disabled={descText.trim().length < DESCRIPTION_MIN_CHARS} onClick={() => void saveDescription()}>
+              {descText.trim().length < DESCRIPTION_MIN_CHARS
+                ? `Encore ${DESCRIPTION_MIN_CHARS - descText.trim().length} caractères pour pouvoir résumer l’offre`
+                : "Enregistrer"}
             </button>
           </div>
         </div>

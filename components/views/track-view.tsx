@@ -64,6 +64,8 @@ export function TrackView({ ctx }: { ctx: Ctx }) {
                   c.jobs.map((job) => {
                     const stage = stageOf(job);
                     const due = followUpDue(job);
+                    // Same rule as the offer card: a sent application is followed whatever happens to the ad.
+                    const gone = Boolean(job.gone_reason) && stage !== "applied" && stage !== "interview";
                     return (
                       <button key={job.id} type="button" className="track-card" onClick={() => openOffer(job)}>
                         <span className="track-card-top">
@@ -88,6 +90,7 @@ export function TrackView({ ctx }: { ctx: Ctx }) {
                         )}
                         {stage === "offer" && <span className="track-flag is-good">Acceptée</span>}
                         {stage === "rejected" && <span className="track-flag is-bad">Refusée</span>}
+                        {gone && <span className="track-flag is-bad">Plus disponible</span>}
                         <Milestones stage={stage} kit={kits.get(job.id)} />
                       </button>
                     );
