@@ -15,11 +15,20 @@ import {
   type UserCosts,
 } from "@/lib/economics";
 import { monthStartParis } from "@/lib/plan";
+import type { CostOrigin } from "./origin";
 import { LEVELS, progress, type GrowthStats, type Progress } from "./levels";
 
 type Env = Record<string, string | undefined>;
 
-export type ModelLine = { model: string; label: string; calls: number; input: number; output: number; usd: number; priced: boolean };
+export type ModelLine = { model: string; label: string; calls: number; input: number; output: number; usd: number; priced: boolean; origin: CostOrigin };
+
+/** Origin of every amount of the growth page; the front shows it next to the figure. */
+export type GrowthOrigins = {
+  money: Record<keyof Growth["money"], CostOrigin>;
+  perUser: CostOrigin;
+  levels: CostOrigin;
+  selfHosting: CostOrigin;
+};
 
 export type Growth = {
   at: string;
@@ -37,7 +46,17 @@ export type Growth = {
     eurUsd: number;
     breakEvenPro: number;
   };
-  ai: { models: Models; recommended: Models; byModel: ModelLine[]; perUser: UserCosts; perUserRecommended: UserCosts; analysisPriceIn: number };
+  ai: {
+    models: Models;
+    recommended: Models;
+    byModel: ModelLine[];
+    /** Calls of the month with no stored cost: counted in calls and tokens, not in dollars. */
+    unpricedCalls: number;
+    perUser: UserCosts;
+    perUserRecommended: UserCosts;
+    analysisPriceIn: number;
+  };
+  origins: GrowthOrigins;
   /** Each level's forecast at its goal. */
   levels: { n: number; name: string; users: number; pro: number; forecast: Forecast }[];
   selfHosting: typeof SELF_HOSTING;
@@ -45,7 +64,8 @@ export type Growth = {
 };
 
 export type RawStats = GrowthStats & {
-  ai_by_model: { model: string; calls: number; input: number; output: number }[];
+  ai_by_model: { model: string; calls: number; input: number; output: number; usd?: number | string | null }[];
+  ai_month?: { unpriced?: number | string | null } | null;
   signups_30d: { day: string; n: number }[];
 };
 
@@ -88,10 +108,20 @@ export function growthFrom(raw: RawStats, quests: Quest[], env: Env = process.en
   };
 
   // Real AI spend this month, priced model by model.
+  // The stored cost of each call is used as is; tokens × coded prices only when the SQL gave no cost.
   const byModel: ModelLine[] = (raw.ai_by_model ?? []).map((m) => {
     const tokens = { input: n(m.input), output: n(m.output) };
     const price = priceFor(m.model);
-    return { model: m.model, label: price?.label ?? m.model, calls: n(m.calls), ...tokens, usd: callCost(m.model, tokens, env), priced: Boolean(price) };
+    const recorded = m.usd !== undefined && m.usd !== null && Number.isFinite(Number(m.usd));
+    return {
+      model: m.model,
+      label: price?.label ?? m.model,
+      calls: n(m.calls),
+      ...tokens,
+      usd: recorded ? Number(m.usd) : callCost(m.model, tokens, env),
+      priced: Boolean(price),
+      origin: recorded ? "measured_or_estimated" : "estimated",
+    };
   });
   byModel.sort((a, b) => b.usd - a.usd);
   const aiUsdMonth = byModel.reduce((t, m) => t + m.usd, 0);
@@ -140,7 +170,24 @@ export function growthFrom(raw: RawStats, quests: Quest[], env: Env = process.en
       eurUsd: rate,
       breakEvenPro: now_.breakEvenPro,
     },
-    ai: { models, recommended, byModel, perUser, perUserRecommended, analysisPriceIn },
+    ai: { models, recommended, byModel, unpricedCalls: n(raw.ai_month?.unpriced), perUser, perUserRecommended, analysisPriceIn },
+    origins: {
+      money: {
+        proPrice: "assumption",
+        proNet: "assumption",
+        mrrEur: "assumption",
+        netEur: "assumption",
+        hostingUsd: "assumption",
+        aiUsdMonth: byModel.every((m) => m.origin === "estimated") && byModel.length > 0 ? "estimated" : "measured_or_estimated",
+        aiUsdMonthProjected: "estimated",
+        marginEur: "assumption",
+        eurUsd: "assumption",
+        breakEvenPro: "assumption",
+      },
+      perUser: "assumption",
+      levels: "assumption",
+      selfHosting: "assumption",
+    },
     levels: LEVELS.map((l) => ({
       n: l.n,
       name: l.name,
