@@ -120,7 +120,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
   const isDemo = Boolean(demo);
   const { status, failed: statusFailed, refresh: refreshStatus } = useSystemStatus(Boolean(supabase), demo?.status);
   const pipeline = usePipeline({ supabase, status, reload, refreshStatus });
-  const { hasProfile, refresh: refreshProfile } = useProfileState(Boolean(supabase), isDemo);
+  const { hasProfile, summary: profileSummary, failed: profileFailed, refresh: refreshProfile } = useProfileState(Boolean(supabase), isDemo);
   // Once per session, after the first load and only with a saved CV: the list is opened from the shared catalogue.
   const { refreshedAt: catalogueRefreshedAt } = useCatalogueRefresh({
     enabled: hasProfile === true && !loading && !isDemo && Boolean(supabase),
@@ -430,7 +430,10 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
     go,
     notify,
     reload,
+    demo: isDemo,
     hasProfile,
+    profileSummary,
+    profileFailed,
     refreshProfile,
     catalogueRefreshedAt,
     jobFilter,

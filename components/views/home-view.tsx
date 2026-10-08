@@ -15,6 +15,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { freshnessText } from "@/components/catalogue-refresh";
+import { CV_SAVED_NOTE, profileCardLines } from "@/components/profile-card";
 import { openQuestionCount } from "@/components/questions-panel";
 import { Callout, PageHead, Progress } from "@/components/ui";
 import { kitsByJob, stageOf, todayTasks, TRACK } from "@/lib/journey";
@@ -38,6 +39,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
 
   // Known to have no CV yet: the CV comes first. Unknown (undefined) changes nothing.
   const noProfile = ctx.hasProfile === false;
+  const savedCv = ctx.profileSummary ?? null;
   const noSource = status ? !status.scanConfigured : false;
   const lastRun = runs.find((r) => r.run_type === "PIPELINE");
   const last = status?.lastScanAt ?? lastRun?.created_at ?? null;
@@ -211,16 +213,38 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
         </section>
       )}
       <h2 className="section-title">Ta recherche</h2>
-      {!noProfile && (
+      {savedCv ? (
+        // The CV is saved: say so, with the file, the date and what was read (never "importer" as if it were missing).
         <div className="card cv-cta">
           <div>
             <strong>Ton CV</strong>
-            <p className="muted small-text">Importé une fois en PDF : tous tes CV et lettres partent de lui, rien n’est inventé.</p>
+            {profileCardLines(savedCv, timeAgo).map((line) => (
+              <p key={line} className="muted small-text">
+                {line}
+              </p>
+            ))}
+            <p className="muted small-text">{CV_SAVED_NOTE}</p>
+            <button className="linkbtn small-text" onClick={() => go("settings")}>
+              Voir ce qui a été lu
+            </button>
           </div>
           <button className="btn secondary" onClick={() => go("settings")}>
-            Importer ou mettre à jour
+            Voir ou mettre à jour mon CV
           </button>
         </div>
+      ) : (
+        !noProfile && (
+          // Loading, unreadable or demo: the neutral card of before, never "Commence par ton CV".
+          <div className="card cv-cta">
+            <div>
+              <strong>Ton CV</strong>
+              <p className="muted small-text">Importé une fois en PDF : tous tes CV et lettres partent de lui, rien n’est inventé.</p>
+            </div>
+            <button className="btn secondary" onClick={() => go("settings")}>
+              Importer ou mettre à jour
+            </button>
+          </div>
+        )
       )}
 
       {showStudentCard && (

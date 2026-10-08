@@ -7,7 +7,7 @@ import type { ProviderStatus } from "@/lib/integrations";
 import { DEFAULT_PREFS, MAX_TARGETS, type ScanPrefs } from "@/lib/scan/config";
 import { CATEGORIES, category } from "@/lib/scan/categories";
 import type { ImportedProfile } from "@/lib/profile-import";
-import type { ProfileSummary } from "@/lib/profile-store";
+import { CV_SAVED_NOTE } from "@/components/profile-card";
 import type { DiscoveredTarget } from "@/lib/scan/discover";
 import { ATS_LABEL, boardUrl, parseAtsTarget } from "@/lib/scan/sources/ats";
 import { timeAgo } from "@/lib/labels";
@@ -645,31 +645,13 @@ const period = (start: string | null, end: string | null) => [start, end ?? (sta
 /** Your CV, read once: every CV and letter is written from it, nothing else. */
 function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => void }) {
   const { notify, reload } = ctx;
-  const [summary, setSummary] = useState<ProfileSummary | null | undefined>(undefined);
+  // The saved CV is read once for the whole dashboard (components/use-profile.ts), not again here.
+  const summary = ctx.profileSummary;
   const [answer, setAnswer] = useState<ImportAnswer | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [busy, setBusy] = useState<"" | "read" | "save">("");
   /** The profile was just saved: the next step is the offers. */
   const [justSaved, setJustSaved] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/profile")
-      .then(async (r) => {
-        const body = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
-        if (!cancelled) setSummary(body.profile ?? null);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) {
-          setSummary(null);
-          notify(`Profil illisible : ${e instanceof Error ? e.message : "erreur"}`, "bad");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [notify]);
 
   async function read(file: File) {
     setBusy("read");
@@ -701,7 +683,7 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
-      setSummary(body.profile);
+      await ctx.refreshProfile();
       if (picked.length) {
         // Tick the suggested job categories in the search too.
         const current = await fetch("/api/settings").then((r) => r.json());
@@ -722,7 +704,6 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
       } else notify("Profil enregistré : tes prochains CV et lettres partiront de lui.", "good");
       setAnswer(null);
       setJustSaved(true);
-      void ctx.refreshProfile();
     } catch (e) {
       notify(e instanceof Error ? e.message : "Enregistrement impossible", "bad");
     } finally {
@@ -740,13 +721,27 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
           lettre adapté part de là. Rien n’est inventé, et tu vérifies avant d’enregistrer. Le PDF n’est pas conservé.
         </p>
         {summary === undefined ? (
-          <p className="muted">Chargement…</p>
+          ctx.demo ? (
+            <p className="muted">Mode démonstration : le profil n’est pas lu.</p>
+          ) : ctx.profileFailed ? (
+            <Callout tone="warn" title="Ton profil n’a pas pu être lu">
+              Recharge la page. Rien n’a été modifié.
+            </Callout>
+          ) : (
+            <p className="muted">Chargement…</p>
+          )
         ) : summary ? (
-          <p className="wide">
-            <strong>{summary.full_name}</strong> · {summary.experience} expérience(s), {summary.education} formation(s),{" "}
-            {summary.projects} projet(s), {summary.skills} compétence(s)
-            {summary.updated_at ? <span className="muted"> · mis à jour {timeAgo(summary.updated_at)}</span> : null}
-          </p>
+          <>
+            <p className="wide">
+              <strong>{summary.full_name}</strong> · {summary.experience} expérience(s), {summary.education} formation(s),{" "}
+              {summary.projects} projet(s), {summary.skills} compétence(s)
+              {summary.updated_at ? <span className="muted"> · mis à jour {timeAgo(summary.updated_at)}</span> : null}
+            </p>
+            <p className="wide muted small-text">
+              {summary.source ? `CV importé : « ${summary.source} ». ` : ""}
+              {CV_SAVED_NOTE}
+            </p>
+          </>
         ) : (
           <Callout tone="info" title="Aucun profil encore">
             Sans profil, l’appli ne peut ni noter les offres ni écrire tes CV.

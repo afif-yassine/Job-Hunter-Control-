@@ -6,6 +6,7 @@ import type { SystemStatus } from "@/components/use-status";
 import type { usePipeline } from "@/components/use-pipeline";
 import type { DocumentDialogState } from "@/components/document-tools";
 import type { AdminOverview } from "@/lib/admin/overview";
+import type { ProfileSummary } from "@/lib/profile-store";
 
 export type View =
   | "home"
@@ -43,8 +44,14 @@ export type Ctx = {
   reload: () => Promise<void>;
   /** Fixed admin data for the /demo page. */
   adminDemo?: AdminOverview;
+  /** The demo page: nothing is read from the account. */
+  demo: boolean;
   /** Whether a CV profile is saved (undefined while unknown: nothing is blocked). */
   hasProfile: boolean | undefined;
+  /** What the saved CV holds (undefined: loading or unreadable; null: no profile yet). */
+  profileSummary: ProfileSummary | null | undefined;
+  /** The profile could not be read: shown instead of an endless "Chargement…". */
+  profileFailed: boolean;
   refreshProfile: () => Promise<void>;
   /** When the shared catalogue was last checked for this student in this browser session (null: not yet). */
   catalogueRefreshedAt: string | null;
