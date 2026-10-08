@@ -492,12 +492,15 @@ export function scanMessage(s: ScanSummary): string {
  * called): right after sign-up or a change of search. Returns how many
  * offers were added.
  */
-export async function seedFromCatalogue(supabase: SupabaseClient, userId: string): Promise<number> {
+export async function seedFromCatalogue(supabase: SupabaseClient, userId: string, options: { refreshVector?: boolean } = {}): Promise<number> {
   const settings = await loadUserSettings(supabase, userId);
   if (!hasChosenSearch(settings.prefs)) return 0;
   const config = configFromPrefs(settings.prefs);
-  if (semanticEnabled()) await ensureSemanticProfile(supabase, userId, process.env);
-  else await ensureProfileEmbedding(supabase, userId, geminiEmbedder());
+  // The profile's vector is refreshed unless the caller only copies what the catalogue holds (no AI call).
+  if (options.refreshVector !== false) {
+    if (semanticEnabled()) await ensureSemanticProfile(supabase, userId, process.env);
+    else await ensureProfileEmbedding(supabase, userId, geminiEmbedder());
+  }
   const found = await importFromCatalogue(supabase, config);
   const offers = found.offers.filter(isRelevant);
   if (!offers.length) return 0;
