@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CV_SAVED_NOTE, profileCardLines, readCounts } from "../components/profile-card";
+import { categoriesFailedMessage, CV_SAVED_NOTE, profileCardLines, profileSavedMessage, readCounts } from "../components/profile-card";
 import type { ProfileSummary } from "../lib/profile-store";
 
 const summary: ProfileSummary = {
@@ -32,6 +32,21 @@ test("the plural follows the number, and a part that was not read is left out", 
 test("an unknown file or date is never invented", () => {
   assert.deepEqual(profileCardLines({ ...summary, source: null, updated_at: null, experience: 0, education: 0, skills: 0 }, ago), ["CV enregistré"]);
   assert.equal(profileCardLines({ ...summary, source: null }, ago)[0], "CV enregistré");
+});
+
+test("the confirmation after a saved profile says what happened to the suggested jobs", () => {
+  assert.equal(profileSavedMessage({ picked: 0, imported: 0 }), "Profil enregistré : tes prochains CV et lettres partiront de lui.");
+  assert.equal(profileSavedMessage({ picked: 3, imported: 0 }), "Profil enregistré. 3 métier(s) coché(s).");
+  assert.equal(profileSavedMessage({ picked: 3, imported: 12 }), "Profil enregistré. 3 métier(s) coché(s), 12 offre(s) ajoutée(s) tout de suite.");
+});
+
+test("when the jobs could not be ticked, the profile is still said saved and the student is told where to choose them", () => {
+  const message = categoriesFailedMessage();
+  assert.match(message, /^Profil enregistré\./);
+  assert.match(message, /n’ont pas pu être cochés/);
+  assert.match(message, /2 · Ce que tu cherches/);
+  // No technical cause is shown to the student.
+  assert.doesNotMatch(message, /HTTP|fetch|Error|undefined/i);
 });
 
 test("the reassurance sentence says the CV does not need to be uploaded again", () => {

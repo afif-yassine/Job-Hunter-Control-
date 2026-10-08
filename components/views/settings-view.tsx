@@ -7,7 +7,7 @@ import type { ProviderStatus } from "@/lib/integrations";
 import { DEFAULT_PREFS, MAX_TARGETS, type ScanPrefs } from "@/lib/scan/config";
 import { CATEGORIES, category } from "@/lib/scan/categories";
 import type { ImportedProfile } from "@/lib/profile-import";
-import { CV_SAVED_NOTE } from "@/components/profile-card";
+import { categoriesFailedMessage, CV_SAVED_NOTE, profileSavedMessage } from "@/components/profile-card";
 import type { DiscoveredTarget } from "@/lib/scan/discover";
 import { ATS_LABEL, boardUrl, parseAtsTarget } from "@/lib/scan/sources/ats";
 import { timeAgo } from "@/lib/labels";
@@ -675,6 +675,7 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
   async function save() {
     if (!answer) return;
     setBusy("save");
+    // 1. The profile itself. Only a failure here keeps the draft open: nothing was saved.
     try {
       const response = await fetch("/api/profile", {
         method: "PUT",
@@ -683,11 +684,23 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Enregistrement impossible", "bad");
+      setBusy("");
+      return;
+    }
+    // The profile is saved: close the draft now, whatever happens to the suggested jobs below.
+    const wanted = picked;
+    setAnswer(null);
+    setJustSaved(true);
+    try {
       await ctx.refreshProfile();
-      if (picked.length) {
-        // Tick the suggested job categories in the search too.
+      // 2. The suggested job categories, ticked in the search too. A failure here is not a failure to save the CV.
+      if (!wanted.length) {
+        notify(profileSavedMessage({ picked: 0, imported: 0 }), "good");
+      } else {
         const current = await fetch("/api/settings").then((r) => r.json());
-        const categories = [...new Set([...(current.prefs?.categories ?? []), ...picked])];
+        const categories = [...new Set([...(current.prefs?.categories ?? []), ...wanted])];
         const put = await fetch("/api/settings", {
           method: "PUT",
           headers: { "content-type": "application/json" },
@@ -697,15 +710,10 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
         if (!put.ok) throw new Error(saved.error || "Métiers non enregistrés");
         onCategories();
         await reload();
-        notify(
-          `Profil enregistré. ${picked.length} métier(s) coché(s)${saved.imported ? `, ${saved.imported} offre(s) ajoutée(s) tout de suite` : ""}.`,
-          "good",
-        );
-      } else notify("Profil enregistré : tes prochains CV et lettres partiront de lui.", "good");
-      setAnswer(null);
-      setJustSaved(true);
-    } catch (e) {
-      notify(e instanceof Error ? e.message : "Enregistrement impossible", "bad");
+        notify(profileSavedMessage({ picked: wanted.length, imported: Number(saved.imported) || 0 }), "good");
+      }
+    } catch {
+      notify(categoriesFailedMessage(), "info");
     } finally {
       setBusy("");
     }
@@ -747,8 +755,9 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
             Sans profil, l’appli ne peut ni noter les offres ni écrire tes CV.
           </Callout>
         )}
-        {justSaved && summary && (
+        {justSaved && (
           <div className="wide toolbar">
+            <strong>Profil enregistré.</strong>
             <button className="btn" onClick={() => ctx.go("jobs", "new")}>
               Voir mes offres
             </button>
