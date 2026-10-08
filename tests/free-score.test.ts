@@ -80,6 +80,20 @@ test("AI and data skills use one safe form on both sides, without wide equivalen
   assert.equal(normalizeSkill("IA générative"), "ia generative");
   assert.equal(normalizeSkill("Intelligence artificielle"), "ia");
   assert.equal(normalizeSkill("Torch"), "pytorch");
+  // A purely numeric version tail is dropped, so "Java 17/21" meets an offer asking for "Java".
+  for (const [raw, expected] of [["Java 17/21", "java"], ["Python 3.12", "python"], ["Spring Boot 3", "spring boot"], ["Node.js 20", "node"], ["Angular 17", "angular"], ["Java 8+", "java"], ["Python (3.12)", "python"]])
+    assert.equal(normalizeSkill(raw), expected, raw);
+  // A number that is part of the name stays.
+  for (const name of ["C++", "ES6", "S3", "K8s", "Web3", "Web 3", "Industrie 4.0", "Kimi k2.5", "3D", "Python3", "Office 365"])
+    assert.equal(normalizeSkill(name), normalizeSkill(name.toLowerCase()), name);
+  assert.equal(normalizeSkill("K8s"), "kubernetes");
+  assert.equal(normalizeSkill("Kimi k2.5"), "kimi k2 5");
+  assert.equal(normalizeSkill("Industrie 4.0"), "industrie 4 0");
+  assert.equal(normalizeSkill("Web 3"), "web 3");
+  assert.equal(normalizeSkill("3D"), "3d");
+  assert.equal(normalizeSkill("S3"), "s3");
+  assert.equal(normalizeSkill("C++"), "c++");
+  assert.notEqual(normalizeSkill("Java 17"), normalizeSkill("JavaScript"));
   // Neighbouring skills are not merged: a TensorFlow CV does not prove PyTorch.
   assert.notEqual(normalizeSkill("TensorFlow"), normalizeSkill("PyTorch"));
   assert.notEqual(normalizeSkill("Machine learning"), normalizeSkill("Deep learning"));

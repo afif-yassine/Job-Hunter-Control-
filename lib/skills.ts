@@ -40,13 +40,28 @@ const ALIASES: Record<string, string> = {
   torch: "pytorch",
 };
 
-/** "  React.JS " → "react"; "" for nothing usable. */
+/** Names whose final number is part of their identity ("Industrie 4.0", "Web 3"). */
+const NUMBER_IS_IDENTITY = new Set(["industrie", "industry", "web", "office", "microsoft"]);
+
+/** "java 17/21" → "java": only a purely numeric tail (digits, dots, slashes), after a separate word. */
+function withoutVersion(s: string): string {
+  const m = /^(.*\S)\s+v?\d+(?:[./,-]\d+)*\+?$/.exec(s);
+  if (!m || NUMBER_IS_IDENTITY.has(m[1])) return s;
+  return m[1];
+}
+
+/** "  React.JS " → "react"; "Java 17/21" → "java"; "" for nothing usable. */
 export function normalizeSkill(raw: string): string {
-  let s = raw
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/\(.*?\)/g, " ")
+  let s = withoutVersion(
+    raw
+      .normalize("NFKD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/\(.*?\)/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+  s = s
     .replace(/\.js\b/g, "js")
     .replace(/[^a-z0-9+#/ -]+/g, " ")
     .replace(/[-/]+/g, " ")
