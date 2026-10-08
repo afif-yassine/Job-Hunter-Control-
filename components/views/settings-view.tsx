@@ -884,28 +884,16 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
 
 /* ------------------------------------------------------------------ Account (RGPD) */
 
-type AccountInfo = { email: string; providers: string[]; createdAt: string; lastSignInAt: string | null };
-
 const PROVIDER_LABEL: Record<string, string> = { google: "Google", email: "lien par e-mail" };
 
 /** Your account: how you sign in, download everything, delete everything. */
 function AccountSection({ ctx }: { ctx: Ctx }) {
-  const [info, setInfo] = useState<AccountInfo | null>(null);
+  // Read once for the whole dashboard (components/use-account.ts), so the menu and this card show the same address.
+  const info = ctx.account;
   const [asking, setAsking] = useState(false);
   const [typed, setTyped] = useState("");
   const [working, setWorking] = useState(false);
   const [problem, setProblem] = useState("");
-
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/account")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: AccountInfo | null) => alive && setInfo(d))
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   async function remove() {
     setWorking(true);
@@ -936,7 +924,7 @@ function AccountSection({ ctx }: { ctx: Ctx }) {
       <div className="card list">
         <div className="row static">
           <span className="row-main">
-            <strong>{info?.email || ctx.userEmail || "Ton compte"}</strong>
+            <strong>{ctx.userEmail || "Ton compte"}</strong>
             <span className="muted">
               {[via ? `Connexion par ${via}` : null, since ? `compte créé le ${since}` : null].filter(Boolean).join(" · ") || "…"}
             </span>

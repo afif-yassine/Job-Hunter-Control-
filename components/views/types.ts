@@ -7,6 +7,7 @@ import type { usePipeline } from "@/components/use-pipeline";
 import type { DocumentDialogState } from "@/components/document-tools";
 import type { AdminOverview } from "@/lib/admin/overview";
 import type { ProfileSummary } from "@/lib/profile-store";
+import type { AccountInfo } from "@/components/use-account";
 
 export type View =
   | "home"
@@ -38,7 +39,10 @@ export type Ctx = {
   refreshStatus: () => Promise<void>;
   pipeline: ReturnType<typeof usePipeline>;
   busy: string;
+  /** The address shown everywhere: the account's own (/api/account) once loaded, else the token's. */
   userEmail: string;
+  /** The signed-in account as the server reads it now (null until loaded). */
+  account: AccountInfo | null;
   go: (view: View, filter?: JobFilter) => void;
   notify: (text: string, tone?: Tone) => void;
   reload: () => Promise<void>;

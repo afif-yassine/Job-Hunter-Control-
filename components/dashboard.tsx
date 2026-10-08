@@ -32,6 +32,7 @@ import { useSystemStatus, type SystemStatus } from "@/components/use-status";
 import { useProfileState } from "@/components/use-profile";
 import { createInflightGuard } from "@/components/in-flight";
 import { useCatalogueRefresh } from "@/components/use-catalogue-refresh";
+import { shownEmail, useAccount } from "@/components/use-account";
 import { Callout, Progress } from "@/components/ui";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { RoadmapView } from "@/components/views/roadmap-view";
@@ -114,13 +115,16 @@ async function post(url: string, body: unknown = {}) {
 
 export type DemoState = { data: Data; status: SystemStatus; admin?: AdminOverview };
 
-export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?: DemoState }) {
+export function Dashboard({ userEmail: tokenEmail = "", demo }: { userEmail?: string; demo?: DemoState }) {
   const { supabase, data, loading, error: loadError, reload, patchJob } = useDashboardData(demo?.data);
   const router = useRouter();
   const isDemo = Boolean(demo);
   const { status, failed: statusFailed, refresh: refreshStatus } = useSystemStatus(Boolean(supabase), demo?.status);
   const pipeline = usePipeline({ supabase, status, reload, refreshStatus });
   const { hasProfile, summary: profileSummary, failed: profileFailed, refresh: refreshProfile } = useProfileState(Boolean(supabase), isDemo);
+  // One address everywhere: the account's own once loaded (the token's can be stale after a change), else the token's.
+  const { account } = useAccount(Boolean(supabase), isDemo);
+  const userEmail = shownEmail(account, tokenEmail);
   // Once per session, after the first load and only with a saved CV: the list is opened from the shared catalogue.
   const { refreshedAt: catalogueRefreshedAt } = useCatalogueRefresh({
     enabled: hasProfile === true && !loading && !isDemo && Boolean(supabase),
@@ -427,6 +431,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
     pipeline,
     busy: locked,
     userEmail,
+    account,
     go,
     notify,
     reload,
