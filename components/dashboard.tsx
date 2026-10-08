@@ -30,6 +30,7 @@ import { usePipeline } from "@/components/use-pipeline";
 import { useDashboardData, type Data } from "@/components/use-dashboard-data";
 import { useSystemStatus, type SystemStatus } from "@/components/use-status";
 import { useProfileState } from "@/components/use-profile";
+import { createInflightGuard } from "@/components/in-flight";
 import { Callout, Progress } from "@/components/ui";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { RoadmapView } from "@/components/views/roadmap-view";
@@ -200,6 +201,10 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
     [reload],
   );
 
+  // Writing the kit of an offer runs once at a time, even for two clicks in the same tick (see components/in-flight.ts).
+  const inflight = useRef(createInflightGuard());
+  const once = useCallback((key: string, work: () => Promise<void>) => inflight.current.run(key, work).then(() => undefined), []);
+
   const act: Ctx["act"] = useMemo(
     () => ({
       analyze: (job) =>
@@ -216,7 +221,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
         return r.ok;
       },
       generate: (job) =>
-        run(job.id, async () => {
+        once(`kit:${job.id}`, () => run(job.id, async () => {
           notify(`Rédaction du CV et de la lettre pour « ${job.company} »…`);
           const r = await post(`/api/jobs/${job.id}/generate`);
           if (!r.ok) return notify(readable(r.body.error), "bad");
@@ -225,7 +230,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
             `Documents prêts${stats.asked ? ` · ${stats.asked} question(s) à valider` : ""}.`,
             "good",
           );
-        }),
+        })),
       review: (job, action, platform) =>
         run(job.id, async () => {
           const r = await post(`/api/jobs/${job.id}/review`, { action, platform });
@@ -282,7 +287,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
       },
       openDocument: (state) => setDocDialog(state),
       prepareKit: (job) =>
-        run(job.id, async () => {
+        once(`kit:${job.id}`, () => run(job.id, async () => {
           if (job.status === "DISCOVERED") {
             notify(`Lecture de l’offre « ${job.company} »…`);
             const a = await post(`/api/jobs/${job.id}/analyze`);
@@ -293,7 +298,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
           void refreshStatus();
           if (!r.ok) return notify(readable(r.body.error), "bad");
           notify("Ton dossier est prêt : relis ton CV et ta lettre, puis postule.", "good");
-        }),
+        })),
       moveStage: async (job, stage, extra) => {
         const patch = stagePatch(stage, job, extra);
         history.current.set(job.id, {
@@ -331,7 +336,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
         notify(error ? readable(error.message) : "Notes enregistrées.", error ? "bad" : "info");
       },
     }),
-    [notify, readable, isAdmin, reload, run, supabase, patchJob, refreshStatus, data.documents],
+    [notify, readable, isAdmin, reload, run, once, supabase, patchJob, refreshStatus, data.documents],
   );
 
   const closeOffer = useCallback(() => setOpenId(null), []);
