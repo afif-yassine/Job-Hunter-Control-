@@ -1,6 +1,6 @@
 # LeBonTaf — contexte commun pour Codex et Claude
 
-Mis à jour le 7 octobre 2026. Lire cette page au début d’une session, puis les fichiers utiles à la tâche. Les documents datés sont des preuves historiques, pas une autre liste de travail.
+Mis à jour le 8 octobre 2026. Lire cette page au début d’une session, puis les fichiers utiles à la tâche. Les documents datés sont des preuves historiques, pas une autre liste de travail.
 
 ## Produit et règles
 
@@ -17,6 +17,8 @@ LeBonTaf aide les étudiants à chercher stages et alternances en France : impor
 2. [Livraison du 7 octobre](MVP-2026-10-07.md) : preuves, migrations et limites connues.
 3. `AGENTS.md`, importé aussi par `CLAUDE.md` : consignes communes et règles de la version Next installée.
 4. [Spécification v1.1 du nouveau parcours étudiant](SPEC-V1.1-PARCOURS-ETUDIANT-2026-10-07.md) : **en pause** (décision du 7 octobre) — onboarding bloquant, recommandations cumulatives 8/jour, catalogue flouté, écran ville + consigne. Contrat d'API figé avec la session backend ; à relire intégralement avant tout démarrage v1.1.
+5. `docs/audits/` : cinq rapports du 7 octobre, tous en lecture du code, aucun parcours vérifié en production. Revue du parcours étudiant (R1 à R25), préparation de MVP-04, sécurité et coûts, attributions et licences des sources, destinataires des données personnelles.
+6. [Migrations en attente](MIGRATIONS-EN-ATTENTE-2026-10-08.md) : trois migrations préparées, non appliquées, avec les contrôles avant et après.
 
 ## Skills de design dans Claude Code
 
@@ -30,16 +32,18 @@ Le document sur claude.ai ne se synchronise pas avec le dépôt. Mettre à jour 
 
 ## État de reprise
 
-- Dernière base Git connue : `main`, fusion PR #4, commit `f71510e7` ; livraison MVP PR #3 déjà en production. Vérifier `git status` et `git log -3 --oneline` au début de la session : cette référence peut évoluer.
-- Derniers changements locaux : backlog réorganisé avec 65 cases cochées et 30 actions ouvertes ; contexte commun et carte locale préparés. Vérifier le diff avant commit : ces documents ne constituent pas une nouvelle livraison de code applicatif.
+- Dernière base Git connue : `main`, commit `6ba5c5e0` du 8 octobre, poussé directement sur `main` après relecture. Vérifier `git status` et `git log -3 --oneline` au début de la session : cette référence évolue.
+- Les 7 et 8 octobre, 34 commits ont été poussés depuis `f71510e7`, correctifs et documents compris (parcours du nouvel étudiant, écrans sans détails de plateforme, mise à jour depuis le catalogue commun, plafond des révisions IA, route Drive réservée à l’administrateur). Ils sont testés automatiquement mais pas revus à l’écran par le propriétaire : voir « Travaux des 7 et 8 octobre » dans le backlog. Seul MVP-02 est vérifié en production.
+- Méthode de travail en cours : plusieurs sessions en parallèle. Une session coordonne, relit chaque diff et pousse ; une session backend (`lib/`, `app/api/`, `supabase/migrations/`, `tests/`) ; une session front (`components/`, pages de `app/`) ; des sessions d’audit en lecture seule (`docs/audits/`) ; des agents « business » qui n’écrivent que dans `docs/business/`. Avant de modifier le backlog ou cette page, la session l’annonce aux autres. Ajouts par `git add` fichier par fichier ; le dossier « capture d’écrant/ » (captures du propriétaire) ne doit jamais être commité.
 - Next 16.3.6, React, TypeScript ; Supabase Auth/Postgres/pgvector et Vercel. Worker Railway utilisé dans les parcours de documents.
-- SMTP personnalisé Resend activé ; expéditeur et réinitialisation complète encore à vérifier. Protection des mots de passe divulgués désactivée, réservée à Pro selon l’interface Supabase contrôlée.
+- SMTP personnalisé Resend activé ; expéditeur, modèles français et réinitialisation complète vérifiés en production par le propriétaire le 7 octobre (MVP-02). Protection des mots de passe divulgués désactivée, réservée à Pro selon l’interface Supabase contrôlée.
 - Import PDF numérique via extraction locale puis Gateway ; PDF scannés non pris en charge. Test complet d’import en production encore ouvert après blocage de la permission fichiers de l’extension Chrome.
-- Recherche sauvegardée vérifiée sur compte connecté. Classement contrôlé par SQL ; parcours connecté avec plusieurs profils encore à vérifier.
+- Recherche sauvegardée vérifiée sur compte connecté. Classement : essai du propriétaire le 7 octobre non validé (scores trop bas, libellés contradictoires) ; correctifs poussés, revue à refaire (MVP-03). Le score gratuit est une couverture exacte des compétences demandées, jamais une probabilité d’embauche.
 - Kit CV/lettre réel et deux PDF contrôlés ; nouvelle chaîne import → confirmation → kit et relecture des reformulations encore à vérifier.
-- Tests de la dernière livraison : 181 réussis, un LaTeX ignoré, 42 assertions PostgreSQL/pgvector, build réussi. Ce sont des résultats datés, pas un résultat de test de chaque nouvelle session.
+- Tests au commit `6ba5c5e0` (8 octobre) : 239 tests, 238 réussis, un LaTeX ignoré, contrôle de types réussi. Les 42 assertions PostgreSQL/pgvector datent de la livraison du 7 octobre et n’ont pas été relancées ; les trois migrations du 8 octobre n’ont jamais été exécutées. Ce sont des résultats datés, pas un résultat de test de chaque nouvelle session.
 - Collecte et traitements du catalogue fonctionnent en production ; compteurs variables. Ne pas réutiliser les anciens constats « zéro embedding », « 17 stages » ou « recharge Gemini obligatoire » comme état actuel.
-- Capacité de 100 utilisateurs non validée par test de charge. Prochaine tâche : choisir et terminer une vérification MVP-01 à MVP-06, sans refaire les fonctionnalités cochées.
+- Capacité de 100 utilisateurs non validée par test de charge. La collecte qui alimente le catalogue n’est pas planifiée dans le dépôt : elle dépend d’une tâche Supabase que le propriétaire doit confirmer.
+- Ce qui attend le propriétaire (REVUE-01 à REVUE-03 du backlog) : revue visuelle du site, réglages de production à lire dans Vercel et Supabase, décision sur les trois migrations, chemin du PDF de son CV pour MVP-01. Prochaine tâche d’une session : aider à terminer une vérification MVP-01 à MVP-06, sans refaire les fonctionnalités livrées et sans ouvrir de nouvelle fonctionnalité (v1.1 en pause).
 
 ## IA actuelle et fichiers utiles
 
