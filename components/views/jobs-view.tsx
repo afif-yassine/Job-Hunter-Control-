@@ -207,15 +207,28 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
 
       {rows.length === 0 ? (
         data.jobs.length === 0 ? (
-          <Empty
-            title="Aucune offre pour l’instant"
-            text="Choisis tes métiers dans Réglages : les offres arrivent deux fois par jour."
-            action={
-              <button className="btn" onClick={() => ctx.go("settings")}>
-                Choisir mes métiers
-              </button>
-            }
-          />
+          // Known to have no CV: the CV comes first. Unknown (undefined) keeps the neutral text.
+          ctx.hasProfile === false ? (
+            <Empty
+              title="Commence par ton CV"
+              text="Importe ton CV, puis choisis les métiers qui t’intéressent : on te montre les offres qui te correspondent."
+              action={
+                <button className="btn" onClick={() => ctx.go("settings")}>
+                  Importer mon CV
+                </button>
+              }
+            />
+          ) : (
+            <Empty
+              title="Aucune offre pour l’instant"
+              text="Choisis tes métiers dans Réglages : tes offres arrivent dès qu’elles sont trouvées."
+              action={
+                <button className="btn" onClick={() => ctx.go("settings")}>
+                  Choisir mes métiers
+                </button>
+              }
+            />
+          )
         ) : jobFilter === "new" ? (
           <Empty title="Tu as tout vu" text="Les nouvelles offres arrivent le matin et en début d’après-midi." />
         ) : (
