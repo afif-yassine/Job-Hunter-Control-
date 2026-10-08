@@ -20,7 +20,9 @@ export type View =
   | "admin"
   | "roadmap";
 
-export type JobFilter = "new" | "all" | "best" | "review" | "gone";
+export type SummarizeResult = "ok" | "gone" | "failed";
+
+export type JobFilter ="new" | "all" | "best" | "review" | "gone";
 
 export type ReviewAction = "keep" | "merge" | "dismiss" | "applied_elsewhere";
 
@@ -57,8 +59,11 @@ export type Ctx = {
     undoStage: (job: Job) => Promise<void>;
     saveNotes: (job: Job, notes: string) => Promise<void>;
     analyze: (job: Job) => Promise<void>;
-    /** Writes the short summary when an offer is opened: no toast and no global lock. Resolves false when it could not be done. */
-    summarize: (job: Job) => Promise<boolean>;
+    /**
+     * Writes the short summary when an offer is opened: no toast and no global lock.
+     * "gone": the server refused because the offer is closed for everybody (code GONE).
+     */
+    summarize: (job: Job) => Promise<SummarizeResult>;
     generate: (job: Job) => Promise<void>;
     review: (job: Job, action: ReviewAction, platform?: string) => Promise<void>;
     /** "Offre plus disponible" (false) or "Toujours en ligne" (true). */

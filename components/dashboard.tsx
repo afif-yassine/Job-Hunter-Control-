@@ -223,8 +223,16 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
       summarize: async (job) => {
         // Opening an offer is not a request: no toast, and no `busy` lock that would freeze the panel buttons.
         const r = await post(`/api/jobs/${job.id}/analyze`);
-        if (r.ok) await reload();
-        return r.ok;
+        if (r.ok) {
+          await reload();
+          return "ok";
+        }
+        // Closed for everybody: reload too, in case the server marked the student's copy.
+        if (r.body.code === "GONE") {
+          await reload();
+          return "gone";
+        }
+        return "failed";
       },
       generate: (job) =>
         once(`kit:${job.id}`, () => run(job.id, async () => {

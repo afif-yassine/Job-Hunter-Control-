@@ -126,11 +126,15 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   // The short summary is written quietly when the offer is opened: no toast, no lock on the other buttons.
   const [summarising, setSummarising] = useState(false);
   const [summaryFailed, setSummaryFailed] = useState(false);
+  // The server refused the summary because the offer is closed for everybody. Once the student's own copy is
+  // marked (and reloaded), `gone` takes over with the existing red box, so the message is never doubled.
+  const [summaryGone, setSummaryGone] = useState(false);
+  const knownGone = summaryGone && !gone;
   // A text too short for the reader never gets a summary, so the block must not promise one.
-  const brief = summaryState({ hasSummary: Boolean(summary), status: job.status, description: job.description, summarising, failed: summaryFailed });
+  const brief = summaryState({ hasSummary: Boolean(summary), status: job.status, description: job.description, summarising, failed: summaryFailed, knownGone });
   const shortText = brief === "short-text";
-  // Only the paid or heavy actions wait for the summary; leaving or discarding the offer never does.
-  const waiting = disabled || summarising;
+  // Only the paid or heavy actions wait for the summary (or stop for a closed offer); leaving or discarding the offer never does.
+  const waiting = disabled || summarising || knownGone;
   const plan = status?.plan;
   // A comfort only (the server still decides): unknown plan or limit keeps the button active.
   const monthFull = plan && plan.limit !== null && plan.used >= plan.limit ? { limit: plan.limit, resetsOn: plan.resetsOn } : null;
@@ -161,9 +165,10 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   const summarise = useCallback(async () => {
     setSummarising(true);
     setSummaryFailed(false);
-    const ok = await act.summarize(job);
+    const result = await act.summarize(job);
     setSummarising(false);
-    if (!ok) setSummaryFailed(true);
+    if (result === "failed") setSummaryFailed(true);
+    if (result === "gone") setSummaryGone(true);
   }, [act, job]);
   useEffect(() => {
     if (!canSummarise || asked.current || busy) return;
@@ -369,9 +374,11 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                     ? "L’annonce n’a pas pu être lue automatiquement : colle son texte pour la résumer."
                     : shortText
                       ? "Le texte de cette annonce est trop court pour être résumé. Ouvre l’annonce d’origine, ou colle son texte complet."
-                      : brief === "failed"
-                        ? "Résumé indisponible pour l’instant."
-                        : "Le résumé (missions, outils, rythme) arrive dès que l’offre est lue, quelques minutes après son arrivée."}
+                      : brief === "gone"
+                        ? "Cette offre n’est plus disponible."
+                        : brief === "failed"
+                          ? "Résumé indisponible pour l’instant."
+                          : "Le résumé (missions, outils, rythme) arrive dès que l’offre est lue, quelques minutes après son arrivée."}
                 </p>
                 {shortText && !gone && !job.review_flag && (
                   <button className="btn secondary small" disabled={disabled} onClick={() => act.pasteDescription(job)}>
@@ -404,6 +411,8 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                     <button className="btn" disabled={disabled} onClick={() => act.pasteDescription(job)}>
                       Coller le texte de l’annonce
                     </button>
+                  ) : knownGone ? (
+                    <p className="hint">Cette offre n’est plus disponible : pas de CV ni de lettre à créer.</p>
                   ) : ctx.hasProfile === false ? (
                     <>
                       <button
