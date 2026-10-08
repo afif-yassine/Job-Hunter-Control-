@@ -30,7 +30,7 @@ import type { Ctx } from "./types";
 /** The shared reader only summarises an announcement of at least this many characters (lib/offer-reader.ts, migration 20261007111753). */
 const READER_MIN_CHARS = 120;
 
-const FT_LICENCE ="https://francetravail.io/produits-partages/documentation/conditions-dutilisation-api/licence-offres-emploi";
+const FT_LICENCE = "https://francetravail.io/produits-partages/documentation/conditions-dutilisation-api/licence-offres-emploi";
 
 /** "En bref": from this account's analysis, or shared by the first account that analysed the offer. */
 export function summaryOf(job: Job): OfferSummary | null {
@@ -128,6 +128,8 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   // A text exists but is too short for the reader: the summary will never come, so do not promise it.
   const shortText = !summary && Boolean(job.description) && (job.description?.trim().length ?? 0) < READER_MIN_CHARS;
   const plan = status?.plan;
+  // A comfort only (the server still decides): unknown plan or limit keeps the button active.
+  const monthFull = plan && plan.limit !== null && plan.used >= plan.limit ? { limit: plan.limit, resetsOn: plan.resetsOn } : null;
 
   // "As-tu postulé ?" when the student comes back from the ad.
   const [askApplied, setAskApplied] = useState(false);
@@ -397,12 +399,16 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                       </button>
                       <span className="muted small-text">Ton CV sert de base à ton dossier : rien n’est écrit sans lui.</span>
                     </>
+                  ) : monthFull ? (
+                    <p className="hint">
+                      Tes {monthFull.limit} dossiers du mois sont utilisés. Les prochains arrivent le {monthFull.resetsOn}. Tu peux toujours chercher, garder et suivre tes offres.
+                    </p>
                   ) : (
                     <button className="btn" disabled={disabled} onClick={() => void act.prepareKit(job)}>
                       {working ? <LoaderCircle size={16} className="spin" aria-hidden /> : <Sparkles size={16} aria-hidden />} Créer mon CV et ma lettre
                     </button>
                   )}
-                  {plan && plan.limit !== null && (
+                  {plan && plan.limit !== null && !monthFull && (
                     <span className={`plan-meter${plan.used >= plan.limit ? " is-full" : ""}`}>
                       Offre gratuite : {Math.max(plan.limit - plan.used, 0)} dossier{plan.limit - plan.used > 1 ? "s" : ""} restant
                       {plan.limit - plan.used > 1 ? "s" : ""} ce mois-ci
@@ -424,6 +430,9 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                     </a>
                     <button className="btn ghost small" onClick={() => act.openDocument({ doc: d, mode: "edit" })}>
                       <Pencil size={14} aria-hidden /> Modifier
+                    </button>
+                    <button className="btn ghost small" disabled={disabled} onClick={() => act.openDocument({ doc: d, mode: "revise" })}>
+                      <Sparkles size={14} aria-hidden /> Demander une modification
                     </button>
                   </div>
                 ))}
