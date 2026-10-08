@@ -32,6 +32,33 @@ export function gatewayReasonText(reason: "not_configured" | "unauthorized" | "u
   return "le Gateway n’a pas répondu";
 }
 
+/** A date, or the dash when the server did not give one. */
+export function dateText(iso: string | null | undefined): string {
+  if (!iso) return UNKNOWN;
+  const time = Date.parse(iso);
+  return Number.isNaN(time) ? UNKNOWN : new Date(time).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** The cost of an account: a real zero is "0,00 $", an unknown cost is the dash. */
+export function costText(value: number | null | undefined): string {
+  return orDash(value, (n) => (n > 0 && n < 0.01 ? "< 0,01 $" : usd2(n)));
+}
+
+/** The plan of an account as the database says it ("pro" is the paid plan; no price is adopted). */
+export function planText(plan: "free" | "pro" | null | undefined): string {
+  return plan === "free" ? "gratuite" : plan === "pro" ? "payante" : UNKNOWN;
+}
+
+/** Where the list stands: "Page 2 sur 4 · 26 à 50 sur 87 comptes", or without the total when the auth service gave none. */
+export function pageLabel(input: { page: number; perPage: number; total: number | null; count: number }): string {
+  const { page, perPage, total, count } = input;
+  if (count === 0) return total === 0 ? "Aucun compte" : `Page ${page} : aucun compte`;
+  const from = (page - 1) * perPage + 1;
+  const to = from + count - 1;
+  if (total === null) return `Page ${page} · ${from} à ${to}`;
+  return `Page ${page} sur ${Math.max(1, Math.ceil(total / perPage))} · ${from} à ${to} sur ${total} compte${total > 1 ? "s" : ""}`;
+}
+
 /** The French label of where an amount comes from (null when the server gave none). */
 export function originText(origin: CostOrigin | null | undefined): string | null {
   return origin ? ORIGIN_LABELS[origin] : null;

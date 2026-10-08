@@ -1,6 +1,21 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { gapText, gatewayReasonText, orDash, originText, spendTitle, UNKNOWN, unpricedText, usdFixed, vectorBarLabel, yesNoOrDash } from "../components/admin/admin-display";
+import {
+  costText,
+  dateText,
+  gapText,
+  gatewayReasonText,
+  orDash,
+  originText,
+  pageLabel,
+  planText,
+  spendTitle,
+  UNKNOWN,
+  unpricedText,
+  usdFixed,
+  vectorBarLabel,
+  yesNoOrDash,
+} from "../components/admin/admin-display";
 
 test("an unknown number is a dash, never zero", () => {
   assert.equal(UNKNOWN, "—");
@@ -50,6 +65,29 @@ test("each reason a balance cannot be read is said in French and is not a balanc
   assert.match(gatewayReasonText("unauthorized"), /refusé/);
   assert.match(gatewayReasonText("unavailable"), /pas répondu/);
   for (const reason of ["not_configured", "unauthorized", "unavailable"] as const) assert.doesNotMatch(gatewayReasonText(reason), /\d/);
+});
+
+test("the accounts table never turns an unknown into a zero or a 'non'", () => {
+  assert.equal(dateText(null), "—");
+  assert.equal(dateText("pas une date"), "—");
+  assert.match(dateText("2026-10-08T08:00:00.000Z"), /2026/);
+  assert.equal(costText(null), "—");
+  assert.equal(costText(0), "0,00 $");
+  assert.equal(costText(0.004), "< 0,01 $");
+  assert.equal(costText(1.5), "1,50 $");
+  assert.equal(planText(null), "—");
+  assert.equal(planText("free"), "gratuite");
+  assert.equal(planText("pro"), "payante");
+  assert.equal(orDash(null, String), "—");
+});
+
+test("the page label says where the list stands, with or without the total", () => {
+  assert.equal(pageLabel({ page: 1, perPage: 25, total: 87, count: 25 }), "Page 1 sur 4 · 1 à 25 sur 87 comptes");
+  assert.equal(pageLabel({ page: 4, perPage: 25, total: 87, count: 12 }), "Page 4 sur 4 · 76 à 87 sur 87 comptes");
+  assert.equal(pageLabel({ page: 1, perPage: 25, total: 1, count: 1 }), "Page 1 sur 1 · 1 à 1 sur 1 compte");
+  assert.equal(pageLabel({ page: 2, perPage: 25, total: null, count: 25 }), "Page 2 · 26 à 50");
+  assert.equal(pageLabel({ page: 1, perPage: 25, total: 0, count: 0 }), "Aucun compte");
+  assert.equal(pageLabel({ page: 9, perPage: 25, total: 87, count: 0 }), "Page 9 : aucun compte");
 });
 
 test("the catalogue bar names the column it counts", () => {

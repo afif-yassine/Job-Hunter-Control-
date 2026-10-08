@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { AdminApp } from "@/components/admin/admin-app";
-import { demoGateway } from "@/components/admin/demo-fixtures";
+import { demoAccounts, demoGateway } from "@/components/admin/demo-fixtures";
 import { growthFrom } from "@/lib/admin/growth";
 import { demoAdmin, demoGrowthRaw, demoQuests } from "@/lib/demo-data";
 import { createClient } from "@/lib/supabase/server";
@@ -19,7 +19,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     return (
       <AdminApp
         email="yassine@example.com"
-        demo={{ growth: growthFrom(demoGrowthRaw, demoQuests, env, new Date("2026-10-20T10:00:00Z")), overview: demoAdmin, gateway: demoGateway }}
+        demo={{ growth: growthFrom(demoGrowthRaw, demoQuests, env, new Date("2026-10-20T10:00:00Z")), overview: demoAdmin, gateway: demoGateway, accounts: demoAccounts }}
       />
     );
   }

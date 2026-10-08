@@ -774,6 +774,11 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .grow-origin.is-assumption { border-style: dashed; }
 .grow-kpi .grow-origin { margin-left: 0; margin-right: 6px; }
 /* Balance of the AI key (admin space) */
+/* Accounts table (admin space): scrolls sideways inside its card on a phone */
+.acc-table { min-width: 760px; }
+.acc-table th[scope="row"] { font-weight: 600; overflow-wrap: anywhere; }
+.acc-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.grow-table-wrap:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .gw-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 10px; }
 .gw-figures dd .grow-origin { display: block; width: max-content; margin: 4px 0 0; font-family: var(--font-sans), sans-serif; letter-spacing: 0; }
 
