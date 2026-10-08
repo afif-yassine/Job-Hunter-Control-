@@ -31,7 +31,7 @@ Il n’y a plus deux listes « P0/P1/P2 » et « Sprint 1/2/3 ». Les priorités
 | Sécurité et limites | À terminer | Isolation des comptes, quotas, réservations des traitements payants ; compteur indisponible = appel refusé. | Décider de la protection des mots de passe divulgués : PUBLIC-01 ; test pilote : MVP-06 ; réserves de l’audit du 7 octobre : PUBLIC-06. La réservation des kits dépend de `AI_GENERATION_LEASES=1`, non confirmé : REVUE-02. |
 | Coûts IA maîtrisés | À vérifier | Catalogue réutilisé, suivi des coûts, alerte administrateur, deux kits gratuits par mois et plafond Gateway configuré à 2 USD. Depuis le 8 octobre : plafond journalier des révisions IA. | L’audit du 7 octobre n’a pas pu comparer les coûts de l’admin aux factures réelles ; l’alerte est un bandeau, le seul plafond réel est celui de la clé Gateway. Limite des lectures répétées en attente de migration : REVUE-03. Comportement aux limites : MVP-06. |
 | Pages légales et données personnelles | Fait | Pages présentes et fonctions d’export/suppression livrées. Cela ne constitue pas une validation juridique. | Identité de l’éditeur et modèle de facturation : PUBLIC-03. |
-| Tests et mise en ligne | Fait | CI et production livrées ; 181 tests réussis, 42 assertions PostgreSQL/pgvector, compilation réussie. Un test LaTeX ignoré. | Validation des parcours et de la charge : MVP-01 à MVP-06. |
+| Tests et mise en ligne | Fait | CI et production livrées. Livraison du 7 octobre : 181 tests réussis, 42 assertions PostgreSQL/pgvector, compilation réussie, un test LaTeX ignoré. Au 8 octobre (commit `6ba5c5e0`) : 239 tests, 238 réussis, un LaTeX ignoré ; les assertions PostgreSQL n’ont pas été relancées. | Validation des parcours et de la charge : MVP-01 à MVP-06. |
 
 **Pourquoi certaines lignes restent « à vérifier » :** un test automatique ou un déploiement réussi ne remplace pas la vérification du parcours complet d’un étudiant sur le site.
 
@@ -117,7 +117,7 @@ Cette liste reprend les fonctionnalités cochées dans l’ancien backlog, regro
 - [x] Limites de requêtes, en-têtes de sécurité et politique CSP avec nonces.
 - [x] Erreurs des sources visibles sans bloquer toutes les autres sources.
 - [x] CI GitHub, tests, compilation, migrations et mise en production des dernières livraisons.
-- [x] Derniers contrôles : 181 tests réussis, 42 assertions PostgreSQL/pgvector et interface vérifiée à 390/1 440 px.
+- [x] Contrôles de la livraison du 7 octobre : 181 tests réussis, 42 assertions PostgreSQL/pgvector et interface vérifiée à 390/1 440 px.
 
 ## 3. À faire maintenant — terminer le pilote
 
