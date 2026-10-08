@@ -35,6 +35,7 @@ import { useCatalogueRefresh } from "@/components/use-catalogue-refresh";
 import { shownEmail, useAccount } from "@/components/use-account";
 import { unlockState, type PlanKnowledge } from "@/components/unlock";
 import { useUnlocked } from "@/components/use-unlocked";
+import { useSessionGuard } from "@/components/use-session-guard";
 import { Callout, Progress } from "@/components/ui";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { RoadmapView } from "@/components/views/roadmap-view";
@@ -117,10 +118,13 @@ async function post(url: string, body: unknown = {}) {
 
 export type DemoState = { data: Data; status: SystemStatus; admin?: AdminOverview };
 
-export function Dashboard({ userEmail: tokenEmail = "", demo }: { userEmail?: string; demo?: DemoState }) {
+export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEmail?: string; userId?: string; demo?: DemoState }) {
   const { supabase, data, loading, error: loadError, reload, patchJob } = useDashboardData(demo?.data);
   const router = useRouter();
   const isDemo = Boolean(demo);
+  // The page acts as whoever the browser's session belongs to: if another account signs in from another window,
+  // reload on that account instead of showing the old one (components/session-guard.ts). Not in the demo.
+  useSessionGuard(userId, !isDemo);
   const { status, failed: statusFailed, refresh: refreshStatus } = useSystemStatus(Boolean(supabase), demo?.status);
   const pipeline = usePipeline({ supabase, status, reload, refreshStatus });
   const { hasProfile, summary: profileSummary, failed: profileFailed, refresh: refreshProfile } = useProfileState(Boolean(supabase), isDemo);

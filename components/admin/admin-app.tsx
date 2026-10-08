@@ -8,6 +8,7 @@ import type { AdminOverview } from "@/lib/admin/overview";
 import type { Growth } from "@/lib/admin/growth";
 import type { GatewayCredits } from "@/lib/admin/gateway-credits";
 import type { AccountsPage } from "@/lib/admin/users";
+import { useSessionGuard } from "@/components/use-session-guard";
 import { AccountsView } from "./accounts-view";
 import type { Tone } from "@/lib/labels";
 import { GrowthView } from "./growth-view";
@@ -23,7 +24,9 @@ const HASH: Record<Tab, string> = { growth: "#croissance", platform: "#plateform
 const tabFromHash = (hash: string): Tab => (hash === HASH.platform ? "platform" : hash === HASH.accounts ? "accounts" : "growth");
 
 /** The admin space: its own header and pages, apart from the students' space. */
-export function AdminApp({ email, demo }: { email: string; demo?: { growth: Growth; overview: AdminOverview; gateway?: GatewayCredits; accounts?: AccountsPage } }) {
+export function AdminApp({ email, userId, demo }: { email: string; userId?: string; demo?: { growth: Growth; overview: AdminOverview; gateway?: GatewayCredits; accounts?: AccountsPage } }) {
+  // Same protection as the student space: reload on the account the browser now acts as (not in the demo).
+  useSessionGuard(userId, !demo);
   const [tab, setTab] = useState<Tab>("growth");
   const [toast, setToast] = useState<{ text: string; tone: Tone } | null>(null);
   const timer = useRef<number | undefined>(undefined);

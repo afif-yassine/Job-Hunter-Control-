@@ -29,5 +29,5 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   if (!data?.claims?.sub) redirect("/login");
   const { data: isAdmin } = await supabase.rpc("is_admin");
   if (isAdmin !== true) redirect("/");
-  return <AdminApp email={String(data.claims.email ?? "")} />;
+  return <AdminApp email={String(data.claims.email ?? "")} userId={String(data.claims.sub)} />;
 }
