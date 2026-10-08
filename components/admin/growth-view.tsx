@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   BadgeCheck,
@@ -22,6 +22,9 @@ import type { Growth } from "@/lib/admin/growth";
 import { LEVELS, progress, RANKS, type LevelState, type Progress } from "@/lib/admin/levels";
 import { forecast } from "@/lib/economics";
 import type { Tone } from "@/lib/labels";
+import type { CostOrigin } from "@/lib/admin/origin";
+import { spendTitle, unpricedText, vectorBarLabel } from "./admin-display";
+import { OriginTag } from "./origin-tag";
 
 const fr = (n: number, d = 0) => n.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
 const eur = (n: number, d = 0) => `${fr(n, d)} €`;
@@ -154,17 +157,29 @@ function Kpis({ g }: { g: Growth }) {
   const s = g.stats;
   const students = Math.max(0, s.users - s.admins);
   const cost = g.money.hostingUsd + g.money.aiUsdMonthProjected;
-  const tiles = [
+  const o = g.origins.money;
+  // No price is adopted: the revenue figures are hypotheses and are said so, with the price as "supposé, non adopté".
+  const tiles: { icon: typeof Users; label: string; value: string; sub: ReactNode; origin?: CostOrigin; tone?: "good" | "bad" }[] = [
     { icon: Users, label: "Étudiants inscrits", value: fr(students), sub: `+${fr(s.new_7d)} cette semaine · +${fr(s.new_today)} aujourd’hui` },
     { icon: Sparkles, label: "Actifs sur 7 jours", value: fr(s.active_7d), sub: `${pct(s.active_7d, s.users)} % des inscrits · ${fr(s.active_1d)} aujourd’hui` },
-    { icon: BadgeCheck, label: "Abonnés Pro", value: fr(s.pro), sub: `${students ? fr((s.pro / students) * 100, 1) : "0"} % des étudiants` },
-    { icon: Wallet, label: "Revenu par mois", value: eur(g.money.mrrEur, 2), sub: `${eur(g.money.netEur, 2)} après Stripe · Pro à ${eur(g.money.proPrice, 2)}` },
-    { icon: Cpu, label: "Coûts du mois (prévus)", value: usd(cost), sub: `IA ${usd(g.money.aiUsdMonthProjected)} · hébergement ${usd(g.money.hostingUsd)}` },
+    { icon: BadgeCheck, label: "Comptes en formule payante", value: fr(s.pro), sub: `${students ? fr((s.pro / students) * 100, 1) : "0"} % des étudiants` },
+    { icon: Wallet, label: "Revenu par mois", value: eur(g.money.mrrEur, 2), origin: o.mrrEur, sub: `${eur(g.money.netEur, 2)} après Stripe · prix supposé ${eur(g.money.proPrice, 2)}, non adopté` },
+    {
+      icon: Cpu,
+      label: "Coûts du mois (prévus)",
+      value: usd(cost),
+      sub: (
+        <>
+          IA {usd(g.money.aiUsdMonthProjected)} <OriginTag origin={o.aiUsdMonthProjected} /> · hébergement {usd(g.money.hostingUsd)} <OriginTag origin={o.hostingUsd} />
+        </>
+      ),
+    },
     {
       icon: Flag,
       label: "Marge du mois",
       value: eur(g.money.marginEur, 2),
-      sub: Number.isFinite(g.money.breakEvenPro) ? `rentable à partir de ${fr(g.money.breakEvenPro)} Pro` : "pas rentable à ce prix",
+      origin: o.marginEur,
+      sub: Number.isFinite(g.money.breakEvenPro) ? `rentable à partir de ${fr(g.money.breakEvenPro)} abonnés payants` : "pas rentable au prix supposé",
       tone: g.money.marginEur >= 0 ? "good" : "bad",
     },
   ];
@@ -176,7 +191,10 @@ function Kpis({ g }: { g: Growth }) {
             <t.icon size={15} aria-hidden /> {t.label}
           </span>
           <strong>{t.value}</strong>
-          <span className="muted small-text">{t.sub}</span>
+          <span className="muted small-text">
+            {t.origin && <OriginTag origin={t.origin} />}
+            {t.sub}
+          </span>
         </motion.div>
       ))}
     </section>
@@ -230,7 +248,7 @@ function LevelsMap({ g, toggle }: { g: Growth; toggle: (id: string, done: boolea
             </span>
             <strong className="grow-level-name">{l.name}</strong>
             <Bar value={Math.min(students, l.goalUsers)} max={l.goalUsers} label="Étudiants" />
-            {l.goalPro > 0 && <Bar value={Math.min(g.stats.pro, l.goalPro)} max={l.goalPro} label="Pro" />}
+            {l.goalPro > 0 && <Bar value={Math.min(g.stats.pro, l.goalPro)} max={l.goalPro} label="Abonnés payants (objectif supposé)" />}
             <span className="grow-level-foot small-text">
               <span>
                 {l.done}/{l.steps.length} étapes
@@ -250,7 +268,7 @@ function LevelsMap({ g, toggle }: { g: Growth; toggle: (id: string, done: boolea
             <h3>{level.name}</h3>
           </div>
           <span className="muted small-text">
-            Hébergement à ce niveau : {usd(level.hosting.vercel + level.hosting.supabase + level.hosting.other)} / mois
+            Hébergement à ce niveau : {usd(level.hosting.vercel + level.hosting.supabase + level.hosting.other)} / mois <OriginTag origin={g.origins.money.hostingUsd} />
           </span>
         </header>
         <ol className="grow-steps">
@@ -314,7 +332,8 @@ function Money({ g }: { g: Growth }) {
       </h2>
       <div className="grow-money">
         <div className="card grow-sim">
-          <h3>Simulateur</h3>
+          <h3>Simulateur (hypothèse)</h3>
+          <p className="muted small-text">Tout ce que ce simulateur calcule part de suppositions : ce n’est ni une facture ni un prix adopté.</p>
           <label className="grow-range">
             <span>
               Étudiants inscrits <b>{fr(users)}</b>
@@ -323,7 +342,7 @@ function Money({ g }: { g: Growth }) {
           </label>
           <label className="grow-range">
             <span>
-              Part qui passe Pro <b>{fr(rate, 1)} %</b> <span className="muted">({fr(pro)} Pro)</span>
+              Part qui passe en formule payante <b>{fr(rate, 1)} %</b> <span className="muted">({fr(pro)} abonnés payants)</span>
             </span>
             <input type="range" min={0} max={10} step={0.5} value={rate} onChange={(e) => setRate(Number(e.target.value))} />
           </label>
@@ -337,7 +356,7 @@ function Money({ g }: { g: Growth }) {
               <dd>{usd(f.hostingUsd)}</dd>
             </div>
             <div>
-              <dt>Revenu Pro</dt>
+              <dt>Revenu de la formule payante</dt>
               <dd>{eur(f.revenueEur)}</dd>
             </div>
             <div className={f.marginEur >= 0 ? "is-good" : "is-bad"}>
@@ -346,11 +365,13 @@ function Money({ g }: { g: Growth }) {
             </div>
           </dl>
           <p className="muted small-text">
-            Rentable à partir de <b>{Number.isFinite(f.breakEvenPro) ? fr(f.breakEvenPro) : "—"} Pro</b>. En freemium, 2 à 5 % des inscrits passent payants en général.
+            Rentable à partir de <b>{Number.isFinite(f.breakEvenPro) ? fr(f.breakEvenPro) : "—"} abonnés payants</b>. En freemium, 2 à 5 % des inscrits passent payants en général.
           </p>
         </div>
         <div className="card grow-table-card">
-          <h3>Coût par niveau</h3>
+          <h3>
+            Coût par niveau <OriginTag origin={g.origins.levels} />
+          </h3>
           <div className="grow-table-wrap">
             <table className="grow-table">
               <thead>
@@ -359,7 +380,7 @@ function Money({ g }: { g: Growth }) {
                   <th scope="col">Hébergement</th>
                   <th scope="col">IA</th>
                   <th scope="col">Total / mois</th>
-                  <th scope="col">Pro pour être rentable</th>
+                  <th scope="col">Abonnés payants pour être rentable</th>
                 </tr>
               </thead>
               <tbody>
@@ -368,7 +389,7 @@ function Money({ g }: { g: Growth }) {
                     <th scope="row">
                       {l.n}. {l.name}
                       <span className="muted small-text">
-                        {fr(l.users)} inscrits{l.pro ? `, ${fr(l.pro)} Pro` : ""}
+                        {fr(l.users)} inscrits{l.pro ? `, ${fr(l.pro)} abonnés payants` : ""}
                       </span>
                     </th>
                     <td>{usd(l.forecast.hostingUsd)}</td>
@@ -383,7 +404,8 @@ function Money({ g }: { g: Growth }) {
             </table>
           </div>
           <p className="muted small-text">
-            Un Pro rapporte {eur(g.money.proNet, 2)} après Stripe. Prix des modèles d’octobre 2026, 1 € ≈ {fr(g.money.eurUsd, 2)} $.
+            Un abonné payant rapporterait {eur(g.money.proNet, 2)} après Stripe <OriginTag origin={g.origins.money.proNet} />, pour un prix supposé de {eur(g.money.proPrice, 2)}, non adopté. Prix des modèles
+            d’octobre 2026, 1 € ≈ {fr(g.money.eurUsd, 2)} $ <OriginTag origin={g.origins.money.eurUsd} />.
           </p>
         </div>
       </div>
@@ -408,7 +430,7 @@ function AiSection({ g }: { g: Growth }) {
       )}
       <div className="grow-ai">
         <div className="card">
-          <h3>Dépense réelle par modèle</h3>
+          <h3>{spendTitle(g.ai.byModel.map((m) => m.origin))}</h3>
           {g.ai.byModel.length === 0 ? (
             <p className="muted">Aucun appel IA enregistré ce mois-ci.</p>
           ) : (
@@ -433,19 +455,25 @@ function AiSection({ g }: { g: Growth }) {
                       <td>
                         {fr(m.input / 1000)} k / {fr(m.output / 1000)} k
                       </td>
-                      <td>{usd(m.usd)}</td>
+                      <td>
+                        {usd(m.usd)} <OriginTag origin={m.origin} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+          {unpricedText(g.ai.unpricedCalls) && <p className="muted small-text">{unpricedText(g.ai.unpricedCalls)}</p>}
           <p className="muted small-text">
-            {usd(g.money.aiUsdMonth)} dépensés depuis le 1er, soit environ {usd(g.money.aiUsdMonthProjected)} sur le mois.
+            {usd(g.money.aiUsdMonth)} <OriginTag origin={g.origins.money.aiUsdMonth} /> enregistrés depuis le 1er, soit environ {usd(g.money.aiUsdMonthProjected)}{" "}
+            <OriginTag origin={g.origins.money.aiUsdMonthProjected} /> sur le mois.
           </p>
         </div>
         <div className="card">
-          <h3>Coût d’un étudiant par mois</h3>
+          <h3>
+            Coût d’un étudiant par mois <OriginTag origin={g.origins.perUser} />
+          </h3>
           <dl className="grow-per">
             <div>
               <dt>Gratuit, très actif</dt>
@@ -456,7 +484,7 @@ function AiSection({ g }: { g: Growth }) {
               <dd>{usd(per.freeAverage)}</dd>
             </div>
             <div>
-              <dt>Pro (30 dossiers, 600 scores)</dt>
+              <dt>Formule payante supposée (30 dossiers, 600 scores)</dt>
               <dd>{usd(per.pro)}</dd>
             </div>
             <div>
@@ -469,7 +497,9 @@ function AiSection({ g }: { g: Growth }) {
           </p>
         </div>
         <div className="card grow-gpu">
-          <h3>Héberger nos propres modèles ?</h3>
+          <h3>
+            Héberger nos propres modèles ? <OriginTag origin={g.origins.selfHosting} />
+          </h3>
           <p>
             Une carte graphique louée tout le mois coûte <b>{gpu.low} à {gpu.high} $</b>. La lecture des offres et les scores nous coûtent aujourd’hui environ <b>{usd(readingAndScoring)}</b> par mois.
           </p>
@@ -531,11 +561,16 @@ function Students({ g }: { g: Growth }) {
             </div>
           </dl>
           <Bar value={s.offers_summarized} max={s.offers_open} label="Résumées" />
-          <Bar value={s.offers_embedded} max={s.offers_open} label="Vectorisées" />
-          {s.offers_open > 0 && s.offers_embedded / s.offers_open < 0.9 && (
-            <p className="grow-warn small-text">
-              <TriangleAlert size={14} aria-hidden /> Sans vecteurs, le classement selon le CV ne marche pas.
-            </p>
+          <Bar value={s.offers_embedded} max={s.offers_open} label={vectorBarLabel(g.embeddings.counted)} />
+          {g.embeddings.counted === "legacy_embedding" ? (
+            <p className="muted small-text">Ce chiffre compte l’ancienne colonne de vecteurs : il ne dit pas combien d’offres ont un vecteur actuel.</p>
+          ) : (
+            s.offers_open > 0 &&
+            s.offers_embedded / s.offers_open < 0.9 && (
+              <p className="grow-warn small-text">
+                <TriangleAlert size={14} aria-hidden /> Sans vecteurs, le classement selon le CV ne marche pas.
+              </p>
+            )
           )}
         </div>
       </div>

@@ -768,6 +768,11 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .grow-kpi strong { font: 800 28px/1.1 var(--font-display), sans-serif; letter-spacing: -.04em; }
 .grow-kpi.is-good strong { color: var(--good); }
 .grow-kpi.is-bad strong { color: var(--bad); }
+/* Where an amount comes from, said next to the figure (admin space) */
+.grow-origin { display: inline-block; margin-left: 6px; padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 500; line-height: 1.5; white-space: nowrap; vertical-align: middle; }
+.grow-origin.is-measured { color: var(--good); border-color: currentColor; }
+.grow-origin.is-assumption { border-style: dashed; }
+.grow-kpi .grow-origin { margin-left: 0; margin-right: 6px; }
 
 .grow-section { margin-top: 10px; }
 .grow-map { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding-top: 10px; }

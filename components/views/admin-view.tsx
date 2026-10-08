@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Callout, Chip, PageHead, Progress } from "@/components/ui";
 import type { AdminAction, AdminOverview, AdminSource, SourceState } from "@/lib/admin/overview";
+import type { CostOrigin } from "@/lib/admin/origin";
+import { OriginTag } from "@/components/admin/origin-tag";
 import { timeAgo } from "@/lib/labels";
 import type { Ctx } from "./types";
 
@@ -537,6 +539,8 @@ type AiCostsState = {
   total: { calls: number; input: number; output: number; usd: number };
   accounts: { userId: string; email: string | null; calls: number; input: number; output: number; usd: number }[];
   alert: { thresholdUsd: number; level: "normal" | "warning" | "exceeded" };
+  /** Where the costs come from, said next to them (absent in the demo). */
+  origin?: CostOrigin;
 };
 
 const usd = (n: number) => (n < 0.01 && n > 0 ? "< 0,01 $" : `${n.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} $`);
@@ -584,6 +588,7 @@ function AiCostSection({ ctx }: { ctx: AdminCtx }) {
                 {usd(state.total.usd)} · {state.total.calls} appels · {tokens(state.total.input)} jetons lus,{" "}
                 {tokens(state.total.output)} écrits
               </strong>
+              <OriginTag origin={state.origin} />
             </div>
             {state.accounts.length === 0 ? (
               <p className="muted">Aucun appel IA enregistré depuis la mise en place du comptage.</p>
@@ -595,7 +600,9 @@ function AiCostSection({ ctx }: { ctx: AdminCtx }) {
                     <th>Appels</th>
                     <th>Jetons lus</th>
                     <th>Jetons écrits</th>
-                    <th>Coût comptabilisé</th>
+                    <th>
+                      Coût comptabilisé <OriginTag origin={state.origin} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
