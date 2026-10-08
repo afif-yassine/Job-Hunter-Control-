@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { AdminApp } from "@/components/admin/admin-app";
+import { demoGateway } from "@/components/admin/demo-fixtures";
 import { growthFrom } from "@/lib/admin/growth";
 import { demoAdmin, demoGrowthRaw, demoQuests } from "@/lib/demo-data";
 import { createClient } from "@/lib/supabase/server";
@@ -15,7 +16,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     // Screenshot fixture: only served when DEMO_MODE=1 (never set in production).
     if (process.env.DEMO_MODE !== "1") notFound();
     const env = { ...process.env, AI_MODEL_ANALYSIS: "gemini-2.5-flash-lite" };
-    return <AdminApp email="yassine@example.com" demo={{ growth: growthFrom(demoGrowthRaw, demoQuests, env, new Date("2026-10-20T10:00:00Z")), overview: demoAdmin }} />;
+    return (
+      <AdminApp
+        email="yassine@example.com"
+        demo={{ growth: growthFrom(demoGrowthRaw, demoQuests, env, new Date("2026-10-20T10:00:00Z")), overview: demoAdmin, gateway: demoGateway }}
+      />
+    );
   }
   const supabase = await createClient();
   if (!supabase) notFound();

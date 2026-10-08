@@ -24,6 +24,8 @@ import { forecast } from "@/lib/economics";
 import type { Tone } from "@/lib/labels";
 import type { CostOrigin } from "@/lib/admin/origin";
 import { spendTitle, unpricedText, vectorBarLabel } from "./admin-display";
+import type { GatewayCredits } from "@/lib/admin/gateway-credits";
+import { GatewayCreditsView } from "./gateway-credits-view";
 import { OriginTag } from "./origin-tag";
 
 const fr = (n: number, d = 0) => n.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -34,7 +36,7 @@ const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / who
 type Notify = (text: string, tone?: Tone) => void;
 
 /** Growth page: where LeBonTaf stands, what it costs, and the next steps, played as levels. */
-export function GrowthView({ demo, notify }: { demo?: Growth; notify: Notify }) {
+export function GrowthView({ demo, gatewayDemo, notify }: { demo?: Growth; gatewayDemo?: GatewayCredits; notify: Notify }) {
   const [g, setG] = useState<Growth | null>(demo ?? null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!demo);
@@ -108,6 +110,7 @@ export function GrowthView({ demo, notify }: { demo?: Growth; notify: Notify }) 
       <Kpis g={g} />
       <LevelsMap g={g} toggle={toggle} />
       <Money g={g} />
+      <GatewayCreditsView demo={gatewayDemo} />
       <AiSection g={g} />
       <Students g={g} />
       <AnimatePresence>{levelUp && <LevelUp level={levelUp} close={() => setLevelUp(null)} />}</AnimatePresence>

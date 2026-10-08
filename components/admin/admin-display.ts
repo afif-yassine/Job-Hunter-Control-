@@ -13,6 +13,25 @@ export function yesNoOrDash(value: boolean | null | undefined, yes: string, no: 
   return value === true ? yes : value === false ? no : UNKNOWN;
 }
 
+const usd2 = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
+
+/** An amount in dollars with cents, or the dash when it is unknown. */
+export function usdFixed(value: number | null | undefined): string {
+  return orDash(value, usd2);
+}
+
+/** The gap between what the Gateway says and what the app recorded: signed, or the dash when one side is unknown. */
+export function gapText(gap: number | null | undefined): string {
+  return orDash(gap, (n) => `${n > 0 ? "+" : ""}${usd2(n)}`);
+}
+
+/** Why the balance of the key cannot be read, in French. Never turned into a zero balance. */
+export function gatewayReasonText(reason: "not_configured" | "unauthorized" | "unavailable"): string {
+  if (reason === "not_configured") return "la clé du Gateway n’est pas configurée sur ce serveur";
+  if (reason === "unauthorized") return "le Gateway a refusé la clé";
+  return "le Gateway n’a pas répondu";
+}
+
 /** The French label of where an amount comes from (null when the server gave none). */
 export function originText(origin: CostOrigin | null | undefined): string | null {
   return origin ? ORIGIN_LABELS[origin] : null;

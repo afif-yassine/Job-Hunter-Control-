@@ -6,6 +6,7 @@ import { Mark, Wordmark } from "@/components/jinnjob/logo";
 import { AdminView } from "@/components/views/admin-view";
 import type { AdminOverview } from "@/lib/admin/overview";
 import type { Growth } from "@/lib/admin/growth";
+import type { GatewayCredits } from "@/lib/admin/gateway-credits";
 import type { Tone } from "@/lib/labels";
 import { GrowthView } from "./growth-view";
 
@@ -16,7 +17,7 @@ const TABS: { id: Tab; label: string; icon: typeof Gauge }[] = [
 ];
 
 /** The admin space: its own header and pages, apart from the students' space. */
-export function AdminApp({ email, demo }: { email: string; demo?: { growth: Growth; overview: AdminOverview } }) {
+export function AdminApp({ email, demo }: { email: string; demo?: { growth: Growth; overview: AdminOverview; gateway?: GatewayCredits } }) {
   const [tab, setTab] = useState<Tab>("growth");
   const [toast, setToast] = useState<{ text: string; tone: Tone } | null>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -67,7 +68,7 @@ export function AdminApp({ email, demo }: { email: string; demo?: { growth: Grow
         </div>
       </header>
       <main className="adm-main">
-        {tab === "growth" ? <GrowthView demo={demo?.growth} notify={notify} /> : <AdminView ctx={{ adminDemo: demo?.overview, notify }} />}
+        {tab === "growth" ? <GrowthView demo={demo?.growth} gatewayDemo={demo?.gateway} notify={notify} /> : <AdminView ctx={{ adminDemo: demo?.overview, notify }} />}
       </main>
       {toast && (
         <div className={`toast ${toast.tone}`} role="status" onClick={() => setToast(null)}>

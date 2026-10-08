@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { orDash, originText, spendTitle, UNKNOWN, unpricedText, vectorBarLabel, yesNoOrDash } from "../components/admin/admin-display";
+import { gapText, gatewayReasonText, orDash, originText, spendTitle, UNKNOWN, unpricedText, usdFixed, vectorBarLabel, yesNoOrDash } from "../components/admin/admin-display";
 
 test("an unknown number is a dash, never zero", () => {
   assert.equal(UNKNOWN, "—");
@@ -32,6 +32,24 @@ test("'réelle' is said only when every line is measured", () => {
   assert.equal(spendTitle(["measured", "estimated"]), "Dépense par modèle");
   assert.equal(spendTitle(["measured_or_estimated"]), "Dépense par modèle");
   assert.equal(spendTitle([]), "Dépense par modèle");
+});
+
+test("an unknown balance or gap is a dash, never a zero", () => {
+  assert.equal(usdFixed(null), "—");
+  assert.equal(usdFixed(undefined), "—");
+  assert.equal(usdFixed(0), "0,00 $");
+  assert.equal(usdFixed(12.3), "12,30 $");
+  assert.equal(gapText(null), "—");
+  assert.equal(gapText(0), "0,00 $");
+  assert.equal(gapText(0.5), "+0,50 $");
+  assert.equal(gapText(-1.25), "-1,25 $");
+});
+
+test("each reason a balance cannot be read is said in French and is not a balance", () => {
+  assert.match(gatewayReasonText("not_configured"), /pas configurée/);
+  assert.match(gatewayReasonText("unauthorized"), /refusé/);
+  assert.match(gatewayReasonText("unavailable"), /pas répondu/);
+  for (const reason of ["not_configured", "unauthorized", "unavailable"] as const) assert.doesNotMatch(gatewayReasonText(reason), /\d/);
 });
 
 test("the catalogue bar names the column it counts", () => {
