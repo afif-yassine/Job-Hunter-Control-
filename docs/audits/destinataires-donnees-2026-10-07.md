@@ -57,6 +57,10 @@ Base de données et comptes. Pas de Storage utilisé : aucun appel `storage.from
 - Clés d'API saisies par l'étudiant : chiffrées avec `INTEGRATIONS_SECRET`. **[inventaire]**
 - La page affirme « serveurs dans l'Union européenne (Irlande) » (`app/confidentialite/page.tsx:103`, `lib/brand.ts:25`). **[vérifié]** que c'est écrit ; **[non vérifiable]** que c'est la région réelle.
 
+### Ajout du 8 octobre : liste des comptes pour l’administrateur
+
+Depuis le commit `229f1ca8`, la route `GET /api/admin/users` renvoie à l’administrateur seul, pour chaque compte : adresse e-mail, dates d’inscription et de dernière connexion, CV importé ou non, nombre de dossiers du mois, appels et coût IA sur 30 jours. Aucun contenu de profil, de CV ou de document. À mentionner dans la page de confidentialité (PUBLIC-05).
+
 ## 5. Envoi des e-mails (Resend)
 
 - Resend sert de SMTP personnalisé à Supabase : `smtp.resend.com`, expéditeur `no-reply@lebontaf.com`, domaine en région Europe (`docs/auth-emails/README.md:6,16,18`). **[vérifié]**
