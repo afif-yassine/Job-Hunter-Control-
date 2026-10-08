@@ -56,6 +56,8 @@ export type Growth = {
     perUserRecommended: UserCosts;
     analysisPriceIn: number;
   };
+  /** Which column the "vectorised offers" figure counts, and the legacy column's figure for comparison. */
+  embeddings: { counted: "semantic_embedding" | "legacy_embedding"; legacyCount: number };
   origins: GrowthOrigins;
   /** Each level's forecast at its goal. */
   levels: { n: number; name: string; users: number; pro: number; forecast: Forecast }[];
@@ -66,6 +68,8 @@ export type Growth = {
 export type RawStats = GrowthStats & {
   ai_by_model: { model: string; calls: number; input: number; output: number; usd?: number | string | null }[];
   ai_month?: { unpriced?: number | string | null } | null;
+  /** Open offers holding a Perplexity vector (counted by the application: the SQL function counts the legacy column). */
+  offers_embedded_semantic?: number | null;
   signups_30d: { day: string; n: number }[];
 };
 
@@ -79,7 +83,15 @@ export async function buildGrowth(supabase: SupabaseClient, env: Env = process.e
     supabase.from("admin_quests").select("id,done,done_at"),
   ]);
   if (statsRes.error) throw new Error(statsRes.error.message);
-  return growthFrom(statsRes.data as RawStats, (questsRes.data ?? []) as Quest[], env, now);
+  const raw = statsRes.data as RawStats;
+  // The SQL function (already applied) counts the legacy Gemini column: count the one actually used.
+  try {
+    const { count, error } = await supabase.from("offers").select("id", { count: "exact", head: true }).eq("status", "open").not("semantic_embedding", "is", null);
+    if (!error && typeof count === "number") raw.offers_embedded_semantic = count;
+  } catch {
+    // keep the legacy figure, labelled as such
+  }
+  return growthFrom(raw, (questsRes.data ?? []) as Quest[], env, now);
 }
 
 export type Quest = { id: string; done: boolean; done_at: string };
@@ -103,7 +115,7 @@ export function growthFrom(raw: RawStats, quests: Quest[], env: Env = process.en
     interviews_month: n(raw.interviews_month),
     offers_open: n(raw.offers_open),
     offers_summarized: n(raw.offers_summarized),
-    offers_embedded: n(raw.offers_embedded),
+    offers_embedded: typeof raw.offers_embedded_semantic === "number" ? raw.offers_embedded_semantic : n(raw.offers_embedded),
     offers_new_7d: n(raw.offers_new_7d),
   };
 
@@ -171,6 +183,7 @@ export function growthFrom(raw: RawStats, quests: Quest[], env: Env = process.en
       breakEvenPro: now_.breakEvenPro,
     },
     ai: { models, recommended, byModel, unpricedCalls: n(raw.ai_month?.unpriced), perUser, perUserRecommended, analysisPriceIn },
+    embeddings: { counted: typeof raw.offers_embedded_semantic === "number" ? "semantic_embedding" : "legacy_embedding", legacyCount: n(raw.offers_embedded) },
     origins: {
       money: {
         proPrice: "assumption",

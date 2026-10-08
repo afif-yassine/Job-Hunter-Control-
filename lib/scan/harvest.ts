@@ -184,6 +184,33 @@ export type HarvestReport = {
 };
 
 /**
+ * Keeps what the vectorisation and the shared reader did in harvest_runs.counters (JSON, no migration),
+ * because the slice's own answer is read by nobody. Never throws, never blocks the harvest.
+ */
+async function saveAiProgress(db: SupabaseClient, run: string, report: HarvestReport, provider: "gateway" | "legacy" | "none", now: Date) {
+  try {
+    const { data } = await db.from("harvest_runs").select("counters").eq("id", run).maybeSingle();
+    const counters = ((data as { counters?: Record<string, unknown> } | null)?.counters ?? {}) as Record<string, unknown>;
+    const before = (counters.ai as Record<string, number> | undefined) ?? {};
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+    const failures = report.errors.filter((e) => /^(embeddings|lecture des offres)/.test(e)).map((e) => e.slice(0, 160)).slice(0, 3);
+    const ai = {
+      provider,
+      slices: num(before.slices) + 1,
+      embedded: num(before.embedded) + (report.embedded ?? 0),
+      read: num(before.read) + (report.read ?? 0),
+      lastSliceAt: now.toISOString(),
+      lastEmbedded: report.embedded ?? 0,
+      lastRead: report.read ?? 0,
+      lastErrors: failures,
+    };
+    await db.from("harvest_runs").update({ counters: { ...counters, ai } }).eq("id", run);
+  } catch {
+    // a missing summary must not stop a harvest
+  }
+}
+
+/**
  * One slice of the current run: creates it when due, works through its tasks
  * until `budgetMs` is spent, finishes it when nothing is left.
  */
@@ -202,6 +229,7 @@ export async function runHarvestSlice(
   const embed = opts.embed !== undefined ? opts.embed : geminiEmbedder(env);
   // Keep time for the shared reader: a large embedding backlog must not
   // consume every slice and indefinitely leave the summaries empty.
+  const provider = () => (semanticEnabled(env) ? "gateway" : embed ? "legacy" : "none") as "gateway" | "legacy" | "none";
   const embedSome = async () => {
     const readerReserve = opts.reader === null ? 0 : 20_000;
     if (semanticEnabled(env) && left() >= 10_000) {
@@ -249,6 +277,7 @@ export async function runHarvestSlice(
     // Nothing to collect until the next run: tidy the catalogue meanwhile.
     report.recategorized = await recategorize(db);
     await embedSome();
+    await saveAiProgress(db, run, report, provider(), now);
     report.finished = true;
     return report;
   }
@@ -399,5 +428,6 @@ export async function runHarvestSlice(
       .eq("id", run);
     report.finished = true;
   }
+  await saveAiProgress(db, run, report, provider(), now);
   return report;
 }
