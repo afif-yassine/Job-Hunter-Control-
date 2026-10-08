@@ -96,6 +96,9 @@ export async function readPendingOffers(
         const parsed = parseCard(result.text);
         if (!parsed) {
           failed += 1;
+          // An unusable answer was paid for: count it so the offer is not read again forever.
+          // Without the 20261008100000 migration this call does not exist and nothing is counted (as before).
+          if (leased) await db.rpc("record_offer_reading_failure", { p_id: o.id, p_token: o.reader_token });
           continue;
         }
         const summary = { ...parsed, model: result.model, processed_at: new Date().toISOString() };
