@@ -393,7 +393,6 @@ function Money({ g }: { g: Growth }) {
 
 function AiSection({ g }: { g: Growth }) {
   const per = g.ai.perUser;
-  const rec = g.ai.perUserRecommended;
   const expensive = g.ai.analysisPriceIn > 0.2;
   const readingAndScoring = g.money.aiUsdMonthProjected * 0.6;
   const gpu = g.selfHosting.gpuUsdPerMonth;
@@ -404,8 +403,7 @@ function AiSection({ g }: { g: Growth }) {
       </h2>
       {expensive && (
         <Callout tone="warn" title="Le score utilise un modèle cher">
-          Le score tourne sur {g.ai.models.analysis}. Un étudiant gratuit très actif coûte jusqu’à {usd(per.freeMax)} par mois, contre {usd(rec.freeMax)} avec gemini-2.5-flash-lite. Dans
-          Vercel, mets AI_MODEL_ANALYSIS = gemini-2.5-flash-lite.
+          Le score tourne sur {g.ai.models.analysis}. Un étudiant gratuit très actif coûte jusqu’à {usd(per.freeMax)} par mois.
         </Callout>
       )}
       <div className="grow-ai">
@@ -536,7 +534,7 @@ function Students({ g }: { g: Growth }) {
           <Bar value={s.offers_embedded} max={s.offers_open} label="Vectorisées" />
           {s.offers_open > 0 && s.offers_embedded / s.offers_open < 0.9 && (
             <p className="grow-warn small-text">
-              <TriangleAlert size={14} aria-hidden /> Sans vecteurs, le classement selon le CV ne marche pas : c’est le Sprint 7.
+              <TriangleAlert size={14} aria-hidden /> Sans vecteurs, le classement selon le CV ne marche pas.
             </p>
           )}
         </div>
