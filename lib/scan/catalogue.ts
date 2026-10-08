@@ -69,12 +69,20 @@ export function withinDays(offers: ScannedOffer[], days: number, now = Date.now(
 
 export type CatalogueEntry = { id: string; status: "open" | "expired" | "closed" };
 
+/**
+ * Offers read from the operator's own alert mailbox ("alert:<platform>"; the old "gmail:" prefix too).
+ * They stay in the administrator's list but are never poured into the catalogue everybody shares:
+ * they would reveal which alerts the operator subscribed to.
+ */
+export const isOperatorAlert = (source: string | null | undefined): boolean => /^(alert|gmail):/i.test(source ?? "");
+
 /** Store or refresh offers in the catalogue; fingerprint → catalogue entry. */
 export async function harvestOffers(
   db: SupabaseClient | null,
-  offers: ScannedOffer[],
+  scanned: ScannedOffer[],
 ): Promise<{ entries: Map<string, CatalogueEntry>; error?: string }> {
   const entries = new Map<string, CatalogueEntry>();
+  const offers = scanned.filter((o) => !isOperatorAlert(o.source));
   if (!db || !offers.length) return { entries };
   const rows = offers.map((o) => ({
     fingerprint: offerFingerprint(o),
