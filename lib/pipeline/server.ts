@@ -3,7 +3,7 @@ import type { AiCall } from "@/lib/ai";
 import { PLAN_CODE, PLAN_MANUAL_CODE } from "@/lib/plan";
 import { QUOTA_CODE } from "@/lib/quota";
 import { runScan } from "@/lib/scan";
-import { hasChosenSearch, normalizePrefs } from "@/lib/scan/config";
+import { hasChosenSearch, normalizePrefs, studentCatalogueOnly } from "@/lib/scan/config";
 import type { ScanSummary } from "@/lib/scan/types";
 import { analyzeJob } from "./analyze";
 import { compareJob } from "./compare";
@@ -75,7 +75,20 @@ export async function runServerTick(options: TickOptions): Promise<TickReport> {
       quotaReached: [],
       errors: [],
     });
-  const scan = options.scan ?? ((db: SupabaseClient, userId: string) => runScan({ supabase: db, userId, log: false }));
+  // Only an administrator's account may call job sites; every other account is updated from the shared catalogue.
+  // An unreadable list of administrators means nobody is one.
+  let adminIds: Promise<Set<string>> | null = null;
+  const administrators = () =>
+    (adminIds ??= (async () => {
+      const { data, error } = await supabase.from("app_admins").select("user_id");
+      return new Set<string>(error ? [] : ((data ?? []) as { user_id: string }[]).map((row) => String(row.user_id)));
+    })());
+  const scan =
+    options.scan ??
+    (async (db: SupabaseClient, userId: string) => {
+      const student = !(await administrators()).has(userId);
+      return runScan({ supabase: db, userId, log: false, student, catalogueOnly: student && studentCatalogueOnly(env) });
+    });
 
   // 1. Search for accounts whose last search is old (2 per call at most) ------
   const { data: settings } = await supabase

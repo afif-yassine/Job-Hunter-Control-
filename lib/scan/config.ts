@@ -57,6 +57,12 @@ export const DEFAULT_PREFS: ScanPrefs = {
 export const hasChosenSearch = (prefs: Pick<ScanPrefs, "categories" | "keywords" | "targets">): boolean =>
   Boolean(prefs.categories?.length || prefs.keywords.length || prefs.targets.length);
 
+/**
+ * Whether a student's update reads the shared catalogue only (no job-site API at all).
+ * Off by default: it is the owner's decision, taken once the platform's own collection is proven to run.
+ */
+export const studentCatalogueOnly = (env: Record<string, string | undefined> = process.env): boolean => env.STUDENT_CATALOGUE_ONLY?.trim() === "1";
+
 export const NO_SEARCH_MESSAGE = "Choisis tes métiers pour lancer la recherche.";
 
 export const MAX_TARGETS = 30;

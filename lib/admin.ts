@@ -9,3 +9,9 @@ export async function adminRefusal(supabase: SupabaseClient): Promise<Response |
   const { data: isAdmin } = await supabase.rpc("is_admin");
   return isAdmin === true ? null : Response.json({ error: "Réservé à l’administrateur." }, { status: 403 });
 }
+
+/** Whether the signed-in account is the administrator (same `is_admin` check). An unreadable answer is "no". */
+export async function isAdmin(supabase: SupabaseClient): Promise<boolean> {
+  const { data } = await supabase.rpc("is_admin");
+  return data === true;
+}

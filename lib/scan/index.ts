@@ -110,11 +110,23 @@ export async function runScan(ctx: {
   log?: boolean;
   /** Service client for the shared cache (defaults to SUPABASE_SERVICE_ROLE_KEY). */
   cacheDb?: SupabaseClient | null;
+  /**
+   * A student's account (anyone but the administrator). The operator's mailbox (Gmail)
+   * and the external webhook (which receives the account id) are never used for it,
+   * nor the companies learnt from the shared catalogue: they belong to the platform.
+   */
+  student?: boolean;
+  /**
+   * A student's update that only reads the shared catalogue (and the companies the account
+   * typed itself). No job-site API is called or charged either. Implies `student`.
+   */
+  catalogueOnly?: boolean;
 }): Promise<ScanSummary> {
+  const student = Boolean(ctx.student || ctx.catalogueOnly);
   // Keys typed in the dashboard win over Vercel variables.
   const env = ctx.env ?? {
     ...process.env,
-    ...(await loadIntegrationEnv(ctx.supabase, ctx.userId)),
+    ...(ctx.catalogueOnly ? {} : await loadIntegrationEnv(ctx.supabase, ctx.userId)),
   };
   const has = (name: string) => Boolean(env[name]?.trim());
   // A platform key (Vercel) is shared by every account: its free budget and
@@ -127,7 +139,7 @@ export async function runScan(ctx: {
   const config = configFromPrefs(settings.prefs);
   // Companies the app found by itself on a recruitment platform (see discover.ts)
   // are read like the ones typed in Réglages. null = column not migrated yet.
-  const discovered = await loadDiscovered(ctx.supabase, ctx.userId);
+  const discovered = ctx.catalogueOnly ? null : await loadDiscovered(ctx.supabase, ctx.userId);
   const manualKeys = new Set(config.targets.map(targetKey));
   if (discovered)
     for (const t of discoveredTargets(discovered)) if (!manualKeys.has(targetKey(t))) config.targets.push(t);
@@ -147,7 +159,8 @@ export async function runScan(ctx: {
   const covered = (q: SearchQuery) => Boolean(q.category && q.contract && (coverage.get(`${q.category}|${q.contract}`) ?? 0) >= COVERED);
   const ignored = new Set(discovered?.ignored ?? []);
   const reading = new Set(config.targets.map(targetKey));
-  for (const board of fromCatalogue.boards.slice(0, SHARED_BOARDS)) {
+  // Boards learnt from the catalogue are the collection's job, not a student update's.
+  for (const board of student ? [] : fromCatalogue.boards.slice(0, SHARED_BOARDS)) {
     const t = parseAtsTarget(board);
     if (t && !reading.has(board) && !ignored.has(board)) {
       config.targets.push(t);
@@ -376,7 +389,11 @@ export async function runScan(ctx: {
       reports.push({ source: name, status: "ok", found, message: errors.length ? errors.slice(0, 3).join(" ; ") : undefined });
   };
 
-  await Promise.all([...sources.map(runSource), runCareers()]);
+  if (ctx.catalogueOnly)
+    reports.push({ source: "Sources d’emploi externes", status: "skipped", found: 0, message: "Réservées à la collecte automatique de la plateforme : ta liste vient du catalogue commun." });
+  // Operator-level sources are for the administrator's account only.
+  const allowed = sources.filter((s) => !(student && (s.id === "gmail" || s.id === "webhook")));
+  await Promise.all(ctx.catalogueOnly ? [runCareers()] : [...allowed.map(runSource), runCareers()]);
 
   // Learn new companies from the links of what was just found.
   let discoveredCount = 0;
@@ -387,7 +404,7 @@ export async function runScan(ctx: {
   }
 
   // Company careers pages and the catalogue alone do not need any key.
-  const configured = sources.some((s) => s.enabled) || config.targets.length > 0 || fromCatalogue.offers.length > 0;
+  const configured = ctx.catalogueOnly || sources.some((s) => s.enabled) || config.targets.length > 0 || fromCatalogue.offers.length > 0;
   const relevant = collected.filter(isRelevant);
   // Shared catalogue: store / refresh what was seen, close what left its board,
   // expire what nobody has seen for 3 weeks. Never blocks the scan.
