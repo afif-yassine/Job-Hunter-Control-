@@ -33,6 +33,8 @@ import { useProfileState } from "@/components/use-profile";
 import { createInflightGuard } from "@/components/in-flight";
 import { useCatalogueRefresh } from "@/components/use-catalogue-refresh";
 import { shownEmail, useAccount } from "@/components/use-account";
+import { unlockState, type PlanKnowledge } from "@/components/unlock";
+import { useUnlocked } from "@/components/use-unlocked";
 import { Callout, Progress } from "@/components/ui";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { RoadmapView } from "@/components/views/roadmap-view";
@@ -125,6 +127,22 @@ export function Dashboard({ userEmail: tokenEmail = "", demo }: { userEmail?: st
   // One address everywhere: the account's own once loaded (the token's can be stale after a change), else the token's.
   const { account } = useAccount(Boolean(supabase), isDemo);
   const userEmail = shownEmail(account, tokenEmail);
+  // Which offers can be worked on: read once (and again on a new Paris day). Not used by a screen yet;
+  // any doubt locks nothing, so the app behaves as before until the screens read it.
+  const { fetchState: unlockFetch, answer: unlockAnswer } = useUnlocked(Boolean(supabase) && !isDemo);
+  const planKnowledge: PlanKnowledge = status
+    ? status.isAdmin === true || status.plan?.plan === "pro" || status.plan?.plan === "admin"
+      ? "paid"
+      : status.plan
+        ? "free"
+        : "unknown"
+    : statusFailed
+      ? "unknown"
+      : "loading";
+  const unlock = useMemo(
+    () => unlockState({ demo: isDemo, plan: planKnowledge, fetch: unlockFetch, answer: unlockAnswer }),
+    [isDemo, planKnowledge, unlockFetch, unlockAnswer],
+  );
   // Once per session, after the first load and only with a saved CV: the list is opened from the shared catalogue.
   const { refreshedAt: catalogueRefreshedAt } = useCatalogueRefresh({
     enabled: hasProfile === true && !loading && !isDemo && Boolean(supabase),
@@ -432,6 +450,7 @@ export function Dashboard({ userEmail: tokenEmail = "", demo }: { userEmail?: st
     busy: locked,
     userEmail,
     account,
+    unlock,
     go,
     notify,
     reload,

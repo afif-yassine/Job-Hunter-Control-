@@ -8,6 +8,7 @@ import type { DocumentDialogState } from "@/components/document-tools";
 import type { AdminOverview } from "@/lib/admin/overview";
 import type { ProfileSummary } from "@/lib/profile-store";
 import type { AccountInfo } from "@/components/use-account";
+import type { UnlockState } from "@/components/unlock";
 
 export type View =
   | "home"
@@ -43,6 +44,8 @@ export type Ctx = {
   userEmail: string;
   /** The signed-in account as the server reads it now (null until loaded). */
   account: AccountInfo | null;
+  /** Which offers can be worked on. Nothing is locked unless the state is "locking" (see components/unlock.ts). */
+  unlock: UnlockState;
   go: (view: View, filter?: JobFilter) => void;
   notify: (text: string, tone?: Tone) => void;
   reload: () => Promise<void>;
