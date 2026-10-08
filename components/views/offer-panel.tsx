@@ -18,11 +18,11 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { displayScore } from "@/lib/fit";
 import { followUpDue, isSent, stageOf, type Stage } from "@/lib/journey";
 import { Soon } from "@/components/ui";
 import { DOCUMENT_KIND, platformsOf, REVIEW } from "@/lib/labels";
 import type { DocumentRecord, Job, OfferSummary } from "@/lib/types";
+import { aiScore, listScore } from "./closest";
 import { offerAge, salaryOf, ScoreRing, StageChip } from "./offer-card";
 import { summaryState } from "./summary-state";
 import type { Ctx } from "./types";
@@ -110,7 +110,9 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   const disabled = Boolean(busy);
   const url = job.official_url || job.source_url;
   const summary = summaryOf(job);
-  const shown = displayScore(job);
+  // Two named blocks: the free score ("compétences en commun") and, when it exists, the AI analysis.
+  const freeScore = listScore(job);
+  const analysisScore = aiScore(job);
   const insight = insightOf(job);
   const matchedCount = job.fit?.matched.length ?? 0;
   const askedCount = matchedCount + (job.fit?.missing.length ?? 0);
@@ -251,23 +253,19 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
           <div className="panel-score">
             <ScoreRing job={job} size={64} />
             <div>
-              <strong>{shown ? (shown.detailed ? "Compatibilité avec ton CV" : "Compétences en commun avec ton CV") : "Pas encore comparée"}</strong>
-              <p className="muted small-text">
-                {!shown
-                  ? "Le score arrive dès que l’offre et ton CV sont lus."
-                  : shown.detailed
-                    ? shown.score >= 80
-                      ? "Très proche de ton profil : fonce."
-                      : shown.score >= 60
-                        ? "Une bonne piste, avec quelques écarts."
-                        : "Assez loin de ton profil."
-                    : askedCount
-                      ? `${matchedCount} sur ${askedCount} compétence${askedCount > 1 ? "s" : ""} demandée${askedCount > 1 ? "s" : ""} figure${matchedCount > 1 ? "nt" : ""} dans ton CV.`
-                      : "L’offre ne liste pas encore de compétences à comparer."}
-              </p>
+              <strong>{freeScore !== null ? "Compétences en commun avec ton CV" : analysisScore !== null ? "Pas de score gratuit pour cette offre" : "Pas encore comparée"}</strong>
+              {freeScore !== null ? (
+                <p className="muted small-text">
+                  {askedCount
+                    ? `${matchedCount} sur ${askedCount} compétence${askedCount > 1 ? "s" : ""} demandée${askedCount > 1 ? "s" : ""} figure${matchedCount > 1 ? "nt" : ""} dans ton CV.`
+                    : "L’offre ne liste pas encore de compétences à comparer."}
+                </p>
+              ) : analysisScore === null ? (
+                <p className="muted small-text">Le score arrive dès que l’offre et ton CV sont lus.</p>
+              ) : null}
             </div>
           </div>
-          {!insight && job.fit && (
+          {job.fit && (
             <details className="why">
               <summary>Pourquoi ce score ?</summary>
               <p className="muted small-text">
@@ -298,12 +296,23 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                   </div>
                 </>
               ) : null}
-              {job.description && !job.review_flag && !gone && (
+              {!insight && job.description && !job.review_flag && !gone && (
                 <button className="btn ghost small" onClick={() => void act.analyze(job)} disabled={waiting}>
                   <Sparkles size={15} aria-hidden /> Analyse approfondie par l’IA
                 </button>
               )}
             </details>
+          )}
+          {analysisScore !== null && (
+            <div className="panel-score">
+              <ScoreRing job={job} size={64} kind="ai" />
+              <div>
+                <strong>Compatibilité avec ton CV (analyse IA)</strong>
+                <p className="muted small-text">
+                  {analysisScore >= 80 ? "Très proche de ton profil : fonce." : analysisScore >= 60 ? "Une bonne piste, avec quelques écarts." : "Assez loin de ton profil."}
+                </p>
+              </div>
+            </div>
           )}
           {insight && (
             <details className="why">

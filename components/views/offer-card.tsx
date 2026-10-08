@@ -1,6 +1,6 @@
 "use client";
 import { CalendarDays, Euro, Globe, MapPin, Users } from "lucide-react";
-import { displayScore } from "@/lib/fit";
+import { aiScore, listScore } from "./closest";
 import { milestones, stageOf, STAGE, type Stage } from "@/lib/journey";
 import { platformsOf, timeAgo } from "@/lib/labels";
 import type { Job } from "@/lib/types";
@@ -15,23 +15,31 @@ export function salaryOf(job: Job): string | null {
   return job.offers?.salary ?? null;
 }
 
-/** Score shown on the card: the AI's detailed score when the offer was analysed, else the free comparison with the CV. */
-export function ScoreRing({ job, size = 54 }: { job: Job; size?: number }) {
-  const shown = displayScore(job);
-  if (!shown) {
+/**
+ * The score ring. Lists and cards always show the FREE score ("compétences en commun"); only the offer
+ * panel shows the AI analysis, in its own block, with kind="ai". One quantity per screen area, each named.
+ */
+export function ScoreRing({ job, size = 54, kind = "free" }: { job: Job; size?: number; kind?: "free" | "ai" }) {
+  const score = kind === "ai" ? aiScore(job) : listScore(job);
+  if (score === null) {
+    const title =
+      kind === "ai"
+        ? "Pas d’analyse IA pour cette offre"
+        : aiScore(job) !== null
+          ? "Pas de score gratuit pour cette offre"
+          : "Pas encore comparée à ton CV";
     return (
-      <span className="ring is-none" style={{ width: size, height: size }} title="Pas encore comparée à ton CV">
+      <span className="ring is-none" style={{ width: size, height: size }} title={title}>
         <b>—</b>
         <small>score</small>
       </span>
     );
   }
-  const score = shown.score;
   const tone = score >= 80 ? "good" : score >= 60 ? "mid" : "low";
   const r = 22;
   const c = 2 * Math.PI * r;
   return (
-    <span className={`ring is-${tone}`} style={{ width: size, height: size }} title={shown.detailed ? `Compatibilité avec ton CV (analyse IA) : ${score}/100` : `Compétences en commun avec ton CV : ${score}/100 (comparaison gratuite, indicative)`}>
+    <span className={`ring is-${tone}`} style={{ width: size, height: size }} title={kind === "ai" ? `Compatibilité avec ton CV (analyse IA) : ${score}/100` : `Compétences en commun avec ton CV : ${score}/100 (comparaison gratuite, indicative)`}>
       <svg viewBox="0 0 54 54" aria-hidden="true">
         <circle cx="27" cy="27" r={r} className="ring-track" />
         <circle cx="27" cy="27" r={r} className="ring-value" strokeDasharray={`${(c * score) / 100} ${c}`} />
