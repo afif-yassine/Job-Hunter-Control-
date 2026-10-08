@@ -64,13 +64,13 @@ export function DocumentsView({ ctx }: { ctx: Ctx }) {
   if (!data.documents.length)
     return (
       <>
-        <PageHead title="Documents" subtitle="Tes CV et lettres, adaptés à chaque offre." />
+        <PageHead title="Documents" subtitle="Tes CV et lettres, créés pour les offres que tu as choisies." />
         <Empty
           title="Aucun document pour l’instant"
-          text="Ils sont créés automatiquement pour les offres notées 80 ou plus. Tu peux aussi les créer depuis une offre analysée."
+          text="Ouvre une offre qui te plaît et clique « Créer mon CV et ma lettre » : tes documents arrivent ici."
           action={
-            <button className="btn" onClick={() => ctx.go("jobs", "all")}>
-              Voir les offres à traiter
+            <button className="btn" onClick={() => ctx.go("jobs", "new")}>
+              Voir les offres
             </button>
           }
         />
@@ -124,8 +124,8 @@ export function DocumentsView({ ctx }: { ctx: Ctx }) {
       </div>
       <p className="muted small-text" style={{ marginTop: 12 }}>
         <FileText size={13} aria-hidden /> Astuce : « Demander à l’IA » applique une consigne (ex. « plus court », « reformule
-        le résumé ») ; « Modifier » te laisse tout retoucher toi-même ; « LaTeX » donne le code source à éditer (Overleaf ou
-        ton éditeur).
+        le résumé ») ; « Modifier » te laisse tout retoucher toi-même
+        {ctx.status?.isAdmin ? " ; « LaTeX » donne le code source à éditer (Overleaf ou ton éditeur)." : "."}
       </p>
     </>
   );
@@ -160,9 +160,10 @@ function DocRow({ doc, ctx, working }: { doc: DocumentRecord; ctx: Ctx; working:
         </button>
         <details className="more">
           <summary className="btn ghost small">
-            <Code2 size={14} aria-hidden /> LaTeX
+            <Code2 size={14} aria-hidden /> {admin ? "LaTeX" : "Options avancées"}
           </summary>
           <div className="menu">
+            {!admin && <small className="muted">Pour retoucher ton CV avec LaTeX (utilisateurs avancés).</small>}
             <button className="btn secondary small" onClick={() => void openInOverleaf(doc, ctx.notify)}>
               Éditer dans Overleaf
             </button>
