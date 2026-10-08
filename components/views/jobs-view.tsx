@@ -1,7 +1,6 @@
 "use client";
-import { compareFits } from "@/lib/fit";
 import { useEffect, useMemo, useState } from "react";
-import { closestJobIds } from "./closest";
+import { closestJobIds, compareShown } from "./closest";
 import { matchesAdvancedFilters, searchFilters, type SavedSearch, type SearchFilters } from "@/lib/saved-searches";
 import { Plus, Search } from "lucide-react";
 import { Empty, PageHead } from "@/components/ui";
@@ -14,7 +13,7 @@ import type { Ctx, JobFilter } from "./types";
 const FILTERS: { id: JobFilter; label: string }[] = [
   { id: "new", label: "Nouvelles" },
   { id: "all", label: "Toutes" },
-  { id: "best", label: "Proches de mon CV" },
+  { id: "best", label: "Mieux notées pour mon CV" },
   { id: "review", label: "À vérifier" },
   { id: "gone", label: "Plus disponibles" },
 ];
@@ -63,15 +62,15 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
   }
   const kits = useMemo(() => kitsByJob(data.documents), [data.documents]);
 
-  // The 25 offers closest in meaning to the profile (a rank, not a grade).
+  // The 25 best scored offers, by the score shown on the card (same order as the tab and the sort).
   const closest = useMemo(() => closestJobIds(data.jobs), [data.jobs]);
-  const hasSimilarity = closest.size > 0;
+  const hasScores = closest.size > 0;
 
   const match = useMemo<Record<JobFilter, (j: Job) => boolean>>(
     () => ({
       new: (j) => isOpen(j) && stageOf(j) === "new",
       all: (j) => !isDismissed(j),
-      best: (j) => isOpen(j) && (closest.has(j.id) || (j.match_score ?? 0) >= 80),
+      best: (j) => isOpen(j) && closest.has(j.id),
       review: toReview,
       gone: isGone,
     }),
@@ -108,7 +107,7 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
       .filter((j) => !metier || (facets.get(j.id)?.cats ?? []).includes(metier as never))
       .filter((j) => !contract || facets.get(j.id)?.kind === contract);
     const filtered = list.filter(j => matchesAdvancedFilters(j, { city, maxAgeDays, remote }));
-    if (sort === "score" || (jobFilter === "best" && sort === "recent")) return [...filtered].sort(compareFits);
+    if (sort === "score" || (jobFilter === "best" && sort === "recent")) return [...filtered].sort(compareShown);
     return [...filtered].sort((a, b) => Date.parse(b.publication_date || b.created_at || "1970-01-01") - Date.parse(a.publication_date || a.created_at || "1970-01-01"));
   }, [inTab, jobFilter, query, metier, contract, facets, sort, city, maxAgeDays, remote]);
 
@@ -175,8 +174,8 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
           Trier
           <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
             <option value="recent">Les plus récentes</option>
-            <option value="score" disabled={!hasSimilarity}>
-              Les plus proches de mon CV{hasSimilarity ? "" : " (importe ton CV)"}
+            <option value="score" disabled={!hasScores}>
+              Les mieux notées pour mon CV{hasScores ? "" : " (importe ton CV)"}
             </option>
           </select>
         </label>
@@ -238,7 +237,7 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
         <>
           <div className="offers">
             {visible.map((job) => (
-              <OfferCard key={job.id} job={job} kit={kits.get(job.id)} closest={closest.has(job.id)} onOpen={openOffer} />
+              <OfferCard key={job.id} job={job} kit={kits.get(job.id)} onOpen={openOffer} />
             ))}
           </div>
           {rows.length > shown && (

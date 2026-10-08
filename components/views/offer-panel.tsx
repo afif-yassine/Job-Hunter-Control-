@@ -17,13 +17,12 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { displayScore } from "@/lib/fit";
 import { followUpDue, isSent, stageOf, type Stage } from "@/lib/journey";
 import { Soon } from "@/components/ui";
 import { DOCUMENT_KIND, platformsOf, REVIEW } from "@/lib/labels";
 import type { DocumentRecord, Job, OfferSummary } from "@/lib/types";
-import { closestJobIds, CLOSEST_COUNT } from "./closest";
 import { offerAge, salaryOf, ScoreRing, StageChip } from "./offer-card";
 import { summaryState } from "./summary-state";
 import type { Ctx } from "./types";
@@ -113,8 +112,6 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   const summary = summaryOf(job);
   const shown = displayScore(job);
   const insight = insightOf(job);
-  // Same rank as the "Dans le top 25 de ton CV" tag of the list.
-  const inClosest = useMemo(() => closestJobIds(data.jobs).has(job.id), [data.jobs, job.id]);
   const matchedCount = job.fit?.matched.length ?? 0;
   const askedCount = matchedCount + (job.fit?.missing.length ?? 0);
   const docs = latestDocs(data.documents, job.id);
@@ -267,7 +264,6 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                     : askedCount
                       ? `${matchedCount} sur ${askedCount} compétence${askedCount > 1 ? "s" : ""} demandée${askedCount > 1 ? "s" : ""} figure${matchedCount > 1 ? "nt" : ""} dans ton CV.`
                       : "L’offre ne liste pas encore de compétences à comparer."}
-                {shown && !shown.detailed && inClosest ? ` Par le sens, elle fait partie des ${CLOSEST_COUNT} offres les plus proches de ton CV.` : ""}
               </p>
             </div>
           </div>
@@ -276,7 +272,6 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
               <summary>Pourquoi ce score ?</summary>
               <p className="muted small-text">
                 Comparaison gratuite des compétences demandées par l’offre avec celles que ton CV prouve.
-                {inClosest ? ` Par le sens, l’offre fait partie des ${CLOSEST_COUNT} plus proches de ton CV.` : ""}
               </p>
               <p className="muted small-text">Indicatif : ce score ne mesure pas tes chances d’être retenu(e).</p>
               {job.fit.matched.length ? (

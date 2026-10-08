@@ -68,12 +68,10 @@ export function Milestones({ stage, kit }: { stage: Stage; kit?: { cv: boolean; 
 export function OfferCard({
   job,
   kit,
-  closest,
   onOpen,
 }: {
   job: Job;
   kit?: { cv: boolean; letter: boolean };
-  closest?: boolean;
   onOpen: (job: Job) => void;
 }) {
   const stage = stageOf(job);
@@ -115,7 +113,6 @@ export function OfferCard({
       </span>
       <span className="offer-tags">
         {job.contract_type && <span className="tag">{job.contract_type.split(" · ")[0]}</span>}
-        {closest && <span className="tag is-good" title="Parmi les 25 offres dont le sens est le plus proche de ton CV">Dans le top 25 de ton CV</span>}
         {job.review_flag && !gone && <span className="tag is-warn">À vérifier</span>}
         {gone && <span className="tag is-bad">Plus disponible</span>}
       </span>
