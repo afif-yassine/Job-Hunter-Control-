@@ -9,6 +9,7 @@ import { runServerTick } from "../lib/pipeline/server";
 import { consumeQuota, quotaLimit } from "../lib/quota";
 import type { ScanSummary } from "../lib/scan/types";
 import { fakeSupabase } from "./fake-supabase";
+import { SEARCH_DEV_PARIS } from "./prefs";
 
 const LONG =
   "Tu développeras des API Python et FastAPI, des pipelines de données PostgreSQL et Kafka, et tu déploieras des modèles de machine learning avec Docker. ".repeat(12);
@@ -217,8 +218,8 @@ test("server run: searches due accounts, scores, writes documents, logs and noti
     allow,
     {
       user_settings: [
-        { user_id: "u1", auto_scan: true, last_scan_at: null, plan: "pro" },
-        { user_id: "u2", auto_scan: true, last_scan_at: new Date().toISOString() },
+        { user_id: "u1", auto_scan: true, last_scan_at: null, plan: "pro", scan_config: SEARCH_DEV_PARIS },
+        { user_id: "u2", auto_scan: true, last_scan_at: new Date().toISOString(), scan_config: SEARCH_DEV_PARIS },
       ],
     },
   );

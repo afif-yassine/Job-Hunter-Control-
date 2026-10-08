@@ -44,6 +44,8 @@ export type ScanSummary = {
   suspected: number;
   needsDescription: number;
   configured: boolean;
+  /** No job, keyword or company chosen yet: nothing was searched. */
+  noSearch?: boolean;
   /** Companies found on a recruitment platform during this scan, now followed. */
   discovered?: number;
 };

@@ -5,6 +5,7 @@ import { runScan } from "../lib/scan";
 import { budgetFor, cacheKey, classifyError } from "../lib/scan/health";
 import { mapAtsJobs, parseAtsTarget } from "../lib/scan/sources/ats";
 import { fakeSupabase } from "./fake-supabase";
+import { SEARCH_DEV_PARIS } from "./prefs";
 
 const realFetch = globalThis.fetch;
 const saved = { ...process.env };
@@ -36,7 +37,7 @@ function world(rpc: Record<string, (args: Record<string, unknown>) => unknown> =
       calls.push({ fn: k, args });
       return f(args);
     };
-  const w = fakeSupabase({ jobs: [], job_sources: [], applications: [], user_settings: [], agent_runs: [], notifications: [] }, { rpc: wrap });
+  const w = fakeSupabase({ jobs: [], job_sources: [], applications: [], user_settings: ["u1", "u2"].map((user_id) => ({ user_id, scan_config: SEARCH_DEV_PARIS })), agent_runs: [], notifications: [] }, { rpc: wrap });
   return { ...w, calls };
 }
 

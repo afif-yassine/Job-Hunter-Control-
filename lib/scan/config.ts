@@ -39,15 +39,25 @@ export type ScanPrefs = {
   targets: string[];
 };
 
+/**
+ * A new account searches nothing until it has chosen its jobs (or its CV
+ * import proposed them): no keywords, city or area are assumed for it.
+ */
 export const DEFAULT_PREFS: ScanPrefs = {
   contracts: ["alternance", "stage"],
   categories: [],
-  keywords: ["développeur", "intelligence artificielle", "data"],
-  city: "Paris",
-  departments: ["75", "92", "93", "94", "91"],
+  keywords: [],
+  city: "",
+  departments: [],
   maxAgeDays: 14,
   targets: [],
 };
+
+/** At least one job category, keyword or company was chosen: otherwise nothing is searched. */
+export const hasChosenSearch = (prefs: Pick<ScanPrefs, "categories" | "keywords" | "targets">): boolean =>
+  Boolean(prefs.categories?.length || prefs.keywords.length || prefs.targets.length);
+
+export const NO_SEARCH_MESSAGE = "Choisis tes métiers pour lancer la recherche.";
 
 export const MAX_TARGETS = 30;
 

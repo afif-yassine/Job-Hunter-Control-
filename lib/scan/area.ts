@@ -53,6 +53,8 @@ export function departmentsOf(location: string): Set<string> {
 
 /** In the account's city or one of its départements. */
 export function inArea(location: string | null | undefined, area: { city: string; departments: string[] }): boolean {
+  // No city and no department chosen: the whole of France, no area filter.
+  if (!area.city.trim() && !area.departments.length) return true;
   if (!location) return false;
   const text = normalizeText(location);
   const city = normalizeText(area.city);

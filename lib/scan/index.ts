@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadIntegrationEnv } from "@/lib/integrations";
 import { loadUserSettings, saveUserSettings } from "@/lib/settings";
-import { configFromPrefs, isRelevant } from "./config";
+import { configFromPrefs, hasChosenSearch, isRelevant, NO_SEARCH_MESSAGE } from "./config";
 import { ingestOffers } from "./ingest";
 import { scanAdzuna } from "./sources/adzuna";
 import { discoveredTargets, loadDiscovered, mergeDiscovered, saveDiscovered } from "./discover";
@@ -89,6 +89,8 @@ type SourceDef = {
   keys: string[];
   /** Same results for every account with the same search → shared cache. */
   cacheable: boolean;
+  /** Searched around a city or department: not called when the account chose no area. */
+  zoned?: boolean;
   /**
    * Searched one query at a time (at most this many queries), each query
    * cached on its own: accounts whose searches overlap share the calls.
@@ -119,6 +121,9 @@ export async function runScan(ctx: {
   // cache are shared too. A key typed by one account stays its own.
   const platformKey = (keys: string[]) => keys.every((k) => process.env[k] && env[k] === process.env[k]);
   const settings = await loadUserSettings(ctx.supabase, ctx.userId);
+  // Nothing chosen yet: no source, catalogue or vector work is started for this account.
+  if (!hasChosenSearch(settings.prefs))
+    return { reports: [], found: 0, relevant: 0, inserted: 0, duplicates: 0, alreadyApplied: 0, toReview: 0, suspected: 0, needsDescription: 0, configured: true, noSearch: true };
   const config = configFromPrefs(settings.prefs);
   // Companies the app found by itself on a recruitment platform (see discover.ts)
   // are read like the ones typed in Réglages. null = column not migrated yet.
@@ -165,6 +170,7 @@ export async function runScan(ctx: {
   const sources: SourceDef[] = [
     {
       id: "francetravail",
+      zoned: true,
       name: "France Travail",
       enabled: has("FRANCE_TRAVAIL_CLIENT_ID") && has("FRANCE_TRAVAIL_CLIENT_SECRET"),
       missing: "FRANCE_TRAVAIL_CLIENT_ID / FRANCE_TRAVAIL_CLIENT_SECRET",
@@ -175,6 +181,7 @@ export async function runScan(ctx: {
     },
     {
       id: "jsearch",
+      zoned: true,
       name: "JSearch (LinkedIn, Indeed, WTTJ…)",
       enabled: has("JSEARCH_API_KEY"),
       missing: "JSEARCH_API_KEY",
@@ -186,6 +193,7 @@ export async function runScan(ctx: {
     },
     {
       id: "adzuna",
+      zoned: true,
       name: "Adzuna",
       enabled: has("ADZUNA_APP_ID") && has("ADZUNA_APP_KEY"),
       missing: "ADZUNA_APP_ID / ADZUNA_APP_KEY",
@@ -196,6 +204,7 @@ export async function runScan(ctx: {
     },
     {
       id: "jooble",
+      zoned: true,
       name: "Jooble",
       enabled: has("JOOBLE_API_KEY"),
       missing: "JOOBLE_API_KEY",
@@ -206,6 +215,7 @@ export async function runScan(ctx: {
     },
     {
       id: "lba",
+      zoned: true,
       name: "La bonne alternance",
       enabled: has("LBA_API_KEY"),
       missing: "LBA_API_KEY (et l’accord d’usage commercial de La bonne alternance)",
@@ -237,6 +247,11 @@ export async function runScan(ctx: {
   const runSource = async (source: SourceDef) => {
     if (!source.enabled) {
       reports.push({ source: source.name, status: "skipped", found: 0, message: `Non configuré (${source.missing})` });
+      return;
+    }
+    // No city or department chosen: only the shared catalogue is read, no job site is called or charged.
+    if (source.zoned && !config.city.trim() && !config.departments.length) {
+      reports.push({ source: source.name, status: "skipped", found: 0, message: "Sans ville ni département choisi, seul le catalogue commun est lu." });
       return;
     }
     const shared = platformKey(source.keys);
@@ -456,6 +471,7 @@ export async function runScan(ctx: {
 }
 
 export function scanMessage(s: ScanSummary): string {
+  if (s.noSearch) return NO_SEARCH_MESSAGE;
   if (!s.configured) return SETUP_HINT;
   const errors = s.reports.filter((r) => r.status === "error");
   const head = `Scan terminé : ${s.found} offre(s) trouvée(s), ${s.relevant} pertinente(s), ${s.inserted} nouvelle(s), ${s.duplicates} doublon(s) regroupé(s)${s.alreadyApplied ? ` dont ${s.alreadyApplied} déjà postulée(s) ailleurs` : ""}.${s.toReview + s.suspected ? ` ${s.toReview + s.suspected} offre(s) à vérifier.` : ""}`;
@@ -478,6 +494,7 @@ export function scanMessage(s: ScanSummary): string {
  */
 export async function seedFromCatalogue(supabase: SupabaseClient, userId: string): Promise<number> {
   const settings = await loadUserSettings(supabase, userId);
+  if (!hasChosenSearch(settings.prefs)) return 0;
   const config = configFromPrefs(settings.prefs);
   if (semanticEnabled()) await ensureSemanticProfile(supabase, userId, process.env);
   else await ensureProfileEmbedding(supabase, userId, geminiEmbedder());

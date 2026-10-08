@@ -3,6 +3,7 @@ import type { AiCall } from "@/lib/ai";
 import { PLAN_CODE, PLAN_MANUAL_CODE } from "@/lib/plan";
 import { QUOTA_CODE } from "@/lib/quota";
 import { runScan } from "@/lib/scan";
+import { hasChosenSearch, normalizePrefs } from "@/lib/scan/config";
 import type { ScanSummary } from "@/lib/scan/types";
 import { analyzeJob } from "./analyze";
 import { compareJob } from "./compare";
@@ -79,11 +80,14 @@ export async function runServerTick(options: TickOptions): Promise<TickReport> {
   // 1. Search for accounts whose last search is old (2 per call at most) ------
   const { data: settings } = await supabase
     .from("user_settings")
-    .select("user_id,last_scan_at,auto_scan")
+    .select("user_id,last_scan_at,auto_scan,scan_config")
     .eq("auto_scan", true)
+    .not("scan_config", "is", null)
     .order("last_scan_at", { ascending: true, nullsFirst: true })
-    .limit(20);
-  const due = ((settings ?? []) as { user_id: string; last_scan_at: string | null }[])
+    .limit(200);
+  // Accounts that chose no job, keyword or company yet are not searched (and do not use a turn).
+  const due = ((settings ?? []) as { user_id: string; last_scan_at: string | null; scan_config: unknown }[])
+    .filter((s) => hasChosenSearch(normalizePrefs(s.scan_config)))
     .filter((s) => !s.last_scan_at || now() - Date.parse(s.last_scan_at) >= intervalMs)
     .slice(0, 2);
   for (const s of due) {
@@ -172,6 +176,7 @@ export async function runServerTick(options: TickOptions): Promise<TickReport> {
       .select("id,user_id")
       .eq("status", "ANALYZED")
       .is("review_flag", null)
+      .is("gone_reason", null)
       .gte("match_score", threshold)
       .order("match_score", { ascending: false })
       .limit(10);

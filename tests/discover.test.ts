@@ -6,6 +6,7 @@ import { ATS_IDS, boardUrl, parseAtsTarget } from "../lib/scan/sources/ats";
 import { mapJSearchOffer } from "../lib/scan/sources/jsearch";
 import type { ScannedOffer } from "../lib/scan/types";
 import { fakeSupabase } from "./fake-supabase";
+import { SEARCH_DEV_PARIS } from "./prefs";
 
 const offer = (extra: Partial<ScannedOffer>): ScannedOffer => ({
   source: "jsearch:linkedin",
@@ -103,7 +104,7 @@ test("end to end: a JSearch offer on Lever makes the next scan read that company
     );
   }) as typeof fetch;
   const { db, tables } = fakeSupabase(
-    { jobs: [], job_sources: [], applications: [], user_settings: [], agent_runs: [], notifications: [] },
+    { jobs: [], job_sources: [], applications: [], user_settings: [{ user_id: "u1", scan_config: SEARCH_DEV_PARIS }], agent_runs: [], notifications: [] },
     { rpc: { consume_source_budget: () => true, record_source_run: () => null } },
   );
   const env = { JSEARCH_API_KEY: "k" };
