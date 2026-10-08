@@ -230,7 +230,7 @@ export function JobsView({ ctx }: { ctx: Ctx }) {
             />
           )
         ) : jobFilter === "new" ? (
-          <Empty title="Tu as tout vu" text="Les nouvelles offres arrivent le matin et en début d’après-midi." />
+          <Empty title="Tu as tout vu" text="Reviens un peu plus tard : les nouvelles offres s’ajoutent dès qu’elles sont trouvées." />
         ) : (
           <Empty title="Aucune offre ici" text="Change de filtre ou de recherche." />
         )

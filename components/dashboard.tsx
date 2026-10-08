@@ -31,6 +31,7 @@ import { useDashboardData, type Data } from "@/components/use-dashboard-data";
 import { useSystemStatus, type SystemStatus } from "@/components/use-status";
 import { useProfileState } from "@/components/use-profile";
 import { createInflightGuard } from "@/components/in-flight";
+import { useCatalogueRefresh } from "@/components/use-catalogue-refresh";
 import { Callout, Progress } from "@/components/ui";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { RoadmapView } from "@/components/views/roadmap-view";
@@ -120,6 +121,11 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
   const { status, failed: statusFailed, refresh: refreshStatus } = useSystemStatus(Boolean(supabase), demo?.status);
   const pipeline = usePipeline({ supabase, status, reload, refreshStatus });
   const { hasProfile, refresh: refreshProfile } = useProfileState(Boolean(supabase), isDemo);
+  // Once per session, after the first load and only with a saved CV: the list is opened from the shared catalogue.
+  const { refreshedAt: catalogueRefreshedAt } = useCatalogueRefresh({
+    enabled: hasProfile === true && !loading && !isDemo && Boolean(supabase),
+    reload,
+  });
 
   const [view, setView] = useState<View>("home");
   const [jobFilter, setJobFilter] = useState<JobFilter>("new");
@@ -418,6 +424,7 @@ export function Dashboard({ userEmail = "", demo }: { userEmail?: string; demo?:
     reload,
     hasProfile,
     refreshProfile,
+    catalogueRefreshedAt,
     jobFilter,
     setJobFilter,
     openOffer,

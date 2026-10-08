@@ -44,6 +44,8 @@ export type Ctx = {
   /** Whether a CV profile is saved (undefined while unknown: nothing is blocked). */
   hasProfile: boolean | undefined;
   refreshProfile: () => Promise<void>;
+  /** When the shared catalogue was last checked for this student in this browser session (null: not yet). */
+  catalogueRefreshedAt: string | null;
   jobFilter: JobFilter;
   setJobFilter: (filter: JobFilter) => void;
   /** Opens the offer panel (and marks the offer as seen). */

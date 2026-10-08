@@ -14,6 +14,7 @@ import {
   Check,
   ShieldAlert,
 } from "lucide-react";
+import { freshnessText } from "@/components/catalogue-refresh";
 import { openQuestionCount } from "@/components/questions-panel";
 import { Callout, PageHead, Progress } from "@/components/ui";
 import { kitsByJob, stageOf, todayTasks, TRACK } from "@/lib/journey";
@@ -227,7 +228,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
           <div>
             <strong>Tes offres</strong>
             <p className="muted small-text">
-              {last ? `Dernière mise à jour : ${timeAgo(last)}.` : "Pas encore de mise à jour."} Rien n’est jamais envoyé sans toi.
+              {freshnessText({ refreshedAt: ctx.catalogueRefreshedAt, lastSearchAt: last }, timeAgo)} Rien n’est jamais envoyé sans toi.
             </p>
           </div>
           <button className="btn secondary" disabled={Boolean(ctx.busy)} onClick={() => void pipeline.start()}>
@@ -282,7 +283,7 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
                   {noSource
                     ? "Une clé gratuite suffit pour chercher sur tout internet."
                     : last
-                      ? `Dernière recherche : ${timeAgo(last)}${status?.scheduledScan ? " · automatique sur le serveur" : status?.autoScan ? " · automatique à l’ouverture" : ""}`
+                      ? `Dernière recherche : ${timeAgo(last)}`
                       : "Aucune recherche pour l’instant."}
                 </p>
               </div>
