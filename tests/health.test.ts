@@ -163,6 +163,8 @@ test("admin page: numbered sources with state, budget, quality, and the manual a
       agent_runs: [],
     },
     {
+      // The daily-selection migration is not applied in this scenario.
+      missingTables: ["offer_unlocks"],
       rpc: {
         admin_source_stats: () => [{ source: "francetravail", offers: 30, links: 40, analyzed: 20, avg_score: "72.5", strong: 4, suspected: 1, to_review: 2, unreadable: 0 }],
       },
@@ -194,7 +196,7 @@ test("admin page: numbered sources with state, budget, quality, and the manual a
 });
 
 test("admin page: Marché du travail and Accès à l'emploi are 'à terminer' until set; Open Formation is never nagged about", async () => {
-  const { db } = fakeSupabase({ integrations: [], user_settings: [], source_runs: [], source_budget: [], usage_events: [], notifications: [], agent_runs: [] });
+  const { db } = fakeSupabase({ integrations: [], user_settings: [], source_runs: [], source_budget: [], usage_events: [], notifications: [], agent_runs: [] }, { missingTables: ["offer_unlocks"] });
   const baseEnv = { GEMINI_API_KEY: "x", FRANCE_TRAVAIL_CLIENT_ID: "id", FRANCE_TRAVAIL_CLIENT_SECRET: "secret" };
   const notReady = await buildAdminOverview({ supabase: db, userId: "admin", env: baseEnv, now: new Date("2026-09-29T10:00:00Z") });
   assert.equal(notReady.enrichment.length, 3);
