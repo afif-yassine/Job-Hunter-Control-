@@ -9,7 +9,6 @@ import { fakeSupabase } from "./fake-supabase";
 const U = "u1";
 const day1 = new Date("2026-10-10T10:00:00Z");
 const day2 = new Date("2026-10-11T10:00:00Z");
-const iso = (d: Date) => d.toISOString();
 
 const offer = (n: number, over: Record<string, unknown> = {}) => ({
   id: `o${n}`, fingerprint: `fp${n}`, title: `Alternance DevOps ${n}`, company: `Societe ${n}`, location: "Paris", contract_type: "Contrat apprentissage",
