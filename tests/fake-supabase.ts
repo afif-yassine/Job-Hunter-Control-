@@ -19,6 +19,7 @@ export function fakeSupabase(tables: Record<string, Row[]>, options: Options = {
     let payload: Row | Row[] = [];
     let conflict: string[] = [];
     let single = false;
+    let window: [number, number] | null = null;
     const exec = () => {
       if (options.missingTables?.includes(name))
         return { data: null, error: { code: "42P01", message: `relation "${name}" does not exist` } };
@@ -48,7 +49,8 @@ export function fakeSupabase(tables: Record<string, Row[]>, options: Options = {
         tables[name] = table.filter((r) => !matched.includes(r));
         return { data: null, error: null };
       }
-      return { data: single ? (matched[0] ?? null) : matched, error: null };
+      const view = window ? matched.slice(window[0], window[1] + 1) : matched;
+      return { data: single ? (view[0] ?? null) : view, error: null };
     };
     const q = {
       select: () => q,
@@ -68,6 +70,7 @@ export function fakeSupabase(tables: Record<string, Row[]>, options: Options = {
         return q;
       },
       order: () => q,
+      range: (from: number, to: number) => ((window = [from, to]), q),
       limit: () => q,
       single: () => ((single = true), q),
       maybeSingle: () => ((single = true), q),

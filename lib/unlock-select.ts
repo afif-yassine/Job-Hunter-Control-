@@ -34,6 +34,12 @@ export type Pick = UnlockCandidate & { common: string[]; rank: number };
 export type Selection = {
   chosen: Pick[];
   considered: number;
+  /** Candidates offered by the catalogue for this search, before any filter. */
+  pool: number;
+  /** Of the pool, offers the account already unlocked. */
+  alreadyUnlocked: number;
+  /** Candidates that passed every filter (the lot is the first `limit` of them). */
+  passing: number;
   /** Candidates rejected because their contract does not match the search. */
   wrongContract: number;
   /** Candidates whose skills the reader has not listed yet: not evaluable, not unlocked. */
@@ -93,7 +99,10 @@ export function selectDaily(input: {
       a.id.localeCompare(b.id),
   );
   const chosen = passing.slice(0, limit).map((p, i) => ({ ...p, rank: i + 1 }));
-  const result: Selection = { chosen, considered: fresh.length, wrongContract, unread, fewCommonSkills };
+  const result: Selection = {
+    chosen, considered: fresh.length, pool: input.candidates.length, alreadyUnlocked: input.candidates.length - fresh.length,
+    passing: passing.length, wrongContract, unread, fewCommonSkills,
+  };
   if (!chosen.length && limit > 0) result.reason = fresh.length ? "NONE_ABOVE_THRESHOLD" : "NO_CANDIDATES";
   return result;
 }

@@ -109,7 +109,15 @@ export async function copyOffersToJobs(db: SupabaseClient, userId: string, offer
 export type BatchResult = { newlyUnlocked: number; inserted: number; note?: UnlockNote };
 
 /** Non-sensitive trace of one computation: the last step reached and the time spent in each (milliseconds). */
-export type BatchTrace = { step: string; ms: Record<string, number>; totalMs: number; done: boolean; result?: BatchResult };
+export type BatchTrace = {
+  step: string;
+  ms: Record<string, number>;
+  totalMs: number;
+  done: boolean;
+  result?: BatchResult;
+  /** How many candidates fell at each filter (counts only, no offer, no profile). */
+  funnel?: { pool: number; alreadyUnlocked: number; wrongContract: number; unread: number; fewCommonSkills: number; passing: number; chosen: number };
+};
 
 const newTrace = (): BatchTrace => ({ step: "start", ms: {}, totalMs: 0, done: false });
 
@@ -162,6 +170,10 @@ export async function ensureDailyBatch(db: SupabaseClient, gate: Extract<Gate, {
     at("select");
     const candidates: UnlockCandidate[] = [...found.meta.entries()].map(([id, m]) => ({ id, similarity: m.similarity, skills: m.skills, kind: m.kind, publishedAt: m.publishedAt }));
     const selection = selectDaily({ candidates, profileSkills: mySkills, contracts: config.contracts ?? [], unlocked });
+    trace.funnel = {
+      pool: selection.pool, alreadyUnlocked: selection.alreadyUnlocked, wrongContract: selection.wrongContract, unread: selection.unread,
+      fewCommonSkills: selection.fewCommonSkills, passing: selection.passing, chosen: selection.chosen.length,
+    };
     if (!selection.chosen.length) return end({ newlyUnlocked: 0, inserted, note: selection.reason });
 
     at("claim");
@@ -194,7 +206,7 @@ async function logBatch(db: SupabaseClient, userId: string, trace: BatchTrace) {
     status: trace.done && result?.note !== "DEGRADED" ? "COMPLETED" : "FAILED",
     started_at: now,
     finished_at: now,
-    counters: { step: trace.step, done: trace.done, totalMs: trace.totalMs, ms: trace.ms, newlyUnlocked: result?.newlyUnlocked ?? 0, copied: result?.inserted ?? 0, note: result?.note ?? null },
+    counters: { step: trace.step, done: trace.done, totalMs: trace.totalMs, ms: trace.ms, newlyUnlocked: result?.newlyUnlocked ?? 0, copied: result?.inserted ?? 0, note: result?.note ?? null, funnel: trace.funnel ?? null },
   });
 }
 

@@ -268,3 +268,28 @@ test("ROUTE (duration) — the route has its own time limit and keeps the lot ru
   assert.deepEqual(overview.dailyUnlock.recent, [{ at: "2026-10-10T08:00:00Z", ok: true, step: "done", totalMs: 4200, newlyUnlocked: 8, note: null }]);
   assert.ok(!JSON.stringify(overview.dailyUnlock).includes("someone"));
 });
+
+test("FUNNEL — the trace says how many candidates fell at each filter (counts only), and the pool covers the whole catalogue window, not its first 1 000 rows", async () => {
+  const w = world({
+    offers: [
+      offer(1), offer(2), offer(3, { contract_kind: "cdi", contract_type: "CDI" }), offer(4, { summary: null }), offer(5, { summary: { skills: ["python", "cobol"] } }),
+      ...Array.from({ length: 1500 }, (_, i) => offer(100 + i, { categories: ["web"], title: `Plombier ${i}`, company: `Autre ${i}`, summary: { skills: ["plomberie"] } })),
+      ...Array.from({ length: 5 }, (_, i) => offer(2000 + i)),
+    ],
+  });
+  w.data.offer_unlocks.push({ user_id: U, offer_id: "o1", unlocked_on: "2026-10-09", origin: "backfill" });
+  w.data.jobs.push({ id: "j1", user_id: U, offer_id: "o1", title: "T", company: "C" });
+  await unlockedState(w.db, U, day1, w.db);
+  const run = w.data.agent_runs.find((r) => r.run_type === "DAILY_UNLOCK");
+  assert.ok(run);
+  const funnel = (run.counters as { funnel: Record<string, number> }).funnel;
+  // Offers 2000..2004 sit after the first 1 000 rows: they are in the pool only if the catalogue is read page by page.
+  // 5 early offers + 5 late ones (read only with pagination) + 40 neighbours of the profile.
+  assert.equal(funnel.pool, 50);
+  assert.deepEqual(
+    [funnel.alreadyUnlocked, funnel.wrongContract, funnel.unread, funnel.fewCommonSkills, funnel.passing, funnel.chosen],
+    [1, 1, 1, 41, 6, 6],
+  );
+  assert.ok(w.data.offer_unlocks.some((r) => r.offer_id === "o2000"), "a late offer (beyond the first 1 000 rows) can be unlocked");
+  assert.ok(!JSON.stringify(run.counters).includes("Societe"), "counts only");
+});

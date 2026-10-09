@@ -187,6 +187,7 @@ export function matchesCategories(
 export type CatalogueMeta = { similarity: number | null; skills: string[]; kind: string; publishedAt: string | null };
 
 const IMPORT_SCAN = 3000;
+const CATALOGUE_PAGE = 1000;
 /** Offers added for being close to the profile (embeddings), on top of the words and categories. */
 const SIMILAR_MAX = 40;
 const SIMILAR_MIN = 0.55;
@@ -205,17 +206,25 @@ export async function importFromCatalogue(
   const empty = { offers: [], entries: new Map<string, CatalogueEntry>(), boards: [], meta: new Map<string, CatalogueMeta>() };
   // Nothing asked yet: only the profile can still bring offers (embeddings).
   const seenSince = new Date(now - (EXPIRE_DAYS + 1) * 86_400_000).toISOString();
-  const { data, error } = await db
-    .from("offers")
-    .select("id,fingerprint,title,company,location,contract_type,source,url,apply_url,published_at,rome_code,board,categories,contract_kind")
-    .eq("status", "open")
-    .gte("last_seen_at", seenSince)
-    .order("last_seen_at", { ascending: false })
-    .limit(IMPORT_SCAN);
-  if (error) return { ...empty, error: error.message };
+  // The API returns at most 1 000 rows per request whatever `limit` says: read the most recent offers page by
+  // page, in a stable order, so the account sees the whole window and not an arbitrary 1 000 of it.
+  const data: CatalogueRow[] = [];
+  for (let from = 0; from < IMPORT_SCAN; from += CATALOGUE_PAGE) {
+    const page = await db
+      .from("offers")
+      .select("id,fingerprint,title,company,location,contract_type,source,url,apply_url,published_at,rome_code,board,categories,contract_kind")
+      .eq("status", "open")
+      .gte("last_seen_at", seenSince)
+      .order("last_seen_at", { ascending: false })
+      .order("id")
+      .range(from, Math.min(from + CATALOGUE_PAGE, IMPORT_SCAN) - 1);
+    if (page.error) return { ...empty, error: page.error.message };
+    data.push(...((page.data ?? []) as CatalogueRow[]));
+    if ((page.data?.length ?? 0) < CATALOGUE_PAGE) break;
+  }
   const cutoff = now - config.maxAgeDays * 86_400_000;
   const fits = (o: CatalogueRow) => (!o.published_at || Date.parse(o.published_at) >= cutoff) && inArea(o.location, config);
-  const byWords = ((data ?? []) as CatalogueRow[])
+  const byWords = data
     .filter(fits)
     .filter((o) => matchesCategories(o, config) || config.queries.some((q) => matchesQuery(o, q)))
     .slice(0, IMPORT_MAX);
