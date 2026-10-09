@@ -31,7 +31,7 @@ export default function TermsPage() {
       <p>
         Le service est gratuit aujourd’hui (2 dossiers par mois). Une formule payante, LeBonTaf Plus, est présentée sur la page{" "}
         <Link href="/tarifs">Tarifs</Link> ; le paiement n’est pas encore ouvert. Des fonctions peuvent changer, être limitées
-        (par exemple un nombre de recherches ou de documents par jour) ou s’interrompre. Elle sera optionnelle, annoncée à
+        (par exemple un nombre de recherches ou de documents par jour) ou s’interrompre. Cette formule sera optionnelle, annoncée à
         l’avance et soumise à des conditions séparées : rien ne te sera facturé sans ton accord explicite.
       </p>
 
