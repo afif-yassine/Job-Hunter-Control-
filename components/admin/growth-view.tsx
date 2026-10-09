@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import {
   BadgeCheck,
   Check,
@@ -8,18 +8,15 @@ import {
   ExternalLink,
   Flag,
   LoaderCircle,
-  Lock,
   RefreshCw,
   Sparkles,
   TriangleAlert,
-  Trophy,
   Users,
   Wallet,
-  Zap,
 } from "lucide-react";
 import { Callout } from "@/components/ui";
 import type { Growth } from "@/lib/admin/growth";
-import { LEVELS, progress, RANKS, type LevelState, type Progress } from "@/lib/admin/levels";
+import { LEVELS, progress } from "@/lib/admin/levels";
 import { forecast } from "@/lib/economics";
 import type { Tone } from "@/lib/labels";
 import type { CostOrigin } from "@/lib/admin/origin";
@@ -40,7 +37,6 @@ export function GrowthView({ demo, gatewayDemo, notify }: { demo?: Growth; gatew
   const [g, setG] = useState<Growth | null>(demo ?? null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!demo);
-  const [levelUp, setLevelUp] = useState<LevelState | null>(null);
 
   const load = useCallback(async () => {
     if (demo) return;
@@ -72,8 +68,6 @@ export function GrowthView({ demo, gatewayDemo, notify }: { demo?: Growth; gatew
     const facts = { ...g.stats, analysisPriceIn: g.ai.analysisPriceIn, aiUsdMonth: g.money.aiUsdMonthProjected, monthMarginEur: g.money.marginEur };
     const after = progress(facts, manual);
     setG({ ...g, progress: after });
-    const finished = after.levels.find((l, i) => l.complete && !before.levels[i].complete);
-    if (finished) setLevelUp(finished);
     if (demo) return;
     try {
       const response = await fetch("/api/admin/growth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, done }) });
@@ -106,31 +100,24 @@ export function GrowthView({ demo, gatewayDemo, notify }: { demo?: Growth; gatew
 
   return (
     <div className="grow">
-      <Hero p={g.progress} at={g.at} loading={loading} reload={() => void load()} demo={Boolean(demo)} />
+      <Header at={g.at} loading={loading} reload={() => void load()} demo={Boolean(demo)} />
       <Kpis g={g} />
-      <LevelsMap g={g} toggle={toggle} />
+      <LaunchList g={g} toggle={toggle} />
       <Money g={g} />
       <GatewayCreditsView demo={gatewayDemo} />
       <AiSection g={g} />
       <Students g={g} />
-      <AnimatePresence>{levelUp && <LevelUp level={levelUp} close={() => setLevelUp(null)} />}</AnimatePresence>
     </div>
   );
 }
 
-function Hero({ p, at, loading, reload, demo }: { p: Progress; at: string; loading: boolean; reload: () => void; demo: boolean }) {
-  const prevXp = RANKS.filter((r) => r.xp <= p.xp).pop()?.xp ?? 0;
-  const toward = p.rank.next ? ((p.xp - prevXp) / (p.rank.next.xp - prevXp)) * 100 : 100;
+function Header({ at, loading, reload, demo }: { at: string; loading: boolean; reload: () => void; demo: boolean }) {
   return (
     <section className="grow-hero">
       <div>
-        <p className="grow-kicker">Ton QG · niveau {p.current} en cours</p>
-        <h1 className="grow-title">
-          Monte <em>LeBonTaf</em> niveau par niveau.
-        </h1>
-        <p className="muted">
-          Chaque étape franchie rapporte des points. Les étapes marquées « auto » se cochent toutes seules quand les chiffres sont atteints.
-        </p>
+        <p className="grow-kicker">Espace admin</p>
+        <h1 className="grow-title">Où en est <em>LeBonTaf</em></h1>
+        <p className="muted">Chiffres, coûts et liste de lancement. Les étapes marquées « auto » se cochent toutes seules quand les chiffres sont atteints.</p>
         <div className="grow-hero-actions">
           <button className="btn secondary small" onClick={reload} disabled={loading || demo}>
             <RefreshCw size={15} className={loading ? "spin" : undefined} aria-hidden /> Actualiser
@@ -141,17 +128,6 @@ function Hero({ p, at, loading, reload, demo }: { p: Progress; at: string; loadi
           </span>
         </div>
       </div>
-      <motion.div className="grow-rank" initial={{ rotate: -6, scale: 0.9, opacity: 0 }} animate={{ rotate: -2, scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 260, damping: 18 }}>
-        <span className="grow-rank-label">Rang</span>
-        <strong className="grow-rank-title">{p.rank.title}</strong>
-        <span className="grow-xp">
-          <Zap size={15} aria-hidden /> {fr(p.xp)} XP
-        </span>
-        <div className="grow-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(toward)} aria-label="Points vers le rang suivant">
-          <motion.span initial={{ width: 0 }} animate={{ width: `${Math.max(4, Math.min(100, toward))}%` }} transition={{ duration: 1.1, ease: [0.2, 0.8, 0.2, 1] }} />
-        </div>
-        <span className="muted small-text">{p.rank.next ? `encore ${fr(p.rank.next.xp - p.xp)} XP pour « ${p.rank.next.title} »` : "Rang maximum atteint"}</span>
-      </motion.div>
     </section>
   );
 }
@@ -218,104 +194,62 @@ function Bar({ value, max, label }: { value: number; max: number; label: string 
   );
 }
 
-function LevelsMap({ g, toggle }: { g: Growth; toggle: (id: string, done: boolean) => void }) {
-  const [open, setOpen] = useState(g.progress.current);
+/** The launch list: the same steps as before, grouped by stage, without points, rank or badge. */
+function LaunchList({ g, toggle }: { g: Growth; toggle: (id: string, done: boolean) => void }) {
   const students = Math.max(0, g.stats.users - g.stats.admins);
-  const level = g.progress.levels.find((l) => l.n === open) ?? g.progress.levels[0];
   return (
-    <section className="grow-section" aria-labelledby="levels-title">
-      <h2 id="levels-title" className="section-title">
-        <Trophy size={18} aria-hidden /> Les niveaux
+    <section className="grow-section" aria-labelledby="launch-title">
+      <h2 id="launch-title" className="section-title">
+        <Flag size={18} aria-hidden /> Liste de lancement
       </h2>
-      <div className="grow-map">
-        <svg className="grow-thread" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden>
-          <motion.path d="M2 5 C 25 0, 40 10, 50 5 S 75 0, 98 5" initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }} transition={{ duration: 1.4 }} />
-        </svg>
-        {g.progress.levels.map((l, i) => (
-          <motion.button
-            key={l.id}
-            type="button"
-            className={`grow-level is-${l.status}${open === l.n ? " is-open" : ""}`}
-            onClick={() => setOpen(l.n)}
-            aria-pressed={open === l.n}
-            initial={{ y: 24, opacity: 0, rotate: i % 2 ? 1.5 : -1.5 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.12 * i, type: "spring", stiffness: 200, damping: 20 }}
-          >
-            <span className="grow-pin" aria-hidden />
-            <span className="grow-level-top">
-              <span className="grow-level-n">Niveau {l.n}</span>
-              {l.status === "locked" && <Lock size={14} aria-label="À venir" />}
-              {l.complete && <span className="grow-badge">{l.badge}</span>}
+      {g.progress.levels.map((level) => (
+        <div key={level.id} className="card grow-quests">
+          <header className="grow-quests-head">
+            <div>
+              <p className="grow-kicker">
+                Palier {level.n} · {level.done}/{level.steps.length} étapes
+              </p>
+              <h3>{level.name}</h3>
+            </div>
+            <span className="muted small-text">
+              Hébergement à ce palier : {usd(level.hosting.vercel + level.hosting.supabase + level.hosting.other)} / mois <OriginTag origin={g.origins.money.hostingUsd} />
             </span>
-            <strong className="grow-level-name">{l.name}</strong>
-            <Bar value={Math.min(students, l.goalUsers)} max={l.goalUsers} label="Étudiants" />
-            {l.goalPro > 0 && <Bar value={Math.min(g.stats.pro, l.goalPro)} max={l.goalPro} label="Abonnés payants (objectif supposé)" />}
-            <span className="grow-level-foot small-text">
-              <span>
-                {l.done}/{l.steps.length} étapes
-              </span>
-              <span className="grow-xp-chip">
-                {fr(l.xp)} / {fr(l.xpMax)} XP
-              </span>
-            </span>
-          </motion.button>
-        ))}
-      </div>
-
-      <div className="card grow-quests">
-        <header className="grow-quests-head">
-          <div>
-            <p className="grow-kicker">Niveau {level.n} · badge « {level.badge} »</p>
-            <h3>{level.name}</h3>
-          </div>
-          <span className="muted small-text">
-            Hébergement à ce niveau : {usd(level.hosting.vercel + level.hosting.supabase + level.hosting.other)} / mois <OriginTag origin={g.origins.money.hostingUsd} />
-          </span>
-        </header>
-        <ol className="grow-steps">
-          {level.steps.map((s) => (
-            <li key={s.id} className={s.done ? "is-done" : undefined}>
-              {s.automatic ? (
-                <span className={`grow-check is-auto${s.done ? " is-on" : ""}`} title="Détecté à partir des chiffres">
-                  {s.done && <Check size={15} aria-hidden />}
-                </span>
-              ) : (
-                <motion.button
-                  type="button"
-                  className={`grow-check${s.done ? " is-on" : ""}`}
-                  onClick={() => toggle(s.id, !s.done)}
-                  aria-pressed={s.done}
-                  aria-label={s.done ? `Décocher : ${s.label}` : `Cocher : ${s.label}`}
-                  whileTap={{ scale: 0.8 }}
-                >
-                  <AnimatePresence>
-                    {s.done && (
-                      <motion.span initial={{ scale: 0, rotate: -40 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0 }} transition={{ type: "spring", stiffness: 500, damping: 18 }}>
-                        <Check size={15} aria-hidden />
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </motion.button>
-              )}
-              <div className="grow-step-main">
-                <strong>{s.label}</strong>
-                {s.hint && <span className="muted small-text">{s.hint}</span>}
-                {s.href && (
-                  <a className="linkbtn small-text" href={s.href} target="_blank" rel="noreferrer">
-                    Ouvrir <ExternalLink size={12} aria-hidden />
-                  </a>
+          </header>
+          <Bar value={Math.min(students, level.goalUsers)} max={level.goalUsers} label="Étudiants" />
+          {level.goalPro > 0 && <Bar value={Math.min(g.stats.pro, level.goalPro)} max={level.goalPro} label="Comptes LeBonTaf Plus (objectif supposé)" />}
+          <ol className="grow-steps">
+            {level.steps.map((s) => (
+              <li key={s.id} className={s.done ? "is-done" : undefined}>
+                {s.automatic ? (
+                  <span className={`grow-check is-auto${s.done ? " is-on" : ""}`} title="Détecté à partir des chiffres">
+                    {s.done && <Check size={15} aria-hidden />}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className={`grow-check${s.done ? " is-on" : ""}`}
+                    onClick={() => toggle(s.id, !s.done)}
+                    aria-pressed={s.done}
+                    aria-label={s.done ? `Décocher : ${s.label}` : `Cocher : ${s.label}`}
+                  >
+                    {s.done && <Check size={15} aria-hidden />}
+                  </button>
                 )}
-              </div>
-              <span className="grow-step-side">
-                {s.automatic && <span className="grow-auto">auto</span>}
-                <span className={`grow-xp-chip${s.done ? " is-won" : ""}`}>+{s.xp} XP</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-      </div>
+                <div className="grow-step-main">
+                  <strong>{s.label}</strong>
+                  {s.hint && <span className="muted small-text">{s.hint}</span>}
+                  {s.href && (
+                    <a className="linkbtn small-text" href={s.href} target="_blank" rel="noreferrer">
+                      Ouvrir <ExternalLink size={12} aria-hidden />
+                    </a>
+                  )}
+                </div>
+                <span className="grow-step-side">{s.automatic && <span className="grow-auto">auto</span>}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
     </section>
   );
 }
@@ -621,24 +555,5 @@ function Signups({ days, at }: { days: { day: string; n: number }[]; at: string 
         <span>{label(series[29].day)}</span>
       </div>
     </div>
-  );
-}
-
-function LevelUp({ level, close }: { level: LevelState; close: () => void }) {
-  useEffect(() => {
-    const t = window.setTimeout(close, 5200);
-    return () => window.clearTimeout(t);
-  }, [close]);
-  return (
-    <motion.div className="grow-levelup" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close}>
-      <motion.div className="grow-levelup-card" initial={{ scale: 0.6, rotate: -8 }} animate={{ scale: 1, rotate: -2 }} transition={{ type: "spring", stiffness: 260, damping: 14 }}>
-        <span className="grow-kicker">Niveau {level.n} terminé</span>
-        <strong>{level.name}</strong>
-        <motion.span className="grow-badge big" initial={{ scale: 2.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.35, type: "spring", stiffness: 300, damping: 12 }}>
-          {level.badge}
-        </motion.span>
-        <span className="muted small-text">+{fr(level.xpMax)} XP · le niveau suivant est débloqué</span>
-      </motion.div>
-    </motion.div>
   );
 }
