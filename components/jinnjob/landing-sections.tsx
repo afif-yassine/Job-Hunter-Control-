@@ -461,13 +461,14 @@ export function Final() {
   );
 }
 
-export function Footer() {
+export function Footer({ pricing = false }: { pricing?: boolean }) {
   return (
     <footer className="jj-footer">
       <div className="jj-wrap jj-footer-in">
         <Wordmark size={22} />
         <span>Offres France Travail (<a href="https://francetravail.io/produits-partages/documentation/conditions-dutilisation-api/licence-offres-emploi" target="_blank" rel="noreferrer">licence de réutilisation</a>) · <a href="https://www.adzuna.fr" target="_blank" rel="noreferrer">Jobs by Adzuna</a></span>
         <nav style={{ display: "flex", flexWrap: "wrap", gap: "8px 22px" }} aria-label="Informations légales">
+          {pricing && <Link href="/tarifs">LeBonTaf Plus</Link>}
           {LEGAL_LINKS.map((l) => (
             <Link key={l.href} href={l.href}>{l.label}</Link>
           ))}

@@ -52,6 +52,8 @@ export type Ctx = {
   go: (view: View, filter?: JobFilter) => void;
   notify: (text: string, tone?: Tone) => void;
   reload: () => Promise<void>;
+  /** The pricing page exists (PRICING_PAGE is not 0): links to it may be shown. */
+  pricing: boolean;
   /** Fixed admin data for the /demo page. */
   adminDemo?: AdminOverview;
   /** The demo page: nothing is read from the account. */

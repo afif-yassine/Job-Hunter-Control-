@@ -26,6 +26,7 @@ import { aiScore, listScore } from "./closest";
 import { offerAge, salaryOf, ScoreRing, StageChip } from "./offer-card";
 import { summaryState } from "./summary-state";
 import { LOCKED_NOTE, monthFullNote } from "@/components/panel-notes";
+import { PRICING } from "@/components/pricing";
 import { isUnlocked } from "@/components/unlock";
 import type { Ctx } from "./types";
 
@@ -453,6 +454,14 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                     <div className="locked-note" role="note">
                       <strong>{monthFullNote(monthFull.limit, monthFull.resetsOn).title}</strong>
                       <p className="muted small-text">{monthFullNote(monthFull.limit, monthFull.resetsOn).text}</p>
+                      {ctx.pricing && (
+                        <>
+                          <p className="muted small-text">{PRICING.why}</p>
+                          <a className="btn secondary" href="/tarifs">
+                            {PRICING.panelLink}
+                          </a>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <button className="btn" disabled={waiting} onClick={() => void createKit()}>

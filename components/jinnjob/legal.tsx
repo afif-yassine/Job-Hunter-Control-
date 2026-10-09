@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { pricingEnabled } from "@/components/pricing";
 import { BRAND } from "@/lib/brand";
 import { Logo, Wordmark } from "./logo";
 
@@ -37,13 +38,18 @@ export function LegalPage({ title, lead, children }: { title: string; lead: Reac
   );
 }
 
+/** The pricing link is listed only while the page exists (PRICING_PAGE=0 turns both off). */
+export function pricingLinks(): readonly { href: string; label: string }[] {
+  return pricingEnabled(process.env.PRICING_PAGE) ? [{ href: "/tarifs", label: "LeBonTaf Plus" }] : [];
+}
+
 export function LegalFooter() {
   return (
     <footer className="jj-footer">
       <div className="jj-wrap jj-footer-in">
         <Wordmark size={22} />
         <nav style={{ display: "flex", flexWrap: "wrap", gap: "8px 22px" }} aria-label="Informations légales">
-          {LEGAL_LINKS.map((l) => (
+          {[...pricingLinks(), ...LEGAL_LINKS].map((l) => (
             <Link key={l.href} href={l.href}>{l.label}</Link>
           ))}
           <a href={`mailto:${BRAND.contactEmail}`}>Contact</a>

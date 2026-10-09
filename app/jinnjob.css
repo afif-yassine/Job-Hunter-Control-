@@ -405,6 +405,13 @@ body:has(.jj) { background: #f3f0e9; color-scheme: light; }
 .jj-legal-body h3 { font: 700 18px/1.3 var(--f-sans); margin: 14px 0 0; }
 .jj-legal-body p, .jj-legal-body li { color: var(--ink); max-width: 72ch; }
 .jj-legal-body ul { margin: 4px 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; }
+.pricing-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 8px; }
+.pricing-card { border: 1px solid var(--rule); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; background: var(--paper, transparent); }
+.pricing-card.is-plus { border-color: var(--ink); }
+.jj-legal-body .pricing-card h2 { font: 800 22px/1.1 var(--f-display); margin: 0; padding: 0; border: 0; }
+.pricing-card ul { margin: 0; }
+.pricing-card p { margin: 0; }
+.pricing-price { font: 800 34px/1 var(--f-display); letter-spacing: -0.03em; }
 .jj-legal-body table { border-collapse: collapse; width: 100%; font-size: 15px; margin: 8px 0; }
 .jj-legal-body th, .jj-legal-body td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--rule); }
 .jj-legal-body th { font: 700 12px/1.3 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--ink); }

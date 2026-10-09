@@ -165,7 +165,7 @@ function Kpis({ g }: { g: Growth }) {
   const tiles: { icon: typeof Users; label: string; value: string; sub: ReactNode; origin?: CostOrigin; tone?: "good" | "bad" }[] = [
     { icon: Users, label: "Étudiants inscrits", value: fr(students), sub: `+${fr(s.new_7d)} cette semaine · +${fr(s.new_today)} aujourd’hui` },
     { icon: Sparkles, label: "Actifs sur 7 jours", value: fr(s.active_7d), sub: `${pct(s.active_7d, s.users)} % des inscrits · ${fr(s.active_1d)} aujourd’hui` },
-    { icon: BadgeCheck, label: "Comptes en formule payante", value: fr(s.pro), sub: `${students ? fr((s.pro / students) * 100, 1) : "0"} % des étudiants` },
+    { icon: BadgeCheck, label: "Comptes LeBonTaf Plus (non ouverte)", value: fr(s.pro), sub: `${students ? fr((s.pro / students) * 100, 1) : "0"} % des étudiants` },
     { icon: Wallet, label: "Revenu par mois", value: eur(g.money.mrrEur, 2), origin: o.mrrEur, sub: `${eur(g.money.netEur, 2)} après Stripe · prix supposé ${eur(g.money.proPrice, 2)}, non adopté` },
     {
       icon: Cpu,
@@ -345,7 +345,7 @@ function Money({ g }: { g: Growth }) {
           </label>
           <label className="grow-range">
             <span>
-              Part qui passe en formule payante <b>{fr(rate, 1)} %</b> <span className="muted">({fr(pro)} abonnés payants)</span>
+              Part qui passerait à LeBonTaf Plus (hypothèse) <b>{fr(rate, 1)} %</b> <span className="muted">({fr(pro)} abonnés payants)</span>
             </span>
             <input type="range" min={0} max={10} step={0.5} value={rate} onChange={(e) => setRate(Number(e.target.value))} />
           </label>
@@ -359,7 +359,7 @@ function Money({ g }: { g: Growth }) {
               <dd>{usd(f.hostingUsd)}</dd>
             </div>
             <div>
-              <dt>Revenu de la formule payante</dt>
+              <dt>Revenu de LeBonTaf Plus (hypothèse)</dt>
               <dd>{eur(f.revenueEur)}</dd>
             </div>
             <div className={f.marginEur >= 0 ? "is-good" : "is-bad"}>
@@ -487,7 +487,7 @@ function AiSection({ g }: { g: Growth }) {
               <dd>{usd(per.freeAverage)}</dd>
             </div>
             <div>
-              <dt>Formule payante supposée (30 dossiers, 600 scores)</dt>
+              <dt>LeBonTaf Plus (hypothèse, non ouverte) : 30 dossiers, 600 scores</dt>
               <dd>{usd(per.pro)}</dd>
             </div>
             <div>

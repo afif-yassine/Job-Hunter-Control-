@@ -1,5 +1,5 @@
 "use client";
-import { Activity, ChevronRight, CircleHelp, FileText, Gauge, LogOut, Map as MapIcon, Settings, ShieldCheck } from "lucide-react";
+import { Activity, ChevronRight, CircleHelp, FileText, Gauge, LogOut, Map as MapIcon, Settings, ShieldCheck, Sparkles } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { PageHead } from "@/components/ui";
 import type { Ctx, View } from "./types";
@@ -38,6 +38,20 @@ export function MoreView({ ctx, badge }: { ctx: Ctx; badge: (id: View) => number
           </button>
         ))}
       </div>
+      {ctx.pricing && (
+        <div className="card list" style={{ marginTop: 16 }}>
+          <a className="row" href="/tarifs">
+            <span className="todo-icon">
+              <Sparkles size={20} aria-hidden />
+            </span>
+            <span className="row-main">
+              <strong>LeBonTaf Plus</strong>
+              <span className="muted">Plus de dossiers CV et lettre chaque mois</span>
+            </span>
+            <ChevronRight size={18} aria-hidden />
+          </a>
+        </div>
+      )}
       <div className="card stack" style={{ marginTop: 16 }}>
         <span className="chip good">
           <ShieldCheck size={13} aria-hidden /> Mode sécurisé : jamais d’envoi automatique

@@ -22,7 +22,7 @@ import { SoonModal } from "./soon";
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 
 /** Public home page for visitors who are not signed in. */
-export function Landing() {
+export function Landing({ pricing = false }: { pricing?: boolean }) {
   const [soon, setSoon] = useState<string | null>(null);
   const closeSoon = useCallback(() => setSoon(null), []);
   const reduce = useReducedMotion();
@@ -62,7 +62,7 @@ export function Landing() {
           <Recruit onSoon={setSoon} />
           <Final />
         </main>
-        <Footer />
+        <Footer pricing={pricing} />
         <SoonModal feature={soon} onClose={closeSoon} />
       </div>
     </MotionConfig>

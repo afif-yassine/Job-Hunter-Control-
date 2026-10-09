@@ -16,6 +16,7 @@ import {
   SquareKanban,
   Map as MapIcon,
   ShieldCheck,
+  Sparkles,
   Gauge,
   X,
   type LucideIcon,
@@ -118,7 +119,7 @@ async function post(url: string, body: unknown = {}) {
 
 export type DemoState = { data: Data; status: SystemStatus; admin?: AdminOverview };
 
-export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEmail?: string; userId?: string; demo?: DemoState }) {
+export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = false }: { userEmail?: string; userId?: string; demo?: DemoState; pricing?: boolean }) {
   const { supabase, data, loading, error: loadError, reload, patchJob } = useDashboardData(demo?.data);
   const router = useRouter();
   const isDemo = Boolean(demo);
@@ -491,6 +492,7 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
     openOffer,
     act,
     adminDemo: demo?.admin,
+    pricing,
   };
   const nav = NAV;
   const subNav = [...SECONDARY_NAV, { id: "roadmap" as View, label: "Feuille de route", icon: MapIcon }, ...(status?.isAdmin ? ADMIN_NAV : [])];
@@ -568,6 +570,11 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
           <span className="chip good">
             <ShieldCheck size={13} aria-hidden /> Jamais d’envoi automatique
           </span>
+          {pricing && (
+            <a className="btn ghost small" href="/tarifs">
+              <Sparkles size={14} aria-hidden /> LeBonTaf Plus
+            </a>
+          )}
           {userEmail && <span className="muted small-text">{userEmail}</span>}
           {userEmail && (
             <form action={logout}>
