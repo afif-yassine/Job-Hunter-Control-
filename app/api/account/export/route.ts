@@ -1,4 +1,4 @@
-import { EXPORT_TABLES } from "@/lib/account";
+import { exportTables } from "@/lib/account-export";
 import { authenticatedClient } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
 import { serviceClient } from "@/lib/supabase/admin";
@@ -10,13 +10,7 @@ export async function GET() {
   const { data: me } = await auth.supabase.auth.getUser();
   // The service client reads tables the account cannot list itself (usage counters…), always filtered on its id.
   const db = serviceClient() ?? auth.supabase;
-  const tables: Record<string, unknown[]> = {};
-  const notes: Record<string, string> = {};
-  for (const { table, columns, note } of EXPORT_TABLES) {
-    const { data, error } = await db.from(table).select(columns).eq("user_id", auth.userId).limit(10000);
-    tables[table] = error ? [] : (data ?? []);
-    if (note) notes[table] = note;
-  }
+  const { tables, notes, incomplete } = await exportTables(db, auth.userId);
   const payload = {
     service: BRAND.name,
     exportedAt: new Date().toISOString(),
@@ -28,6 +22,7 @@ export async function GET() {
       providers: Array.from(new Set((me.user?.identities ?? []).map((i) => i.provider))),
     },
     notes,
+    incomplete,
     tables,
   };
   const day = new Date().toISOString().slice(0, 10);
