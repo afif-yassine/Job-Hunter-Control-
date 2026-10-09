@@ -323,7 +323,6 @@ const FEATURES: { icon: string; title: string; text: string }[] = [
   { icon: "M5 5 H19 M5 10 H19 M5 15 H12|M15 18 L17 20 L21 15", title: "On résume chaque offre.", text: "« En bref » : missions, outils et rythme, en trois lignes." },
   { icon: "M6 3 H18 V21 H6 Z|M9 13 H15 M9 16 H15|M12 6 A2 2 0 1 1 12 10 A2 2 0 1 1 12 6 Z", title: "On réécrit ton CV.", text: "Une page, lisible par les logiciels de recrutement, en trois styles : classique, moderne, sobre." },
   { icon: "M4 20 L16 8 C18 6 20 7 18 9 L6 21 Z|M14 4 L20 4", title: "On écrit ta lettre.", text: "Une lettre quand une offre te plaît, avec des faits vrais de ton parcours." },
-  { icon: "M5 6 L7 8 L10 5 M5 12 L7 14 L10 11 M5 18 L7 20 L10 17|M13 7 H20 M13 13 H20 M13 19 H20", title: "On retient tes réponses.", text: "Nationalité, permis, disponibilité : tu réponds une fois, on reprend partout." },
   { icon: "M12 3 L19 6 V11 C19 16 15.5 19.5 12 21 C8.5 19.5 5 16 5 11 V6 Z|M9 9 L15 15 M15 9 L9 15", title: "On écarte les fausses pistes.", text: "Offre retirée ? On s’arrête avant d’écrire. Signalée dix fois, elle disparaît pour tous." },
   { icon: "M3 7 H9 L11 9 H21 V19 H3 Z|M7 13 H17", title: "On range tes candidatures.", text: "À relire, envoyées, entretiens : tout ton suivi au même endroit." },
 ];
