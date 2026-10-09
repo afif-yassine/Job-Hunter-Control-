@@ -4,6 +4,7 @@ import { configFromPrefs, hasChosenSearch } from "./scan/config";
 import { importFromCatalogue, offerFingerprint, type CatalogueEntry } from "./scan/catalogue";
 import { ingestOffers } from "./scan/ingest";
 import type { ScannedOffer } from "./scan/types";
+import { readAll } from "./paged";
 import { loadUserSettings } from "./settings";
 import { profileSkills } from "./skills";
 import { serviceClient } from "./supabase/admin";
@@ -42,8 +43,9 @@ const chunks = <T>(list: T[], size = 100): T[][] => Array.from({ length: Math.ce
 
 /** The account's unlock rows, or null when the table is missing or unreadable. */
 export async function readUnlocks(db: SupabaseClient, userId: string): Promise<Row[] | null> {
-  const { data, error } = await db.from("offer_unlocks").select("offer_id,unlocked_on,origin").eq("user_id", userId).limit(5000);
-  return error ? null : ((data ?? []) as Row[]);
+  // Page by page: the data API stops at 1 000 rows per request, and a missing row would lock a paid offer.
+  const read = await readAll<Row>((from, to) => db.from("offer_unlocks").select("offer_id,unlocked_on,origin").eq("user_id", userId).order("offer_id").range(from, to));
+  return read.error ? null : read.rows;
 }
 
 export type Gate = { active: false } | { active: true; rows: Row[]; service: SupabaseClient };
