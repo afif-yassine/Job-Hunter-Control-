@@ -9,6 +9,16 @@ export function profileSavedMessage(input: { picked: number }): string {
   return `Profil enregistré. ${input.picked} métier(s) coché(s).`;
 }
 
+/** The size the server accepts for a CV (PDF). */
+export const CV_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Said on the screen itself (not in a toast) when a CV could not be read, with what to do next. */
+export function readFailedMessage(file: { size: number }, serverText?: string): string {
+  if (file.size > CV_MAX_BYTES) return "Ce fichier fait plus de 5 Mo. Réexporte ton CV en PDF plus léger, puis réessaie.";
+  const base = serverText && !/^HTTP \d+$/.test(serverText) ? serverText : "Ton CV n’a pas pu être lu.";
+  return `${base} Si c’est un PDF scanné (une photo), exporte-le depuis ton traitement de texte, puis réessaie.`;
+}
+
 /** The profile is saved but the suggested jobs could not be ticked: say so plainly, and where to do it by hand. */
 export function categoriesFailedMessage(): string {
   return "Profil enregistré. Les métiers suggérés n’ont pas pu être cochés : choisis-les dans « 2 · Ce que tu cherches ».";

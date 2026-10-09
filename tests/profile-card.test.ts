@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { categoriesFailedMessage, CV_SAVED_NOTE, profileCardLines, profileSavedMessage, readCounts } from "../components/profile-card";
+import { categoriesFailedMessage, CV_MAX_BYTES, CV_SAVED_NOTE, profileCardLines, profileSavedMessage, readCounts, readFailedMessage } from "../components/profile-card";
 import type { ProfileSummary } from "../lib/profile-store";
 
 const summary: ProfileSummary = {
@@ -48,6 +48,14 @@ test("when the jobs could not be ticked, the profile is still said saved and the
   assert.match(message, /2 · Ce que tu cherches/);
   // No technical cause is shown to the student.
   assert.doesNotMatch(message, /HTTP|fetch|Error|undefined/i);
+});
+
+test("a CV that cannot be read is explained on the screen, with what to do", () => {
+  assert.match(readFailedMessage({ size: CV_MAX_BYTES + 1 }), /plus de 5 Mo.*réessaie/);
+  const scanned = readFailedMessage({ size: 1000 }, "HTTP 422");
+  assert.doesNotMatch(scanned, /HTTP/);
+  assert.match(scanned, /PDF scanné.*réessaie/);
+  assert.match(readFailedMessage({ size: 1000 }, "Le PDF est vide."), /^Le PDF est vide\. /);
 });
 
 test("the reassurance sentence says the CV does not need to be uploaded again", () => {

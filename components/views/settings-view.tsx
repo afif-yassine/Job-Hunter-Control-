@@ -1,13 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CircleCheck, Download, ExternalLink, LoaderCircle, ShieldCheck, Trash2 } from "lucide-react";
 import { Callout, Chip, PageHead } from "@/components/ui";
 import { PROVIDERS, type ProviderDef } from "@/lib/providers";
 import type { ProviderStatus } from "@/lib/integrations";
-import { DEFAULT_PREFS, MAX_TARGETS, type ScanPrefs } from "@/lib/scan/config";
-import { CATEGORIES, category } from "@/lib/scan/categories";
-import type { ImportedProfile } from "@/lib/profile-import";
-import { categoriesFailedMessage, CV_SAVED_NOTE, profileSavedMessage } from "@/components/profile-card";
+import { MAX_TARGETS } from "@/lib/scan/config";
+import { ProfileImportFlow } from "@/components/profile-import-flow";
+import { SearchBasics, useSearchPrefs } from "@/components/search-fields";
 import type { DiscoveredTarget } from "@/lib/scan/discover";
 import { ATS_LABEL, boardUrl, parseAtsTarget } from "@/lib/scan/sources/ats";
 import { timeAgo } from "@/lib/labels";
@@ -261,119 +260,11 @@ function shortLink(link: string): string {
     return link.slice(0, 40);
   }
 }
-
-const CONTRACTS = [
-  ["alternance", "Alternance"],
-  ["stage", "Stage"],
-  ["cdd", "CDD"],
-] as const;
-
-const split = (text: string) =>
-  text
-    .split(/[,;\n]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
 function SearchSection({ ctx }: { ctx: Ctx }) {
-  const { notify, status, refreshStatus, reload } = ctx;
-  const [prefs, setPrefs] = useState<ScanPrefs>(DEFAULT_PREFS);
-  const [keywords, setKeywords] = useState(DEFAULT_PREFS.keywords.join(", "));
-  const [departments, setDepartments] = useState(DEFAULT_PREFS.departments.join(", "));
-  const [targets, setTargets] = useState("");
-  const [discovered, setDiscovered] = useState<DiscoveredTarget[]>([]);
-  const [auto, setAuto] = useState(true);
-  const [loaded, setLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [counts, setCounts] = useState<{ total: number; byCategory: Record<string, number> } | null>(null);
-  const [countsError, setCountsError] = useState("");
-
-  // Offers already in the catalogue for each category, around the place being edited.
-  useEffect(() => {
-    if (!loaded) return;
-    const params = new URLSearchParams({
-      city: prefs.city,
-      departments: split(departments).join(","),
-      contracts: prefs.contracts.join(","),
-      days: String(prefs.maxAgeDays),
-    });
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      void fetch(`/api/catalogue/counts?${params}`, { signal: controller.signal })
-        .then(async (r) => {
-          const body = await r.json().catch(() => ({}));
-          if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
-          setCounts(body);
-          setCountsError("");
-        })
-        .catch((e: unknown) => {
-          if (!controller.signal.aborted) setCountsError(e instanceof Error ? e.message : "erreur");
-        });
-    }, 400);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [loaded, prefs.city, prefs.contracts, prefs.maxAgeDays, departments]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/settings")
-      .then(async (r) => {
-        const body = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
-        return body;
-      })
-      .then((body) => {
-        if (cancelled || !body) return;
-        setPrefs(body.prefs);
-        setKeywords(body.prefs.keywords.join(", "));
-        setDepartments(body.prefs.departments.join(", "));
-        setTargets((body.prefs.targets ?? []).join("\n"));
-        setDiscovered(body.discovered ?? []);
-        setAuto(body.autoScan !== false);
-        setLoaded(true);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) notify(`Réglages de recherche illisibles : ${error instanceof Error ? error.message : "erreur"}`, "bad");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [notify]);
-
-  async function save() {
-    setSaving(true);
-    try {
-      const response = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          prefs: {
-            ...prefs,
-            keywords: split(keywords),
-            departments: split(departments),
-            targets: targets.split(/\n+/).map((t) => t.trim()).filter(Boolean),
-          },
-          autoScan: auto,
-        }),
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || "Enregistrement impossible");
-      setPrefs(body.prefs);
-      setKeywords(body.prefs.keywords.join(", "));
-      setDepartments(body.prefs.departments.join(", "));
-      setTargets((body.prefs.targets ?? []).join("\n"));
-      await refreshStatus();
-      const imported = Number(body.imported) || 0;
-      if (imported) await reload();
-      // No promise about when offers arrive: a student gets his selection of the day, not a list filled at once.
-      notify("Recherche enregistrée : elle sert à choisir tes prochaines offres.", "good");
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Erreur", "bad");
-    } finally {
-      setSaving(false);
-    }
-  }
+  const { notify, status } = ctx;
+  // The fields are shared with the sign-up journey (components/search-fields.tsx); the advanced ones stay here.
+  const s = useSearchPrefs(ctx);
+  const { prefs, setPrefs, departments, setDepartments, targets, setTargets, discovered, setDiscovered, auto, setAuto, loaded, saving } = s;
 
   const lines = targets.split(/\n+/).map((t) => t.trim()).filter(Boolean);
   const unknown = lines.filter((line) => !parseAtsTarget(line));
@@ -390,17 +281,6 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
     notify(`${item.company} ne sera plus suivie.`, "good");
   }
 
-  const toggleCategory = (id: string) => {
-    const current = prefs.categories ?? [];
-    setPrefs({ ...prefs, categories: current.includes(id) ? current.filter((c) => c !== id) : [...current, id] });
-  };
-
-  const toggle = (value: string) =>
-    setPrefs({
-      ...prefs,
-      contracts: prefs.contracts.includes(value) ? prefs.contracts.filter((c) => c !== value) : [...prefs.contracts, value],
-    });
-
   return (
     <section className="settings-section">
       <h2 className="section-title">2 · Ce que tu cherches</h2>
@@ -408,61 +288,10 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
         className="card form searchform"
         onSubmit={(e) => {
           e.preventDefault();
-          void save();
+          void s.save();
         }}
       >
-        <fieldset className="wide">
-          <legend>Type de contrat</legend>
-          <div className="chips">
-            {CONTRACTS.map(([id, label]) => (
-              <label key={id} className={prefs.contracts.includes(id) ? "pill active" : "pill"}>
-                <input
-                  type="checkbox"
-                  className="sr"
-                  checked={prefs.contracts.includes(id)}
-                  onChange={() => toggle(id)}
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <fieldset className="wide">
-          <legend>Métiers</legend>
-          {loaded && !(prefs.categories ?? []).length && !split(keywords).length && (
-            <Callout tone="info" title="Choisis au moins un métier">
-              Sans métier coché, on ne peut pas te proposer d’offres. Coche ceux qui t’intéressent ci-dessous.
-            </Callout>
-          )}
-          <small className="muted">
-            Coche les métiers qui t’intéressent : tes offres du jour sont choisies selon eux. Le nombre indique les offres connues autour de toi
-            {counts ? ` (${counts.total} au total)` : ""}.
-          </small>
-          <div className="categories">
-            {CATEGORIES.map((c) => {
-              const on = (prefs.categories ?? []).includes(c.id);
-              const n = counts?.byCategory[c.id];
-              return (
-                <label key={c.id} className={on ? "category active" : "category"} title={c.examples}>
-                  <input type="checkbox" className="sr" checked={on} onChange={() => toggleCategory(c.id)} />
-                  <span className="category-name">{c.label}</span>
-                  <span className="category-count">{counts ? `${n ?? 0} offre${(n ?? 0) > 1 ? "s" : ""}` : "…"}</span>
-                  <small className="muted">{c.examples}</small>
-                </label>
-              );
-            })}
-          </div>
-          {countsError && <small className="warn-text">Nombre d’offres indisponible : {countsError}</small>}
-        </fieldset>
-        <label className="wide">
-          Autre métier ou mots-clés (facultatif)
-          <input value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="ex. technicien fibre, intégrateur web" />
-          <small className="muted">Pour un métier qui n’est dans aucune case. Sépare-les par des virgules (8 maximum).</small>
-        </label>
-        <label>
-          Ville
-          <input value={prefs.city ?? ""} onChange={(e) => setPrefs({ ...prefs, city: e.target.value })} placeholder="ex. Lyon" />
-        </label>
+        <SearchBasics s={s} />
         <label>
           Départements (France Travail)
           <input value={departments} onChange={(e) => setDepartments(e.target.value)} placeholder="75, 92, 93" />
@@ -634,249 +463,16 @@ function SystemSection({ status, ctx }: { status: SystemStatus | null; ctx: Ctx 
 
 /* ------------------------------------------------------------------ Profile (CV) */
 
-type ImportAnswer = { draft: ImportedProfile; problems: string[]; suggestions: string[]; filename: string };
-
-const period = (start: string | null, end: string | null) => [start, end ?? (start ? "aujourd’hui" : null)].filter(Boolean).join(" → ");
-
 /** Your CV, read once: every CV and letter is written from it, nothing else. */
 function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => void }) {
-  const { notify, reload } = ctx;
-  // The saved CV is read once for the whole dashboard (components/use-profile.ts), not again here.
-  const summary = ctx.profileSummary;
-  const [answer, setAnswer] = useState<ImportAnswer | null>(null);
-  const [picked, setPicked] = useState<string[]>([]);
-  const [busy, setBusy] = useState<"" | "read" | "save">("");
-  /** The profile was just saved: the next step is the offers. */
-  const [justSaved, setJustSaved] = useState(false);
-
-  async function read(file: File) {
-    setBusy("read");
-    setJustSaved(false);
-    notify("Lecture de ton CV… (jusqu’à 30 secondes)");
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const response = await fetch("/api/profile/import", { method: "POST", body: form });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
-      setAnswer(body as ImportAnswer);
-      setPicked((body as ImportAnswer).suggestions);
-    } catch (e) {
-      notify(e instanceof Error ? e.message : "Lecture impossible", "bad");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function save() {
-    if (!answer) return;
-    setBusy("save");
-    // 1. The profile itself. Only a failure here keeps the draft open: nothing was saved.
-    try {
-      const response = await fetch("/api/profile", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ draft: answer.draft, filename: answer.filename }),
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
-    } catch (e) {
-      notify(e instanceof Error ? e.message : "Enregistrement impossible", "bad");
-      setBusy("");
-      return;
-    }
-    // The profile is saved: close the draft now, whatever happens to the suggested jobs below.
-    const wanted = picked;
-    setAnswer(null);
-    setJustSaved(true);
-    try {
-      await ctx.refreshProfile();
-      // 2. The suggested job categories, ticked in the search too. A failure here is not a failure to save the CV.
-      if (!wanted.length) {
-        notify(profileSavedMessage({ picked: 0 }), "good");
-      } else {
-        const current = await fetch("/api/settings").then((r) => r.json());
-        const categories = [...new Set([...(current.prefs?.categories ?? []), ...wanted])];
-        const put = await fetch("/api/settings", {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ prefs: { ...current.prefs, categories } }),
-        });
-        const saved = await put.json().catch(() => ({}));
-        if (!put.ok) throw new Error(saved.error || "Métiers non enregistrés");
-        onCategories();
-        await reload();
-        notify(profileSavedMessage({ picked: wanted.length }), "good");
-      }
-    } catch {
-      notify(categoriesFailedMessage(), "info");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  const d = answer?.draft;
   return (
     <section className="settings-section">
       <h2 className="section-title">1 · Ton CV</h2>
-      <div className="card form">
-        <p className="muted wide">
-          Dépose ton CV une seule fois : l’IA en tire ton profil (expériences, formations, projets, compétences) et chaque CV ou
-          lettre adapté part de là. Rien n’est inventé, et tu vérifies avant d’enregistrer. Le PDF n’est pas conservé.
-        </p>
-        {summary === undefined ? (
-          ctx.demo ? (
-            <p className="muted">Mode démonstration : le profil n’est pas lu.</p>
-          ) : ctx.profileFailed ? (
-            <Callout tone="warn" title="Ton profil n’a pas pu être lu">
-              Recharge la page. Rien n’a été modifié.
-            </Callout>
-          ) : (
-            <p className="muted">Chargement…</p>
-          )
-        ) : summary ? (
-          <>
-            <p className="wide">
-              <strong>{summary.full_name}</strong> · {summary.experience} expérience(s), {summary.education} formation(s),{" "}
-              {summary.projects} projet(s), {summary.skills} compétence(s)
-              {summary.updated_at ? <span className="muted"> · mis à jour {timeAgo(summary.updated_at)}</span> : null}
-            </p>
-            <p className="wide muted small-text">
-              {summary.source ? `CV importé : « ${summary.source} ». ` : ""}
-              {CV_SAVED_NOTE}
-            </p>
-          </>
-        ) : (
-          <Callout tone="info" title="Aucun profil encore">
-            Sans profil, l’appli ne peut ni noter les offres ni écrire tes CV.
-          </Callout>
-        )}
-        {justSaved && (
-          <div className="wide toolbar">
-            <strong>Profil enregistré.</strong>
-            <button className="btn" onClick={() => ctx.go("jobs", "new")}>
-              Voir mes offres
-            </button>
-          </div>
-        )}
-        <label className="wide upload">
-          {summary ? "Remplacer par un nouveau CV (PDF, 5 Mo max)" : "Importer mon CV (PDF, 5 Mo max)"}
-          <input
-            type="file"
-            accept="application/pdf"
-            disabled={Boolean(busy)}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = "";
-              if (f) void read(f);
-            }}
-          />
-        </label>
-        {busy === "read" && (
-          <p className="muted">
-            <LoaderCircle size={14} className="spin" aria-hidden /> Lecture du CV…
-          </p>
-        )}
-        {d && answer && (
-          <div className="wide import-review">
-            <h3>Vérifie ce qui a été lu dans « {answer.filename} »</h3>
-            {answer.problems.map((p) => (
-              <Callout key={p} tone="bad" title="À vérifier">
-                {p}
-              </Callout>
-            ))}
-            <p>
-              <strong>{d.identity.full_name ?? "Nom manquant"}</strong>
-              {[d.identity.location, d.identity.email, d.identity.phone].filter(Boolean).map((x) => ` · ${x}`)}
-            </p>
-            {d.profile.experience.length > 0 && (
-              <>
-                <h4>Expériences</h4>
-                <ul>
-                  {d.profile.experience.map((e, i) => (
-                    <li key={i}>
-                      {e.title} — {e.organization} <span className="muted">{period(e.start, e.end)}</span>
-                      {e.facts.length > 0 && <span className="muted"> · {e.facts.length} réalisation(s)</span>}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {d.profile.education.length > 0 && (
-              <>
-                <h4>Formation</h4>
-                <ul>
-                  {d.profile.education.map((e, i) => (
-                    <li key={i}>
-                      {e.degree} — {e.institution} <span className="muted">{period(e.start, e.end)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {d.profile.projects.length > 0 && (
-              <>
-                <h4>Projets</h4>
-                <ul>
-                  {d.profile.projects.map((p, i) => (
-                    <li key={i}>
-                      {p.name}
-                      {p.technologies.length ? <span className="muted"> · {p.technologies.join(", ")}</span> : null}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {Object.keys(d.profile.skills).length > 0 && (
-              <>
-                <h4>Compétences</h4>
-                <div className="chips">
-                  {Object.values(d.profile.skills)
-                    .flat()
-                    .slice(0, 40)
-                    .map((x) => (
-                      <Chip key={x}>{x}</Chip>
-                    ))}
-                </div>
-              </>
-            )}
-            {answer.suggestions.length > 0 && (
-              <>
-                <h4>Métiers qui correspondent à ton CV</h4>
-                <div className="chips">
-                  {answer.suggestions.map((id) => {
-                    const on = picked.includes(id);
-                    return (
-                      <label key={id} className={on ? "pill active" : "pill"}>
-                        <input
-                          type="checkbox"
-                          className="sr"
-                          checked={on}
-                          onChange={() => setPicked(on ? picked.filter((x) => x !== id) : [...picked, id])}
-                        />
-                        {category(id)?.label ?? id}
-                      </label>
-                    );
-                  })}
-                </div>
-                <small className="muted">Cochés = ajoutés à ta recherche (Réglages &gt; Ce que tu cherches).</small>
-              </>
-            )}
-            <div className="jobactions">
-              <button className="btn" disabled={Boolean(busy) || !d.identity.full_name} onClick={() => void save()}>
-                {busy === "save" ? <LoaderCircle size={16} className="spin" aria-hidden /> : <CircleCheck size={16} aria-hidden />}{" "}
-                Enregistrer ce profil
-              </button>
-              <button className="btn ghost" disabled={Boolean(busy)} onClick={() => setAnswer(null)}>
-                Annuler
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      <ProfileImportFlow ctx={ctx} onCategories={onCategories} showNextStep />
     </section>
   );
 }
+
 
 /* ------------------------------------------------------------------ Account (RGPD) */
 
