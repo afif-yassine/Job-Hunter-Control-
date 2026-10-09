@@ -1,3 +1,4 @@
+import { readAll } from "../paged";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fingerprintOf, fuzzyMatch, type Candidate } from "./dedupe";
 import { detectSuspicion } from "./suspicion";
@@ -70,34 +71,32 @@ export async function ingestOffers(
   };
   if (!offers.length) return result;
 
+  // Every row of the account, page by page: the data API stops at 1 000 rows per request, and a duplicate
+  // check that only sees part of the list lets duplicates in.
   const [jobsRes, sourcesRes, appsRes] = await Promise.all([
-    supabase
-      .from("jobs")
-      .select("id,company,title,location,contract_type,status,source_url,official_url")
-      .eq("user_id", userId)
-      .limit(5000),
-    supabase.from("job_sources").select("job_id,url").eq("user_id", userId).limit(20000),
-    supabase.from("applications").select("job_id,status").eq("user_id", userId).limit(5000),
+    readAll<Record<string, unknown>>((from, to) => supabase.from("jobs").select("id,company,title,location,contract_type,status,source_url,official_url").eq("user_id", userId).order("id").range(from, to)),
+    readAll<Record<string, unknown>>((from, to) => supabase.from("job_sources").select("job_id,url").eq("user_id", userId).order("id").range(from, to)),
+    readAll<Record<string, unknown>>((from, to) => supabase.from("applications").select("job_id,status").eq("user_id", userId).order("id").range(from, to)),
   ]);
-  if (jobsRes.error) return { ...result, error: jobsRes.error.message };
+  if (jobsRes.error) return { ...result, error: jobsRes.error };
   // Before the Phase 1 migration the table does not exist: keep working without it.
   const hasSources = !sourcesRes.error;
 
   const applied = new Set<string>();
-  for (const a of (appsRes.data ?? []) as { job_id: string; status: string }[])
+  for (const a of (appsRes.rows) as { job_id: string; status: string }[])
     if (APPLIED_STATUSES.has(a.status)) applied.add(a.job_id);
 
   const urlToJob = new Map<string, string>();
   const fpToJob = new Map<string, string>();
   const known: Candidate[] = [];
   type JobRow = Candidate & { status: string; source_url: string | null; official_url: string | null };
-  for (const row of (jobsRes.data ?? []) as JobRow[]) {
+  for (const row of (jobsRes.rows) as JobRow[]) {
     if (APPLIED_STATUSES.has(row.status)) applied.add(row.id);
     known.push(row);
     fpToJob.set(fingerprintOf(row), row.id);
     for (const url of [row.source_url, row.official_url]) if (url) urlToJob.set(canonicalUrl(url), row.id);
   }
-  for (const s of (sourcesRes.data ?? []) as { job_id: string; url: string }[])
+  for (const s of (sourcesRes.rows) as { job_id: string; url: string }[])
     urlToJob.set(canonicalUrl(s.url), s.job_id);
 
   const pending: Pending[] = [];
