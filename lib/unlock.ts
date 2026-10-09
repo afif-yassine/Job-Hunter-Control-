@@ -31,7 +31,9 @@ export type UnlockNote =
   /** The CV has no vector: the lot was chosen on skills alone. */
   | "NO_PROFILE_VECTOR"
   /** The selection failed today: the offers unlocked so far are shown, nothing new. */
-  | "DEGRADED";
+  | "DEGRADED"
+  /** Today's lot is still being computed: ask again in a few seconds. */
+  | "COMPUTING";
 
 type Row = { offer_id: string; unlocked_on: string; origin: "daily" | "backfill" };
 
@@ -106,55 +108,125 @@ export async function copyOffersToJobs(db: SupabaseClient, userId: string, offer
 
 export type BatchResult = { newlyUnlocked: number; inserted: number; note?: UnlockNote };
 
+/** Non-sensitive trace of one computation: the last step reached and the time spent in each (milliseconds). */
+export type BatchTrace = { step: string; ms: Record<string, number>; totalMs: number; done: boolean; result?: BatchResult };
+
+const newTrace = (): BatchTrace => ({ step: "start", ms: {}, totalMs: 0, done: false });
+
 /**
  * Today's lot for one account: chosen from the shared catalogue with the search and the CV, claimed
  * on the server (at most once a day, whatever the number of open tabs), then copied into the list.
- * Offers unlocked earlier whose copy is missing are copied too (a run that stopped halfway heals).
- * Never throws: a failure leaves what is unlocked as it was and says DEGRADED.
+ * Offers unlocked recently whose copy is missing are copied too (a run that stopped halfway heals).
+ * Never throws: a failure leaves what is unlocked as it was and says DEGRADED. `trace` is filled as it goes.
  */
-export async function ensureDailyBatch(db: SupabaseClient, gate: Extract<Gate, { active: true }>, userId: string, now = new Date()): Promise<BatchResult> {
+export async function ensureDailyBatch(db: SupabaseClient, gate: Extract<Gate, { active: true }>, userId: string, now = new Date(), trace: BatchTrace = newTrace()): Promise<BatchResult> {
+  const began = Date.now();
+  let last = began;
+  const at = (step: string) => {
+    const t = Date.now();
+    trace.ms[trace.step] = (trace.ms[trace.step] ?? 0) + (t - last);
+    trace.step = step;
+    trace.totalMs = t - began;
+    last = t;
+  };
+  const end = (result: BatchResult): BatchResult => {
+    at("done");
+    trace.done = true;
+    trace.result = result;
+    return result;
+  };
   try {
     const unlocked = new Set(gate.rows.map((r) => r.offer_id));
-    // Heal first: an offer unlocked on a previous run but never copied.
-    let inserted = (await copyOffersToJobs(db, userId, [...unlocked])).inserted;
     const today = parisDay(now);
-    if (gate.rows.some((r) => r.origin === "daily" && r.unlocked_on === today)) return { newlyUnlocked: 0, inserted };
+    // Heal: an offer unlocked by a run that stopped before copying it. Backfilled offers come from the list
+    // itself, and old lots were copied long ago: only the lots of the last three days are checked.
+    at("heal");
+    const since = parisDay(new Date(now.getTime() - 3 * 86_400_000));
+    const healable = gate.rows.filter((r) => r.origin === "daily" && r.unlocked_on >= since).map((r) => r.offer_id);
+    let inserted = (await copyOffersToJobs(db, userId, healable)).inserted;
+    if (gate.rows.some((r) => r.origin === "daily" && r.unlocked_on === today)) return end({ newlyUnlocked: 0, inserted });
 
+    at("settings");
     const settings = await loadUserSettings(db, userId);
-    if (!hasChosenSearch(settings.prefs)) return { newlyUnlocked: 0, inserted, note: "NO_SEARCH" };
+    if (!hasChosenSearch(settings.prefs)) return end({ newlyUnlocked: 0, inserted, note: "NO_SEARCH" });
+    at("profile");
     const { data: profile } = await db.from("candidate_profiles").select("profile,skills,semantic_hash").eq("user_id", userId).maybeSingle();
     const p = profile as { profile?: Record<string, unknown> | null; skills?: unknown; semantic_hash?: string | null } | null;
-    if (!p?.profile) return { newlyUnlocked: 0, inserted, note: "NO_PROFILE" };
+    if (!p?.profile) return end({ newlyUnlocked: 0, inserted, note: "NO_PROFILE" });
     const mySkills = Array.isArray(p.skills) && p.skills.length ? (p.skills as string[]) : profileSkills(p.profile);
 
+    at("catalogue");
     const config = configFromPrefs(settings.prefs);
     const found = await importFromCatalogue(db, config);
-    if (found.error) return { newlyUnlocked: 0, inserted, note: "DEGRADED" };
+    if (found.error) return end({ newlyUnlocked: 0, inserted, note: "DEGRADED" });
+    at("select");
     const candidates: UnlockCandidate[] = [...found.meta.entries()].map(([id, m]) => ({ id, similarity: m.similarity, skills: m.skills, kind: m.kind, publishedAt: m.publishedAt }));
     const selection = selectDaily({ candidates, profileSkills: mySkills, contracts: config.contracts ?? [], unlocked });
-    if (!selection.chosen.length) return { newlyUnlocked: 0, inserted, note: selection.reason };
+    if (!selection.chosen.length) return end({ newlyUnlocked: 0, inserted, note: selection.reason });
 
+    at("claim");
     const claimed = await gate.service.rpc("claim_daily_unlock", { p_user: userId, p_offer_ids: selection.chosen.map((c) => c.id), p_limit: DAILY_LIMIT });
-    if (claimed.error) return { newlyUnlocked: 0, inserted, note: "DEGRADED" };
+    if (claimed.error) return end({ newlyUnlocked: 0, inserted, note: "DEGRADED" });
     const ids = ((claimed.data ?? []) as { o_offer_id: string }[]).map((r) => r.o_offer_id);
+    at("copy");
     inserted += (await copyOffersToJobs(db, userId, ids)).inserted;
     const vectorless = !p.semantic_hash && selection.chosen.every((c) => c.similarity === null);
-    return { newlyUnlocked: ids.length, inserted, note: vectorless ? "NO_PROFILE_VECTOR" : undefined };
+    return end({ newlyUnlocked: ids.length, inserted, note: vectorless ? "NO_PROFILE_VECTOR" : undefined });
   } catch {
-    return { newlyUnlocked: 0, inserted: 0, note: "DEGRADED" };
+    return end({ newlyUnlocked: 0, inserted: 0, note: "DEGRADED" });
+  } finally {
+    await logBatch(db, userId, trace).catch(() => undefined);
   }
+}
+
+/**
+ * One non-sensitive line in agent_runs (never the content of an offer or a profile) for each computation that
+ * went further than "today's lot already exists", including the ones that were cut before the end.
+ */
+async function logBatch(db: SupabaseClient, userId: string, trace: BatchTrace) {
+  const reachedSettings = trace.ms.settings !== undefined || !["start", "heal", "done"].includes(trace.step);
+  if (trace.done && !reachedSettings) return;
+  const now = new Date().toISOString();
+  const result = trace.result;
+  await db.from("agent_runs").insert({
+    user_id: userId,
+    run_type: "DAILY_UNLOCK",
+    status: trace.done && result?.note !== "DEGRADED" ? "COMPLETED" : "FAILED",
+    started_at: now,
+    finished_at: now,
+    counters: { step: trace.step, done: trace.done, totalMs: trace.totalMs, ms: trace.ms, newlyUnlocked: result?.newlyUnlocked ?? 0, copied: result?.inserted ?? 0, note: result?.note ?? null },
+  });
 }
 
 export type UnlockedState =
   | { mode: "all" }
   | { mode: "not_ready" }
-  | { mode: "list"; unlocked: UnlockedEntry[]; note?: UnlockNote; newToday: number };
+  | {
+      mode: "list";
+      unlocked: UnlockedEntry[];
+      note?: UnlockNote;
+      newToday: number;
+      /** Non-sensitive: last step reached and the time spent. */
+      diag: { step: string; totalMs: number; done: boolean };
+      /** Today's lot is still being computed: the caller keeps this promise alive after answering, and the screen asks again. */
+      pending?: Promise<unknown>;
+    };
+
+/** The longest the answer waits for today's lot before replying with what is already unlocked. */
+export const LOT_BUDGET_MS = 5000;
 
 /** What /api/offers/unlocked answers: the administrator sees everything; others the offers they unlocked. */
-export async function unlockedState(db: SupabaseClient, userId: string, now = new Date(), service: SupabaseClient | null = serviceClient()): Promise<UnlockedState> {
+export async function unlockedState(db: SupabaseClient, userId: string, now = new Date(), service: SupabaseClient | null = serviceClient(), budgetMs = LOT_BUDGET_MS): Promise<UnlockedState> {
   const gate = await unlockGate(db, userId, service);
   if (!gate.active) return (await isAdminId(db, userId)) ? { mode: "all" } : { mode: "not_ready" };
-  const batch = await ensureDailyBatch(db, gate, userId, now);
+  const trace = newTrace();
+  const run = ensureDailyBatch(db, gate, userId, now, trace);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<"late">((resolve) => { timer = setTimeout(() => resolve("late"), budgetMs); });
+  const outcome = await Promise.race([run, timeout]);
+  clearTimeout(timer);
+  const late = outcome === "late";
+  const batch: BatchResult = late ? { newlyUnlocked: 0, inserted: 0, note: "COMPUTING" } : outcome;
   const rows = (await readUnlocks(db, userId)) ?? gate.rows;
   const byOffer = new Map(rows.map((r) => [r.offer_id, r]));
   const unlocked: UnlockedEntry[] = [];
@@ -170,5 +242,5 @@ export async function unlockedState(db: SupabaseClient, userId: string, now = ne
   for (const j of (manual ?? []) as { id: string; created_at?: string | null }[])
     unlocked.push({ jobId: j.id, unlockedOn: (j.created_at ?? new Date(now).toISOString()).slice(0, 10), origin: "manual" });
   unlocked.sort((a, b) => b.unlockedOn.localeCompare(a.unlockedOn));
-  return { mode: "list", unlocked, note: batch.note, newToday: batch.newlyUnlocked };
+  return { mode: "list", unlocked, note: batch.note, newToday: batch.newlyUnlocked, diag: { step: trace.step, totalMs: trace.totalMs, done: trace.done }, pending: late ? run : undefined };
 }

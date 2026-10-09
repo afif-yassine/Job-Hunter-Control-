@@ -50,7 +50,13 @@ export type AdminOverview = {
    * Daily selection of 8 offers (migration 20261009090000). `external_open` = the table is installed but
    * STUDENT_CATALOGUE_ONLY is not 1: students' updates still call the job sites (paid calls).
    */
-  dailyUnlock: { status: "not_installed" | "active" | "external_open"; catalogueOnly: boolean; message: string };
+  dailyUnlock: {
+    status: "not_installed" | "active" | "external_open";
+    catalogueOnly: boolean;
+    message: string;
+    /** The last computations of the daily lot, newest first (no account, no content): when, how long, how far, result. */
+    recent: { at: string; ok: boolean; step: string; totalMs: number; newlyUnlocked: number; note: string | null }[];
+  };
   worker: { configured: boolean; online: boolean; browserReady: boolean | null };
   drive: boolean;
   alerts: { title: string; message: string; at: string; read: boolean }[];
@@ -194,13 +200,22 @@ export async function buildAdminOverview(ctx: {
     (acc, r) => ((acc[r.kind as keyof typeof acc] = (acc[r.kind as keyof typeof acc] ?? 0) + 1), acc),
     { scan: 0, analysis: 0, generation: 0 },
   );
+  const unlockRunsRes = await (all ?? db).from("agent_runs").select("created_at,status,counters").eq("run_type", "DAILY_UNLOCK").order("created_at", { ascending: false }).limit(8);
+  const recent = ((unlockRunsRes.data ?? []) as { created_at: string; status: string; counters: Record<string, unknown> | null }[]).map((r) => ({
+    at: r.created_at,
+    ok: r.status === "COMPLETED",
+    step: String(r.counters?.step ?? ""),
+    totalMs: Number(r.counters?.totalMs ?? 0) || 0,
+    newlyUnlocked: Number(r.counters?.newlyUnlocked ?? 0) || 0,
+    note: typeof r.counters?.note === "string" ? r.counters.note : null,
+  }));
   const unlockProbe = await db.from("offer_unlocks").select("offer_id").limit(1);
   const catalogueOnly = studentCatalogueOnly(env);
   const dailyUnlock: AdminOverview["dailyUnlock"] = unlockProbe.error
-    ? { status: "not_installed", catalogueOnly, message: "Sélection quotidienne non installée : la migration 20261009090000 n’est pas appliquée, aucune offre n’est verrouillée." }
+    ? { status: "not_installed", catalogueOnly, recent: [], message: "Sélection quotidienne non installée : la migration 20261009090000 n’est pas appliquée, aucune offre n’est verrouillée." }
     : catalogueOnly
-      ? { status: "active", catalogueOnly, message: "Sélection quotidienne active, recherche des sites d’emploi fermée pour les étudiants." }
-      : { status: "external_open", catalogueOnly, message: "Sélection quotidienne active mais recherche externe encore ouverte : ajoute STUDENT_CATALOGUE_ONLY=1 dans Vercel." };
+      ? { status: "active", catalogueOnly, recent, message: "Sélection quotidienne active, recherche des sites d’emploi fermée pour les étudiants." }
+      : { status: "external_open", catalogueOnly, recent, message: "Sélection quotidienne active mais recherche externe encore ouverte : ajoute STUDENT_CATALOGUE_ONLY=1 dans Vercel." };
   const cronConfigured = has("CRON_SECRET") && has("SUPABASE_SERVICE_ROLE_KEY");
   const lastServerRun = ((serverRunRes.data ?? []) as { created_at: string }[])[0]?.created_at ?? null;
 

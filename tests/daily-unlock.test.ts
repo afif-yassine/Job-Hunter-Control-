@@ -212,3 +212,59 @@ test("ADMIN STATUS — says when the daily selection is installed but the job si
   assert.equal(none.dailyUnlock.status, "not_installed");
   assert.ok(!none.actions.some((a) => /STUDENT_CATALOGUE_ONLY/.test(a.text)));
 });
+
+test("SLOW LOT — the answer never waits for the lot: it returns what is unlocked with COMPUTING, the lot finishes afterwards, and a trace is kept", async () => {
+  const w = world({ count: 12 });
+  w.data.offer_unlocks.push({ user_id: U, offer_id: "o12", unlocked_on: "2026-10-09", origin: "backfill" });
+  w.data.jobs.push({ id: "old", user_id: U, offer_id: "o12", title: "Ancienne offre", company: "C" });
+  const slow = new Proxy(w.db, {
+    get: (target, key) => (key === "rpc" ? async (...args: Parameters<typeof target.rpc>) => { await new Promise((r) => setTimeout(r, 60)); return target.rpc(...args); } : Reflect.get(target, key)),
+  });
+  const first = await unlockedState(slow, U, day1, w.db, 10);
+  assert.ok(first.mode === "list");
+  if (first.mode !== "list") return;
+  assert.equal(first.note, "COMPUTING");
+  assert.deepEqual(first.unlocked.map((e) => [e.jobId, e.origin]), [["old", "backfill"]], "what was unlocked before is returned at once");
+  assert.ok(first.pending && first.diag.done === false);
+  await first.pending;
+  assert.equal(w.data.offer_unlocks.filter((r) => r.origin === "daily").length, 8, "the lot is finished after the answer");
+  // The next visit finds the lot and answers fast, without a new trace line.
+  const second = await unlockedState(w.db, U, day1, w.db);
+  assert.ok(second.mode === "list" && second.note === undefined && second.unlocked.length === 9 && !second.pending);
+  const runs = w.data.agent_runs.filter((r) => r.run_type === "DAILY_UNLOCK");
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0].status, "COMPLETED");
+  const counters = runs[0].counters as { step: string; done: boolean; newlyUnlocked: number; ms: Record<string, number> };
+  assert.deepEqual([counters.step, counters.done, counters.newlyUnlocked], ["done", true, 8]);
+  assert.ok("catalogue" in counters.ms && "claim" in counters.ms);
+  assert.ok(!JSON.stringify(runs[0]).includes("Societe"), "no offer or profile content in the trace");
+});
+
+test("TRACE — a failure is traced with the step reached; a run that only found today's lot writes nothing", async () => {
+  const w = world({ count: 3 });
+  const broken = fakeSupabase(w.data, { rpc: { match_offers_for_me_v2: () => [], claim_daily_unlock: () => { throw new Error("db down"); } } });
+  await unlockedState(broken.db, U, day1, broken.db);
+  const failed = w.data.agent_runs.filter((r) => r.run_type === "DAILY_UNLOCK");
+  assert.equal(failed.length, 1);
+  assert.equal(failed[0].status, "FAILED");
+  assert.equal((failed[0].counters as { note: string }).note, "DEGRADED");
+  const before = w.data.agent_runs.length;
+  w.data.offer_unlocks.push({ user_id: U, offer_id: "o1", unlocked_on: "2026-10-10", origin: "daily" });
+  await unlockedState(w.db, U, day1, w.db);
+  assert.equal(w.data.agent_runs.length, before);
+});
+
+test("ROUTE (duration) — the route has its own time limit and keeps the lot running after answering; the admin sees the recent runs", async () => {
+  const route = readFileSync("app/api/offers/unlocked/route.ts", "utf8");
+  assert.match(route, /export const maxDuration = 60/);
+  assert.match(route, /import \{ after \} from "next\/server"/);
+  assert.match(route, /after\(async \(\) => \{\s*await pending\.catch/);
+  const { buildAdminOverview } = await import("../lib/admin/overview");
+  const { db } = fakeSupabase({
+    offer_unlocks: [], user_settings: [], source_runs: [], source_budget: [], usage_events: [], notifications: [],
+    agent_runs: [{ run_type: "DAILY_UNLOCK", status: "COMPLETED", created_at: "2026-10-10T08:00:00Z", user_id: "someone", counters: { step: "done", totalMs: 4200, newlyUnlocked: 8, note: null } }],
+  }, { rpc: { admin_source_stats: () => [] } });
+  const overview = await buildAdminOverview({ supabase: db, userId: U, env: { STUDENT_CATALOGUE_ONLY: "1" } });
+  assert.deepEqual(overview.dailyUnlock.recent, [{ at: "2026-10-10T08:00:00Z", ok: true, step: "done", totalMs: 4200, newlyUnlocked: 8, note: null }]);
+  assert.ok(!JSON.stringify(overview.dailyUnlock).includes("someone"));
+});

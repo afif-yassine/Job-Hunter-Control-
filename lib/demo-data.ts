@@ -143,7 +143,7 @@ export const demoAdmin: AdminOverview = {
   ),
   notConnected: NOT_CONNECTED,
   automation: { cronConfigured: true, sharedCache: true, lastServerRun: ago(25) },
-  dailyUnlock: { status: "active", catalogueOnly: true, message: "Sélection quotidienne active, recherche des sites d’emploi fermée pour les étudiants." },
+  dailyUnlock: { status: "active", catalogueOnly: true, recent: [], message: "Sélection quotidienne active, recherche des sites d’emploi fermée pour les étudiants." },
   worker: { configured: true, online: true, browserReady: true },
   drive: true,
   alerts: [
