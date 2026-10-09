@@ -13,7 +13,8 @@ test("an offer outside the selection is told exactly as the business judgment wr
 test("the used kits are told with the calculated date and no price, no offer to pay", () => {
   const note = monthFullNote(2, "1er novembre");
   assert.equal(note.title, "Tes 2 dossiers du mois sont utilisés");
-  assert.equal(note.text, "Les prochains arrivent le 1er novembre. D’ici là, tu peux toujours chercher, garder et suivre tes offres, et modifier tes dossiers.");
+  assert.equal(note.text, "Les prochains arrivent le 1er novembre. D’ici là, tu peux toujours garder et suivre tes offres, et modifier tes dossiers.");
+  assert.doesNotMatch(note.text, /chercher/);
   assert.equal(monthFullNote(1, "1er décembre").title, "Ton dossier du mois est utilisé");
 });
 

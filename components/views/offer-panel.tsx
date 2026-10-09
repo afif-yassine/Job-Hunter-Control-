@@ -25,7 +25,7 @@ import { aiScore, listScore } from "./closest";
 import { offerAge, salaryOf, ScoreRing, StageChip } from "./offer-card";
 import { summaryState } from "./summary-state";
 import { LOCKED_NOTE, monthFullNote } from "@/components/panel-notes";
-import { PRICING } from "@/components/pricing";
+import { PRICING, pricingHref, whyKitsLimited } from "@/components/pricing";
 import { isUnlocked } from "@/components/unlock";
 import type { Ctx } from "./types";
 
@@ -455,8 +455,8 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                       <p className="muted small-text">{monthFullNote(monthFull.limit, monthFull.resetsOn).text}</p>
                       {ctx.pricing && (
                         <>
-                          <p className="muted small-text">{PRICING.why}</p>
-                          <a className="btn secondary" href="/tarifs">
+                          <p className="muted small-text">{whyKitsLimited(monthFull.limit)}</p>
+                          <a className="btn secondary" href={pricingHref("fiche")}>
                             {PRICING.panelLink}
                           </a>
                         </>

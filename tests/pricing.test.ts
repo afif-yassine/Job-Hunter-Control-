@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PRICING, pricingEnabled, pricingMailto } from "../components/pricing";
+import { PRICING, pricingEnabled, pricingHref, pricingMailto, whyKitsLimited } from "../components/pricing";
+import { DAILY_LIMIT, PLUS_DAILY_LIMIT } from "../components/unlock";
 
 test("the page is on unless PRICING_PAGE is exactly 0", () => {
   assert.equal(pricingEnabled(undefined), true);
@@ -23,6 +24,21 @@ test("the request is a mail to the contact address, never a payment", () => {
 });
 
 test("nothing promised that is forbidden", () => {
-  const all = [PRICING.lead, PRICING.why, PRICING.terms, ...PRICING.free.lines].join(" ");
-  assert.doesNotMatch(all, /\bPro\b|illimité|garanti|embauch|décroche|offres? en plus|toutes les offres/i);
+  const all = [PRICING.lead, PRICING.description, whyKitsLimited(2), PRICING.terms, PRICING.truth, ...PRICING.free.lines, ...PRICING.plusLines].join(" ");
+  assert.doesNotMatch(all, /\bPro\b|illimité|exclusi|introuvable|débloque|décroche|toutes les offres|partenaire|barré/i);
+  // The promise of "no guarantee" is written, not forbidden: only a promise of result would be wrong.
+  assert.match(PRICING.truth, /ne garantit ni réponse, ni entretien, ni embauche/);
+});
+
+test("the numbers come from one place and the page says 8 or 20, 2 or 30", () => {
+  assert.deepEqual(PRICING.free.lines.slice(0, 2), [`Jusqu’à ${DAILY_LIMIT} offres par jour, choisies selon ton CV`, "2 dossiers (CV et lettre) par mois"]);
+  assert.deepEqual(PRICING.plusLines, [`Jusqu’à ${PLUS_DAILY_LIMIT} offres par jour, choisies selon ton CV`, "30 dossiers (CV et lettre) par mois"]);
+  assert.equal(PRICING.lead, "Plus d’offres choisies pour toi chaque jour, et plus de dossiers (CV et lettre) chaque mois.");
+  assert.doesNotMatch(PRICING.lead, /les mêmes pour tout le monde/);
+  assert.equal(whyKitsLimited(2), "Chaque dossier est écrit par une IA qui nous coûte de l’argent : 2 sont offerts chaque mois, 30 avec LeBonTaf Plus.");
+});
+
+test("every link to the page says where it comes from", () => {
+  assert.equal(pricingHref("fiche"), "/tarifs?de=fiche");
+  assert.equal(pricingHref(), "/tarifs");
 });

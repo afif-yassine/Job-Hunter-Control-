@@ -16,6 +16,12 @@ export const DEGRADED_TEXT = "Ta sélection du jour n’a pas pu être préparé
 /** How many offers a day's batch holds at most. */
 export const DAILY_LIMIT = 8;
 
+/**
+ * How many a day LeBonTaf Plus is promised (the server reads PRO_DAILY_UNLOCKS, default 20). THE one place of
+ * the number in the screens; a Plus account's lot is not served by the server yet.
+ */
+export const PLUS_DAILY_LIMIT = 20;
+
 /** "daily": a day's batch. "backfill": the offers an existing account already had when the batches began. "manual": added by hand or outside the catalogue, always open. */
 export type UnlockOrigin = "daily" | "backfill" | "manual";
 export type UnlockEntry = { jobId: string; unlockedOn: string; origin: UnlockOrigin };

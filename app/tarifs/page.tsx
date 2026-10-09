@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: `${PRICING.name} — ${BRAND.name}`,
-  description: `Les tarifs de ${PRICING.name}, en clair : plus de dossiers CV et lettre, paiement unique.`,
+  description: PRICING.description,
 };
 
 export default function PricingPage() {
@@ -29,12 +29,16 @@ export default function PricingPage() {
           <section key={plan.id} className="pricing-card is-plus" aria-labelledby={`pr-${plan.id}`}>
             <h2 id={`pr-${plan.id}`}>{plan.name}</h2>
             <p className="pricing-price">{plan.price}</p>
-            <p className="muted">Plus de dossiers (CV et lettre) chaque mois</p>
+            <ul>
+              {PRICING.plusLines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
           </section>
         ))}
       </div>
+      <p>{PRICING.truth}</p>
       <p>{PRICING.terms}</p>
-      <p>{PRICING.why}</p>
       <p>
         <strong>{PRICING.notOpen}</strong>
       </p>
