@@ -33,7 +33,7 @@ import { useProfileState } from "@/components/use-profile";
 import { createInflightGuard } from "@/components/in-flight";
 import { useCatalogueRefresh } from "@/components/use-catalogue-refresh";
 import { shownEmail, useAccount } from "@/components/use-account";
-import { unlockState, type PlanKnowledge } from "@/components/unlock";
+import { isUnlocked, unlockState, type PlanKnowledge } from "@/components/unlock";
 import { useUnlocked } from "@/components/use-unlocked";
 import { useSessionGuard } from "@/components/use-session-guard";
 import { Callout, Progress } from "@/components/ui";
@@ -51,7 +51,7 @@ import { MoreView } from "@/components/views/more-view";
 import { AdminView } from "@/components/views/admin-view";
 import type { AdminOverview } from "@/lib/admin/overview";
 import { PageHead } from "@/components/ui";
-import type { Ctx, JobFilter, JobsMode, Tone, View } from "@/components/views/types";
+import type { Ctx, JobFilter, JobsMode, KitResult, Tone, View } from "@/components/views/types";
 
 /** The student space: four places, the rest lives in "Plus" and in each offer's panel. */
 const NAV: { id: View; label: string; icon: LucideIcon }[] = [
@@ -330,19 +330,38 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
         await reload();
       },
       openDocument: (state) => setDocDialog(state),
-      prepareKit: (job) =>
-        once(`kit:${job.id}`, () => run(job.id, async () => {
+      prepareKit: async (job) => {
+        // The server decides. A refusal because the offer is not in the student's selection is told in the panel
+        // (where the button was), not in a toast.
+        let outcome: KitResult = "ok";
+        await once(`kit:${job.id}`, () => run(job.id, async () => {
           if (job.status === "DISCOVERED") {
             notify(`Lecture de l’offre « ${job.company} »…`);
             const a = await post(`/api/jobs/${job.id}/analyze`);
-            if (!a.ok) return notify(readable(a.body.error), "bad");
+            if (!a.ok) {
+              if (a.body.code === "OFFER_LOCKED") {
+                outcome = "locked";
+                return notify("");
+              }
+              outcome = "failed";
+              return notify(readable(a.body.error), "bad");
+            }
           }
           notify(`Rédaction de ton CV et de ta lettre pour « ${job.company} »… (environ 20 secondes)`);
           const r = await post(`/api/jobs/${job.id}/generate`);
           void refreshStatus();
-          if (!r.ok) return notify(readable(r.body.error), "bad");
+          if (!r.ok) {
+            if (r.body.code === "OFFER_LOCKED") {
+              outcome = "locked";
+              return notify("");
+            }
+            outcome = "failed";
+            return notify(readable(r.body.error), "bad");
+          }
           notify("Ton dossier est prêt : relis ton CV et ta lettre, puis postule.", "good");
-        })),
+        }));
+        return outcome;
+      },
       moveStage: async (job, stage, extra) => {
         const patch = stagePatch(stage, job, extra);
         history.current.set(job.id, {
@@ -386,15 +405,18 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
   const closeOffer = useCallback(() => setOpenId(null), []);
 
   /** Opening an offer marks it as seen: it joins "Mon suivi". */
+  const kitJobIds = useMemo(() => new Set(data.documents.map((d) => d.job_id).filter(Boolean)), [data.documents]);
   const openOffer = useCallback(
     (job: Job) => {
       setOpenId(job.id);
       if (stageOf(job) !== "new") return;
+      // Reading an offer outside the selection does not put it in "Mon suivi": no kit can be prepared on it.
+      if (!isUnlocked(job, unlock, kitJobIds.has(job.id))) return;
       const patch = stagePatch("seen", job);
       patchJob(job.id, patch as Partial<Job>);
       if (supabase) void supabase.from("jobs").update(patch).eq("id", job.id);
     },
-    [patchJob, supabase],
+    [patchJob, supabase, unlock, kitJobIds],
   );
 
   async function saveDescription() {

@@ -774,6 +774,9 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .grow-origin.is-assumption { border-style: dashed; }
 .grow-kpi .grow-origin { margin-left: 0; margin-right: 6px; }
 /* Balance of the AI key (admin space) */
+/* A note written in the offer panel where the kit button would be (offer outside the selection, kits used) */
+.locked-note { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+.locked-note p { margin: 0; }
 /* The student's selection: rank badge, folded earlier days, and the teaser of drawn silhouettes */
 .rank-badge { display: inline-flex; width: max-content; padding: 1px 9px; border-radius: 999px; background: var(--brand); color: #fff; font: 700 12px/1.6 var(--font-display), sans-serif; }
 .picks-section { margin-bottom: 18px; }

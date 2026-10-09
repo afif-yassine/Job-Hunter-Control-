@@ -25,6 +25,8 @@ import type { DocumentRecord, Job, OfferSummary } from "@/lib/types";
 import { aiScore, listScore } from "./closest";
 import { offerAge, salaryOf, ScoreRing, StageChip } from "./offer-card";
 import { summaryState } from "./summary-state";
+import { LOCKED_NOTE, monthFullNote } from "@/components/panel-notes";
+import { isUnlocked } from "@/components/unlock";
 import type { Ctx } from "./types";
 
 const FT_LICENCE = "https://francetravail.io/produits-partages/documentation/conditions-dutilisation-api/licence-offres-emploi";
@@ -117,6 +119,12 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   const matchedCount = job.fit?.matched.length ?? 0;
   const askedCount = matchedCount + (job.fit?.missing.length ?? 0);
   const docs = latestDocs(data.documents, job.id);
+  // Outside the student's selection (or refused by the server just now): readable, but no kit can be written.
+  const [serverLocked, setServerLocked] = useState(false);
+  const locked = serverLocked || !isUnlocked(job, ctx.unlock, docs.length > 0);
+  const createKit = async () => {
+    if ((await act.prepareKit(job)) === "locked") setServerLocked(true);
+  };
   const salary = salaryOf(job);
   const platforms = platformsOf(job);
   const gone = Boolean(job.gone_reason) && !isSent(stage);
@@ -417,6 +425,17 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                     </button>
                   ) : knownGone ? (
                     <p className="hint">Cette offre n’est plus disponible : pas de CV ni de lettre à créer.</p>
+                  ) : locked ? (
+                    // Said in the panel where the button would be, not in a toast hidden under it.
+                    <div className="locked-note" role="note">
+                      <strong>{LOCKED_NOTE.title}</strong>
+                      <p className="muted small-text">{LOCKED_NOTE.text}</p>
+                      {url && (
+                        <a className="btn secondary" href={url} target="_blank" rel="noreferrer" onClick={() => (leftForAd.current = true)}>
+                          <ExternalLink size={15} aria-hidden /> {LOCKED_NOTE.action}
+                        </a>
+                      )}
+                    </div>
                   ) : ctx.hasProfile === false ? (
                     <>
                       <button
@@ -431,15 +450,16 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                       <span className="muted small-text">Ton CV sert de base à ton dossier : rien n’est écrit sans lui.</span>
                     </>
                   ) : monthFull ? (
-                    <p className="hint">
-                      Tes {monthFull.limit} dossiers du mois sont utilisés. Les prochains arrivent le {monthFull.resetsOn}. Tu peux toujours chercher, garder et suivre tes offres.
-                    </p>
+                    <div className="locked-note" role="note">
+                      <strong>{monthFullNote(monthFull.limit, monthFull.resetsOn).title}</strong>
+                      <p className="muted small-text">{monthFullNote(monthFull.limit, monthFull.resetsOn).text}</p>
+                    </div>
                   ) : (
-                    <button className="btn" disabled={waiting} onClick={() => void act.prepareKit(job)}>
+                    <button className="btn" disabled={waiting} onClick={() => void createKit()}>
                       {working ? <LoaderCircle size={16} className="spin" aria-hidden /> : <Sparkles size={16} aria-hidden />} Créer mon CV et ma lettre
                     </button>
                   )}
-                  {plan && plan.limit !== null && !monthFull && (
+                  {plan && plan.limit !== null && !monthFull && !locked && (
                     <span className={`plan-meter${plan.used >= plan.limit ? " is-full" : ""}`}>
                       Offre gratuite : {Math.max(plan.limit - plan.used, 0)} dossier{plan.limit - plan.used > 1 ? "s" : ""} restant
                       {plan.limit - plan.used > 1 ? "s" : ""} ce mois-ci

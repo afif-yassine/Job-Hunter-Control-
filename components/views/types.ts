@@ -27,6 +27,9 @@ export type SummarizeResult = "ok" | "gone" | "failed";
 
 export type JobsMode = "picks" | "explore";
 
+/** What came of "Créer mon CV et ma lettre". "locked": the server refused because the offer is not in the student's selection. */
+export type KitResult = "ok" | "locked" | "failed";
+
 export type JobFilter ="new" | "all" | "best" | "review" | "gone";
 
 export type ReviewAction = "keep" | "merge" | "dismiss" | "applied_elsewhere";
@@ -73,7 +76,7 @@ export type Ctx = {
   openOffer: (job: Job) => void;
   act: {
     /** Analyse when needed, then write the CV and letter. */
-    prepareKit: (job: Job) => Promise<void>;
+    prepareKit: (job: Job) => Promise<KitResult>;
     moveStage: (job: Job, stage: Stage, extra?: { interviewAt?: string | null }) => Promise<void>;
     undoStage: (job: Job) => Promise<void>;
     saveNotes: (job: Job, notes: string) => Promise<void>;
