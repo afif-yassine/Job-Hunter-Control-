@@ -24,7 +24,7 @@ export async function GET() {
   let tasks: Record<string, number> = {};
   let errors: { key: string; error: string | null }[] = [];
   if (latest) {
-    const { data } = await a.db.from("harvest_tasks").select("key,status,error").eq("run_id", latest.id).limit(5000);
+    const { data } = await a.db.from("harvest_tasks").select("key,status,error").eq("run_id", latest.id).limit(5000);  // real cap: 1 000 rows per request
     const rows = (data ?? []) as { key: string; status: string; error: string | null }[];
     tasks = rows.reduce<Record<string, number>>((acc, t) => ((acc[t.status] = (acc[t.status] ?? 0) + 1), acc), {});
     errors = rows.filter((t) => t.status === "error").slice(0, 10);
