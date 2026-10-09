@@ -85,3 +85,11 @@ test("CEILING COMMENTS — every remaining read that asks for more than 1 000 ro
     for (const line of risky) assert.match(line, /1 ?000|1000/, `${file}: ${line.trim().slice(0, 80)}`);
   }
 });
+
+test("ORDERED FIT FUNCTIONS — the prepared migration only adds an order by, keeps the signatures, and is not applied", () => {
+  const sql = readFileSync("supabase/migrations/20261010110000_ordered_job_fit.sql", "utf8");
+  assert.match(sql, /NON APPLIQUÉE/);
+  for (const name of ["my_job_fit_v2", "my_job_fit", "my_job_similarity"]) assert.match(sql, new RegExp(`create or replace function public\.${name}\(\)`));
+  assert.equal((sql.match(/order by (j\.)?id;/g) ?? []).length, 3);
+  assert.doesNotMatch(sql, /(drop table|delete from|truncate)/i);
+});

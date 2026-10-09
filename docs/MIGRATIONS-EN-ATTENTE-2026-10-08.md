@@ -1,6 +1,6 @@
 # Migrations en attente — 8 octobre 2026
 
-Quatre migrations sont dans `supabase/migrations/`, **aucune n’est appliquée à la base de production**. Les appliquer est une décision du propriétaire.
+Cinq migrations sont dans `supabase/migrations/`, **aucune n’est appliquée à la base de production**. Les appliquer est une décision du propriétaire.
 
 ## Ce qu’il faut savoir avant
 
@@ -121,6 +121,16 @@ select count(*) from public.offer_unlocks where origin = 'daily';  -- 0 avant la
 **Ce que le propriétaire doit voir à l’écran.** Le compte administrateur voit tout comme avant. Un compte étudiant ouvre l’application : ses offres existantes sont rangées « Avant le <date de la bascule> » ; le lot du jour (au plus 8, parfois moins : seules passent les offres au contrat voulu et avec au moins 2 compétences en commun avec le CV) apparaît à la première visite ; une deuxième visite le même jour n’en ajoute pas ; le lendemain, de nouvelles offres s’ajoutent. Créer un dossier sur une offre non débloquée est refusé avec « Cette offre n’a pas encore été recommandée ».
 
 **Retour arrière.** `drop function public.claim_daily_unlock(uuid, uuid[], integer); drop table public.offer_unlocks;` Le code constate l’absence de la table et revient seul au comportement d’avant (rien n’est verrouillé). Les copies déjà créées dans les listes restent.
+
+## 5. `20261010110000_ordered_job_fit.sql` — ordre stable des fonctions de note
+
+**But.** `my_job_fit_v2`, `my_job_fit` et `my_job_similarity` n’avaient pas d’`ORDER BY`. L’application les lit par pages de 1 000 lignes (la base ne renvoie pas plus par requête) : sans ordre fixe, deux pages peuvent répéter ou sauter des lignes. La migration ajoute seulement `order by` sur l’identifiant : mêmes colonnes, mêmes droits, mêmes résultats. Sans elle, rien ne casse : seuls les comptes de plus de 1 000 offres (aujourd’hui l’administrateur) peuvent voir une note manquante, jamais une fausse note (une ligne répétée garde sa propre note).
+
+**Avant.** `select proname, pg_get_functiondef(oid) like '%order by%' as ordonnee from pg_proc where proname in ('my_job_fit_v2','my_job_fit','my_job_similarity');` — trois lignes, `ordonnee` = false.
+
+**Après.** La même requête : `ordonnee` = true pour les trois. Puis `select has_function_privilege('authenticated', 'public.my_job_fit_v2()', 'execute');` doit rester `true`, et `select has_function_privilege('anon', 'public.my_job_fit_v2()', 'execute');` `false`.
+
+**Retour arrière.** Rejouer les définitions de `20261006145105` (`my_job_fit_v2`), `20261007120000` (`my_job_fit`) et `20261005120000` (`my_job_similarity`).
 
 ## Après les quatre
 
