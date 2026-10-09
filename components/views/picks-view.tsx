@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import { Plus } from "lucide-react";
 import { Callout, Empty, PageHead } from "@/components/ui";
-import { DEGRADED_TEXT, groupByUnlockDay, lockedCount, parisDay, todayBatchSize } from "@/components/unlock";
+import { COMPUTING_TEXT, DEGRADED_TEXT, groupByUnlockDay, lockedCount, parisDay, todayBatchSize } from "@/components/unlock";
 import { kitsByJob, stageOf } from "@/lib/journey";
 import type { Job } from "@/lib/types";
 import { compareShown } from "./closest";
@@ -58,7 +58,19 @@ export function PicksView({ ctx }: { ctx: Ctx }) {
         </section>
       )}
 
-      {unlock.kind === "locking" && unlock.degraded ? (
+      {unlock.kind === "locking" && unlock.computing ? (
+        <Callout
+          tone="info"
+          title={COMPUTING_TEXT}
+          action={
+            <button className="btn secondary small" onClick={ctx.refreshSelection}>
+              Réessayer
+            </button>
+          }
+        >
+          Ça peut prendre une minute. Les offres que tu as déjà reçues restent là.
+        </Callout>
+      ) : unlock.kind === "locking" && unlock.degraded ? (
         <Callout
           tone="warn"
           title={DEGRADED_TEXT}

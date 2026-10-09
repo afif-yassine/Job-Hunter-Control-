@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  COMPUTING_TEXT,
   DEGRADED_TEXT,
   actionMessage,
   dayLabel,
@@ -186,6 +187,15 @@ test("the new contract fields: manual origin, newToday and the new reasons", () 
   const withOffers = answer("DEGRADED", [{ jobId: "a", unlockedOn: "2026-10-08", origin: "daily" }]);
   assert.equal(withOffers.kind === "locking" && withOffers.degraded, true);
   assert.equal(DEGRADED_TEXT, "Ta sélection du jour n’a pas pu être préparée. Réessaie dans un moment.");
+});
+
+test("COMPUTING keeps the lock, even with an empty list, and says the selection is being prepared", () => {
+  for (const unlocked of [[], [{ jobId: "a", unlockedOn: "2026-10-08", origin: "daily" as const }]]) {
+    const state = unlockState({ demo: false, plan: "known", fetch: "done", answer: { unlocked, reason: "COMPUTING", newToday: null } });
+    assert.equal(state.kind, "locking");
+    assert.equal(state.kind === "locking" && state.computing, true);
+  }
+  assert.equal(COMPUTING_TEXT, "On prépare ta sélection du jour…");
 });
 
 test("a manual entry is listed with the followed offers, and the server's day size wins", () => {

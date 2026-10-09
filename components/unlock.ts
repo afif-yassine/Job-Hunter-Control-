@@ -9,6 +9,7 @@ import type { Job } from "@/lib/types";
  */
 
 /** Said when the server could not prepare the day's selection (reason DEGRADED): the lock stays. */
+export const COMPUTING_TEXT = "On prépare ta sélection du jour…";
 export const DEGRADED_TEXT = "Ta sélection du jour n’a pas pu être préparée. Réessaie dans un moment.";
 
 /** How many offers a day's batch holds at most. */
@@ -29,7 +30,7 @@ export type UnlockState =
   /** Nothing is locked, and the student is told what to do: no batch could be made. */
   | { kind: "action"; need: "profile-vector" | "search" }
   /** The batches: offer id → the day it was unlocked (Paris date, YYYY-MM-DD) and where it comes from. */
-  | { kind: "locking"; unlocked: Map<string, { day: string; origin: UnlockOrigin }>; newToday: number | null; /** The day's calculation failed: the lock stays, and the student is told. */ degraded: boolean };
+  | { kind: "locking"; unlocked: Map<string, { day: string; origin: UnlockOrigin }>; newToday: number | null; /** The day's calculation failed: the lock stays, and the student is told. */ degraded: boolean; /** The day's batch is still being computed: "On prépare ta sélection du jour…". */ computing?: boolean };
 
 /** A well-formed answer, or null (anything else is treated as a failure, never as "everything locked"). */
 export function parseUnlocked(body: unknown): UnlockAnswer | null {
@@ -66,8 +67,10 @@ export function unlockState(input: { demo: boolean; plan: PlanKnowledge; fetch: 
   if (unlocked === null) return { kind: "open", why: "not-ready" };
   // DEGRADED: the day's calculation failed and the server gave back what was already unlocked. The lock stays.
   const degraded = reason === "DEGRADED";
+  // COMPUTING: the day's batch is still being worked out. The lock stays, even with an empty list.
+  const computing = reason === "COMPUTING";
   const map = new Map(unlocked.map((e) => [e.jobId, { day: e.unlockedOn, origin: e.origin }]));
-  if (unlocked.length > 0 || degraded) return { kind: "locking", unlocked: map, newToday: input.answer.newToday ?? null, degraded };
+  if (unlocked.length > 0 || degraded || computing) return { kind: "locking", unlocked: map, newToday: input.answer.newToday ?? null, degraded, computing };
   // No offer matches enough: the student sees his (empty) selection, not the whole catalogue.
   if (reason === "NO_CANDIDATES" || reason === "NONE_ABOVE_THRESHOLD") return { kind: "locking", unlocked: map, newToday: 0, degraded: false };
   if (reason === "NO_PROFILE_VECTOR" || reason === "NO_PROFILE") return { kind: "action", need: "profile-vector" };

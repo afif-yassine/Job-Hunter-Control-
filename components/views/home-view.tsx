@@ -18,7 +18,7 @@ import { CV_SAVED_NOTE, profileCardLines } from "@/components/profile-card";
 import { openQuestionCount } from "@/components/questions-panel";
 import { Callout, PageHead, Progress } from "@/components/ui";
 import { kitsByJob, stageOf, todayTasks, TRACK } from "@/lib/journey";
-import { parisDay, studentSees } from "@/components/unlock";
+import { DAILY_LIMIT, parisDay, studentSees } from "@/components/unlock";
 import { compareShown } from "./closest";
 import { OfferCard } from "./offer-card";
 import { summarize } from "@/lib/pipeline-client";
@@ -157,7 +157,9 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
             <span className="muted small-text">
               {plan.used >= plan.limit
                 ? `Tes ${plan.limit} dossiers du mois sont utilisés. Les prochains arrivent le ${plan.resetsOn}.`
-                : `${plan.limit - plan.used} dossier${plan.limit - plan.used > 1 ? "s" : ""} (CV + lettre) restant${plan.limit - plan.used > 1 ? "s" : ""} ce mois-ci. Recherche et suivi illimités.`}
+                : ctx.unlock.kind === "locking"
+                  ? `${plan.limit} dossiers (CV + lettre) par mois. Jusqu’à ${DAILY_LIMIT} nouvelles offres par jour.`
+                  : `${plan.limit - plan.used} dossier${plan.limit - plan.used > 1 ? "s" : ""} (CV + lettre) restant${plan.limit - plan.used > 1 ? "s" : ""} ce mois-ci. Recherche et suivi illimités.`}
             </span>
           </div>
           <span className="plan-dots" aria-label={`${plan.used} sur ${plan.limit} utilisés`}>
@@ -213,9 +215,11 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
         <section aria-label="Nouvelles offres">
           <div className="section-row">
             <h2 className="section-title">Nouvelles offres pour toi</h2>
-            <button className="btn ghost small" onClick={() => go("jobs", "new")}>
-              Toutes les nouvelles ({fresh.length})
-            </button>
+            {ctx.unlock.kind !== "locking" && (
+              <button className="btn ghost small" onClick={() => go("jobs", "new")}>
+                Toutes les nouvelles ({fresh.length})
+              </button>
+            )}
           </div>
           <div className="offers">
             {freshTop.map((job) => (
