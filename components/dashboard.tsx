@@ -40,7 +40,7 @@ import { Callout, Progress } from "@/components/ui";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { RoadmapView } from "@/components/views/roadmap-view";
 import { HomeView } from "@/components/views/home-view";
-import { JobsView } from "@/components/views/jobs-view";
+import { JobsEntry } from "@/components/views/jobs-entry";
 import { DocumentsView } from "@/components/views/documents-view";
 import { TrackView } from "@/components/views/track-view";
 import { OfferPanel } from "@/components/views/offer-panel";
@@ -51,7 +51,7 @@ import { MoreView } from "@/components/views/more-view";
 import { AdminView } from "@/components/views/admin-view";
 import type { AdminOverview } from "@/lib/admin/overview";
 import { PageHead } from "@/components/ui";
-import type { Ctx, JobFilter, Tone, View } from "@/components/views/types";
+import type { Ctx, JobFilter, JobsMode, Tone, View } from "@/components/views/types";
 
 /** The student space: four places, the rest lives in "Plus" and in each offer's panel. */
 const NAV: { id: View; label: string; icon: LucideIcon }[] = [
@@ -134,11 +134,12 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
   // Which offers can be worked on: read once (and again on a new Paris day). Not used by a screen yet;
   // any doubt locks nothing, so the app behaves as before until the screens read it.
   const { fetchState: unlockFetch, answer: unlockAnswer } = useUnlocked(Boolean(supabase) && !isDemo);
+  // Only the administrator is never locked: a paying account gets the same offers as a free one.
   const planKnowledge: PlanKnowledge = status
-    ? status.isAdmin === true || status.plan?.plan === "pro" || status.plan?.plan === "admin"
-      ? "paid"
+    ? status.isAdmin === true || status.plan?.plan === "admin"
+      ? "admin"
       : status.plan
-        ? "free"
+        ? "known"
         : "unknown"
     : statusFailed
       ? "unknown"
@@ -155,6 +156,7 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
 
   const [view, setView] = useState<View>("home");
   const [jobFilter, setJobFilter] = useState<JobFilter>("new");
+  const [jobsMode, setJobsMode] = useState<JobsMode>("picks");
   const [openId, setOpenId] = useState<string | null>(null);
   const openJob = openId ? (data.jobs.find((j) => j.id === openId) ?? null) : null;
   // The last move of each offer, so "Revenir à l’étape d’avant" restores it.
@@ -210,6 +212,8 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
     }
     setView(next);
     if (filter) setJobFilter(filter);
+    // "Offres" opens the student's selection; asking for a given tab (new, all…) opens the whole catalogue on it.
+    if (next === "jobs") setJobsMode(filter ? "explore" : "picks");
     try {
       window.history.replaceState(null, "", `#${next}`);
     } catch {
@@ -466,6 +470,8 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
     catalogueRefreshedAt,
     jobFilter,
     setJobFilter,
+    jobsMode,
+    setJobsMode,
     openOffer,
     act,
     adminDemo: demo?.admin,
@@ -608,7 +614,7 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
           ) : view === "home" ? (
             <HomeView ctx={ctx} />
           ) : view === "jobs" ? (
-            <JobsView ctx={ctx} />
+            <JobsEntry ctx={ctx} />
           ) : view === "documents" ? (
             <DocumentsView ctx={ctx} />
           ) : view === "questions" ? (

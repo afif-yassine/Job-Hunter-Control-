@@ -25,6 +25,8 @@ export type View =
 
 export type SummarizeResult = "ok" | "gone" | "failed";
 
+export type JobsMode = "picks" | "explore";
+
 export type JobFilter ="new" | "all" | "best" | "review" | "gone";
 
 export type ReviewAction = "keep" | "merge" | "dismiss" | "applied_elsewhere";
@@ -64,6 +66,9 @@ export type Ctx = {
   catalogueRefreshedAt: string | null;
   jobFilter: JobFilter;
   setJobFilter: (filter: JobFilter) => void;
+  /** "picks": the student's selection (day's batch). "explore": the whole catalogue with its tabs and filters. */
+  jobsMode: JobsMode;
+  setJobsMode: (mode: JobsMode) => void;
   /** Opens the offer panel (and marks the offer as seen). */
   openOffer: (job: Job) => void;
   act: {

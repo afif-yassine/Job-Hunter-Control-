@@ -774,6 +774,21 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .grow-origin.is-assumption { border-style: dashed; }
 .grow-kpi .grow-origin { margin-left: 0; margin-right: 6px; }
 /* Balance of the AI key (admin space) */
+/* The student's selection: rank badge, folded earlier days, and the teaser of drawn silhouettes */
+.rank-badge { display: inline-flex; width: max-content; padding: 1px 9px; border-radius: 999px; background: var(--brand); color: #fff; font: 700 12px/1.6 var(--font-display), sans-serif; }
+.picks-section { margin-bottom: 18px; }
+.picks-fold { margin: 12px 0; }
+.picks-fold > summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
+.picks-fold > summary .count { margin-left: 6px; }
+.teaser { display: grid; gap: 14px; margin: 18px 0; }
+.teaser-silhouettes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; filter: blur(2.5px); opacity: .8; pointer-events: none; user-select: none; }
+.teaser-card { display: grid; gap: 8px; align-content: center; height: 88px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+.teaser-card i { display: block; height: 10px; border-radius: 6px; background: var(--line); }
+.teaser-card i:nth-child(1) { width: 78%; }
+.teaser-card i:nth-child(2) { width: 52%; }
+.teaser-card i:nth-child(3) { width: 34%; }
+.teaser-text h2 { margin: 0 0 6px; font: 800 20px/1.2 var(--font-display), sans-serif; letter-spacing: -.03em; }
+.teaser-text p { margin: 0 0 12px; }
 /* Accounts table (admin space): scrolls sideways inside its card on a phone */
 .acc-table { min-width: 760px; }
 .acc-table th[scope="row"] { font-weight: 600; overflow-wrap: anywhere; }

@@ -76,10 +76,13 @@ export function Milestones({ stage, kit }: { stage: Stage; kit?: { cv: boolean; 
 export function OfferCard({
   job,
   kit,
+  rank,
   onOpen,
 }: {
   job: Job;
   kit?: { cv: boolean; letter: boolean };
+  /** Position in the day's selection (1 = best score), shown as a badge. */
+  rank?: number;
   onOpen: (job: Job) => void;
 }) {
   const stage = stageOf(job);
@@ -91,6 +94,7 @@ export function OfferCard({
     <button type="button" className={`offer card is-${stage}${gone ? " is-gone" : ""}`} onClick={() => onOpen(job)} aria-label={`${job.title}, ${job.company}`}>
       <span className="offer-top">
         <span className="offer-titles">
+          {rank ? <span className="rank-badge">#{rank}</span> : null}
           {stage === "new" && <span className="new-dot">Nouvelle</span>}
           <strong className="offer-title">{job.title}</strong>
           <span className="offer-company">{job.company}</span>

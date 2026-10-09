@@ -5,9 +5,15 @@ import type { Job } from "@/lib/types";
  * Which offers a student can work on ("déverrouillées"), and how a day's batch is shown.
  * Pure functions only: the server stays the only truth (it refuses the generation of a locked offer),
  * and every doubt here ends in "nothing is locked" — a student is never locked by mistake.
+ * Only the administrator is exempt by plan: a paying account gets the same offers as a free one.
  */
 
-export type UnlockEntry = { jobId: string; unlockedOn: string };
+/** How many offers a day's batch holds at most. */
+export const DAILY_LIMIT = 8;
+
+/** "daily": a day's batch. "backfill": the offers an existing account already had when the batches began. */
+export type UnlockOrigin = "daily" | "backfill";
+export type UnlockEntry = { jobId: string; unlockedOn: string; origin: UnlockOrigin };
 
 /** GET /api/offers/unlocked, as the contract says. `unlocked` is a list, or null with a reason. */
 export type UnlockAnswer = { unlocked: UnlockEntry[] | null; reason: string | null };
@@ -15,12 +21,12 @@ export type UnlockAnswer = { unlocked: UnlockEntry[] | null; reason: string | nu
 export type UnlockState =
   /** The list (or the plan) is not known yet. */
   | { kind: "loading" }
-  /** Nothing is locked: demo, paid or admin account, route absent, unreadable answer, empty list without a reason… */
-  | { kind: "open"; why: "demo" | "paid" | "unknown-plan" | "failed" | "not-ready" | "all" | "empty" }
+  /** Nothing is locked: demo, administrator, route absent, unreadable answer, empty list without a reason… */
+  | { kind: "open"; why: "demo" | "admin" | "unknown-plan" | "failed" | "not-ready" | "all" | "empty" }
   /** Nothing is locked, and the student is told what to do: no batch could be made. */
   | { kind: "action"; need: "profile-vector" | "search" }
-  /** The batches: offer id → day it was unlocked (Paris date, YYYY-MM-DD). */
-  | { kind: "locking"; unlocked: Map<string, string> };
+  /** The batches: offer id → the day it was unlocked (Paris date, YYYY-MM-DD) and where it comes from. */
+  | { kind: "locking"; unlocked: Map<string, { day: string; origin: UnlockOrigin }> };
 
 /** A well-formed answer, or null (anything else is treated as a failure, never as "everything locked"). */
 export function parseUnlocked(body: unknown): UnlockAnswer | null {
@@ -31,29 +37,30 @@ export function parseUnlocked(body: unknown): UnlockAnswer | null {
   if (!Array.isArray(unlocked)) return null;
   const entries: UnlockEntry[] = [];
   for (const item of unlocked) {
-    const e = item as { jobId?: unknown; unlockedOn?: unknown } | null;
+    const e = item as { jobId?: unknown; unlockedOn?: unknown; origin?: unknown } | null;
     if (!e || typeof e.jobId !== "string" || !e.jobId || typeof e.unlockedOn !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(e.unlockedOn)) return null;
-    entries.push({ jobId: e.jobId, unlockedOn: e.unlockedOn.slice(0, 10) });
+    // An absent or unknown origin is a daily batch.
+    entries.push({ jobId: e.jobId, unlockedOn: e.unlockedOn.slice(0, 10), origin: e.origin === "backfill" ? "backfill" : "daily" });
   }
   return { unlocked: entries, reason: why };
 }
 
-export type PlanKnowledge = "loading" | "unknown" | "free" | "paid";
+export type PlanKnowledge = "loading" | "unknown" | "known" | "admin";
 
 /**
  * The state of the locks. `fetch` is where the call stands, `answer` the parsed reply.
- * A paid or admin account is never locked; an unknown plan never locks; a doubt never locks.
+ * The administrator is never locked; an unknown plan never locks; a doubt never locks.
  */
 export function unlockState(input: { demo: boolean; plan: PlanKnowledge; fetch: "loading" | "failed" | "done"; answer: UnlockAnswer | null }): UnlockState {
   if (input.demo) return { kind: "open", why: "demo" };
-  if (input.plan === "paid") return { kind: "open", why: "paid" };
+  if (input.plan === "admin") return { kind: "open", why: "admin" };
   if (input.plan === "unknown") return { kind: "open", why: "unknown-plan" };
   if (input.plan === "loading" || input.fetch === "loading") return { kind: "loading" };
   if (input.fetch === "failed" || !input.answer) return { kind: "open", why: "failed" };
   const { unlocked, reason } = input.answer;
   if (reason === "all") return { kind: "open", why: "all" };
   if (unlocked === null) return { kind: "open", why: "not-ready" };
-  if (unlocked.length > 0) return { kind: "locking", unlocked: new Map(unlocked.map((e) => [e.jobId, e.unlockedOn])) };
+  if (unlocked.length > 0) return { kind: "locking", unlocked: new Map(unlocked.map((e) => [e.jobId, { day: e.unlockedOn, origin: e.origin }])) };
   if (reason === "NO_PROFILE_VECTOR") return { kind: "action", need: "profile-vector" };
   if (reason === "NO_SEARCH") return { kind: "action", need: "search" };
   return { kind: "open", why: "empty" };
@@ -89,35 +96,68 @@ const shiftDay = (day: string, delta: number) => {
   return d.toISOString().slice(0, 10);
 };
 
+const longDate = (day: string, today: string) =>
+  new Date(`${day}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: "numeric" }), timeZone: "UTC" });
+
 /** "Aujourd'hui", "Hier", "Le 6 octobre" (with the year when it is not this year's). */
 export function dayLabel(day: string, today: string): string {
   if (day === today) return "Aujourd’hui";
   if (day === shiftDay(today, -1)) return "Hier";
-  const sameYear = day.slice(0, 4) === today.slice(0, 4);
-  const text = new Date(`${day}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", ...(sameYear ? {} : { year: "numeric" }), timeZone: "UTC" });
-  return `Le ${text}`;
+  return `Le ${longDate(day, today)}`;
 }
 
-export type UnlockGroup = { key: string; day: string | null; label: string; jobs: Job[] };
+export type UnlockGroup = { key: string; kind: "day" | "backfill" | "followed"; day: string | null; label: string; jobs: Job[] };
 
 /**
- * The unlocked offers by the day they were unlocked, newest day first. Offers that are usable without being in a batch
- * (added by hand, already worked on) come last under "Déjà suivies". Locked offers are not in any group.
+ * The unlocked offers by the day they were unlocked, newest day first. The offers an account already had when the
+ * batches began come next, under "Avant le [date]". Offers that are usable without being in a batch (added by hand,
+ * already worked on) come last under "Déjà suivies". Locked offers are not in any group.
  */
 export function groupByUnlockDay(jobs: Job[], state: UnlockState, hasKit: (job: Job) => boolean, today: string): UnlockGroup[] {
-  const days = new Map<string, Job[]>();
+  const daily = new Map<string, Job[]>();
+  const backfill = new Map<string, Job[]>();
   const followed: Job[] = [];
   for (const job of jobs) {
     if (!isUnlocked(job, state, hasKit(job))) continue;
-    const day = state.kind === "locking" ? state.unlocked.get(job.id) : undefined;
-    if (day) days.set(day, [...(days.get(day) ?? []), job]);
-    else followed.push(job);
+    const entry = state.kind === "locking" ? state.unlocked.get(job.id) : undefined;
+    if (!entry) followed.push(job);
+    else {
+      const bucket = entry.origin === "backfill" ? backfill : daily;
+      bucket.set(entry.day, [...(bucket.get(entry.day) ?? []), job]);
+    }
   }
-  const groups: UnlockGroup[] = [...days.entries()]
-    .sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))
-    .map(([day, list]) => ({ key: day, day, label: dayLabel(day, today), jobs: list }));
-  if (followed.length) groups.push({ key: "followed", day: null, label: "Déjà suivies", jobs: followed });
+  const newestFirst = ([a]: [string, Job[]], [b]: [string, Job[]]) => (a < b ? 1 : a > b ? -1 : 0);
+  const groups: UnlockGroup[] = [
+    ...[...daily.entries()].sort(newestFirst).map(([day, list]): UnlockGroup => ({ key: `day-${day}`, kind: "day", day, label: dayLabel(day, today), jobs: list })),
+    ...[...backfill.entries()].sort(newestFirst).map(([day, list]): UnlockGroup => ({ key: `backfill-${day}`, kind: "backfill", day, label: `Avant le ${longDate(day, today)}`, jobs: list })),
+  ];
+  if (followed.length) groups.push({ key: "followed", kind: "followed", day: null, label: "Déjà suivies", jobs: followed });
   return groups;
+}
+
+/** How many offers of the day's batch (counted from the server's list, not from what the screen shows). */
+export function todayBatchSize(state: UnlockState, today: string): number {
+  if (state.kind !== "locking") return 0;
+  let n = 0;
+  for (const entry of state.unlocked.values()) if (entry.origin === "daily" && entry.day === today) n += 1;
+  return n;
+}
+
+/** The words of the zone under the day's offers, exactly as the business judgment wrote them. */
+export function teaserText(batch: number): { title: string; text: string } {
+  const open = "Tout le catalogue reste ouvert et gratuit.";
+  if (batch >= DAILY_LIMIT) return { title: "Tes offres du jour sont là", text: `Demain, de nouvelles offres choisies selon tes compétences. Celles que tu as déjà restent à toi. ${open}` };
+  if (batch <= 0)
+    return { title: "Aujourd’hui, aucune offre ne correspond assez à ton profil", text: "Élargis tes métiers dans Réglages, ou explore tout le catalogue : il reste ouvert et gratuit." };
+  return {
+    title: `Aujourd’hui, ${batch} offre${batch > 1 ? "s" : ""} ${batch > 1 ? "te correspondent" : "te correspond"}`,
+    text: `On préfère t’en montrer peu que t’en montrer de mauvaises. ${open}`,
+  };
+}
+
+/** The drawn silhouettes of the teaser: 4 to 6, never a picture of real offers. */
+export function silhouetteCount(locked: number): number {
+  return Math.min(6, Math.max(4, Math.floor(locked)));
 }
 
 /** How many of these offers stay locked (the teaser says it as a number, never lists them). */
