@@ -262,6 +262,8 @@ function shortLink(link: string): string {
 }
 function SearchSection({ ctx }: { ctx: Ctx }) {
   const { notify, status } = ctx;
+  // A student with a daily selection: the platform collects the offers, his own search calls no job site any more.
+  const selection = ctx.unlock.kind === "locking";
   // The fields are shared with the sign-up journey (components/search-fields.tsx); the advanced ones stay here.
   const s = useSearchPrefs(ctx);
   const { prefs, setPrefs, departments, setDepartments, targets, setTargets, discovered, setDiscovered, auto, setAuto, loaded, saving } = s;
@@ -316,8 +318,10 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
           />
           <small className="muted">
             Colle le lien de la page carrière d’une entreprise (une par ligne, {MAX_TARGETS} maximum). Pris en charge :
-            Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee. Leurs offres sont lues à la source, sans clé, souvent avant
-            LinkedIn ou Indeed.
+            Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee.{" "}
+            {selection
+              ? "Ces entreprises sont ajoutées à la collecte de la plateforme ; leurs offres t’arrivent par ta sélection du jour si elles correspondent à ton CV."
+              : "Leurs offres sont lues à la source, sans clé, souvent avant LinkedIn ou Indeed."}
           </small>
           {unknown.length > 0 && (
             <small className="warn-text">
@@ -326,6 +330,7 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
             </small>
           )}
         </label>
+        {!selection && (
         <div className="wide discovered">
           <div className="discovered-head">
             <strong>Entreprises trouvées automatiquement ({discovered.length})</strong>
@@ -372,11 +377,14 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
             </ul>
           )}
         </div>
+        )}
         <label className="check switch wide">
           <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
-          {status?.scheduledScan
-            ? "Recherche automatique sur le serveur, même appli fermée (au plus toutes les 12 h)"
-            : "Chercher automatiquement à l’ouverture de l’appli (au plus toutes les 12 h)"}
+          {selection
+            ? "Ta sélection se prépare chaque jour, même appli fermée"
+            : status?.scheduledScan
+              ? "Recherche automatique sur le serveur, même appli fermée (au plus toutes les 12 h)"
+              : "Chercher automatiquement à l’ouverture de l’appli (au plus toutes les 12 h)"}
         </label>
         <div className="wide toolbar">
           <button className="btn" disabled={saving || !loaded}>
