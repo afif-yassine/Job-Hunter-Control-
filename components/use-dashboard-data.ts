@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { RETRY_DELAY_MS, retryDecision } from "@/components/load-retry";
 import { fitScore } from "@/lib/fit";
 import { createClient } from "@/lib/supabase/client";
 import type {
@@ -36,6 +37,7 @@ export function useDashboardData(demo?: Data) {
       setLoading(false);
       return;
     }
+    const fetchOnce = async () => {
     const [j, a, q, d, r, n] = await Promise.all([
       supabase.from("jobs").select("*,job_sources(platform,url),offers(summary,salary)").order("created_at", { ascending: false }),
       supabase.from("applications").select("*,jobs(company,title)").order("created_at", { ascending: false }),
@@ -83,6 +85,16 @@ export function useDashboardData(demo?: Data) {
       const applicants = new Map(((crowd.data ?? []) as { offer_id: string; applicants: number }[]).map((x) => [x.offer_id, x.applicants]));
       for (const job of (jobs.data ?? []) as Job[]) job.applicants = job.offer_id ? (applicants.get(job.offer_id) ?? null) : null;
     }
+    return { jobs, a, d, r, n, questions };
+    };
+    const failureOf = (x: { jobs: { error: { message?: string; code?: string } | null }; a: { error: { message?: string; code?: string } | null }; d: { error: { message?: string; code?: string } | null }; r: { error: { message?: string; code?: string } | null }; n: { error: { message?: string; code?: string } | null } }) => [x.jobs, x.a, x.d, x.r, x.n].find((y) => y.error)?.error;
+    let got = await fetchOnce();
+    // A token dated slightly in the future: wait and ask again (twice at most) before showing anything.
+    for (let attempt = 0; retryDecision(failureOf(got), attempt).retry; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, RETRY_DELAY_MS));
+      got = await fetchOnce();
+    }
+    const { jobs, a, d, r, n, questions } = got;
     const failure = [jobs, a, d, r, n].find((x) => x.error)?.error;
     setError(failure ? failure.message : "");
     setData({
@@ -126,5 +138,8 @@ export function useDashboardData(demo?: Data) {
     setData((d) => ({ ...d, jobs: d.jobs.map((j) => (j.id === id ? { ...j, ...patch } : j)) }));
   }, []);
 
-  return { supabase, data, loading, error, reload: load, patchJob };
+  // A plain reload: never hands an event to `load` as its retry counter.
+  const reload = useCallback(() => load(), [load]);
+
+  return { supabase, data, loading, error, reload, patchJob };
 }

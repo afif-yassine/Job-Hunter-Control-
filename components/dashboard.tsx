@@ -35,6 +35,7 @@ import { useCatalogueRefresh } from "@/components/use-catalogue-refresh";
 import { shownEmail, useAccount } from "@/components/use-account";
 import { isUnlocked, unlockState, type PlanKnowledge } from "@/components/unlock";
 import { useUnlocked } from "@/components/use-unlocked";
+import { CONNECTION_TEXT, loadErrorText } from "@/components/load-retry";
 import { onboardingGate } from "@/components/onboarding";
 import { useOnboardingFacts } from "@/components/use-onboarding";
 import { OnboardingView } from "@/components/views/onboarding-view";
@@ -681,10 +682,15 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
             </div>
           )}
           {loadError && (
-            <div className="callout bad" style={{ marginBottom: 16 }}>
+            <div className="callout bad" style={{ marginBottom: 16 }} role="alert">
               <div className="callout-body">
-                <strong>Impossible de charger les données</strong>
-                <div>{loadError}</div>
+                <strong>{loadErrorText(loadError, status?.isAdmin ? "admin" : "student").title}</strong>
+                {loadErrorText(loadError, status?.isAdmin ? "admin" : "student").hint && <div>{loadErrorText(loadError, status?.isAdmin ? "admin" : "student").hint}</div>}
+                <div>
+                  <button className="btn secondary small" onClick={() => void reload()}>
+                    {CONNECTION_TEXT.retry}
+                  </button>
+                </div>
               </div>
             </div>
           )}
