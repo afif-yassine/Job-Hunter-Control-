@@ -12,19 +12,16 @@ import {
   useSpring,
   useTransform,
 } from "motion/react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PushPin, Tape, Tent, Thread, type PinColor, type Pt } from "./board";
-import { Chapters, Features, Filature, Final, Footer, Kinetic, Ledger, Pistes, Recruit, Ribbons } from "./landing-sections";
+import { Chapters, Features, Filature, Final, Footer, Kinetic, Ledger, Pistes, Ribbons } from "./landing-sections";
 import { Logo } from "./logo";
 import { Magnetic } from "./magnetic";
-import { SoonModal } from "./soon";
 
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 
 /** Public home page for visitors who are not signed in. */
 export function Landing({ pricing = false }: { pricing?: boolean }) {
-  const [soon, setSoon] = useState<string | null>(null);
-  const closeSoon = useCallback(() => setSoon(null), []);
   const reduce = useReducedMotion();
   // A visitor who already saw the opening this session gets a quick one.
   const [returning] = useState(() => {
@@ -57,13 +54,11 @@ export function Landing({ pricing = false }: { pricing?: boolean }) {
           <Pistes />
           <Kinetic />
           <Chapters />
-          <Features onSoon={setSoon} />
+          <Features />
           <Ledger />
-          <Recruit onSoon={setSoon} />
           <Final />
         </main>
         <Footer pricing={pricing} />
-        <SoonModal feature={soon} onClose={closeSoon} />
       </div>
     </MotionConfig>
   );
@@ -138,7 +133,6 @@ function Nav() {
         </Link>
         <nav className="jj-nav-links" aria-label="Navigation principale">
           <a className="jj-nav-a is-optional" href="#chapitres">Comment ça marche</a>
-          <a className="jj-nav-a is-optional" href="#recruteurs">Recruteurs</a>
           <Link className="jj-nav-a is-login" href="/login">Se connecter</Link>
           <Link className="jj-ribbon is-small" href="/login"><span className="jj-sm-hide">Ouvrir mon dossier</span><span className="jj-sm-only">Mon dossier</span> <span className="arr" aria-hidden="true">→</span></Link>
         </nav>

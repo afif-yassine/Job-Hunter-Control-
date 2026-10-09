@@ -328,14 +328,7 @@ const FEATURES: { icon: string; title: string; text: string }[] = [
   { icon: "M3 7 H9 L11 9 H21 V19 H3 Z|M7 13 H17", title: "On range tes candidatures.", text: "À relire, envoyées, entretiens : tout ton suivi au même endroit." },
 ];
 
-const SOON: [string, string, string][] = [
-  ["Postuler depuis n’importe quel site.", "Une extension Chrome qui garde la trace de tes candidatures.", "extension Chrome"],
-  ["Les réponses des recruteurs, lues pour toi.", "Ta boîte Gmail triée : entretien, refus, relance.", "lecture de Gmail"],
-  ["Des relances au bon moment.", "Une semaine sans nouvelles ? On te propose un message.", "relances"],
-  ["Une fiche pour l’entretien.", "L’entreprise, le poste et tes meilleurs exemples sur une page.", "fiche d’entretien"],
-];
-
-export function Features({ onSoon }: { onSoon: (feature: string) => void }) {
+export function Features() {
   return (
     <section className="jj-sand">
       <div className="jj-wrap jj-section" style={{ display: "flex", flexDirection: "column", gap: 44 }}>
@@ -356,19 +349,6 @@ export function Features({ onSoon }: { onSoon: (feature: string) => void }) {
               </motion.div>
             </div>
           ))}
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="jj-kicker">Dossiers sous scellés · bientôt</div>
-          <div className="jj-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))", gap: 20 }}>
-            {SOON.map(([title, text, feature], i) => (
-              <motion.button key={title} type="button" className="jj-soon" onClick={() => onSoon(feature)} {...reveal(i)} whileHover={{ y: -6, rotate: -0.6 }}>
-                <span className="jj-soon-tab">CONFIDENTIEL</span>
-                <span className="jj-soon-title">{title}</span>
-                <span className="jj-soon-text">{text}</span>
-                <span className="jj-soon-seal" aria-hidden="true">SOUS SCELLÉS</span>
-              </motion.button>
-            ))}
-          </div>
         </div>
         <div className="jj-sources">
           <span className="jj-label">Les offres viennent de</span>
@@ -420,22 +400,7 @@ export function Ledger() {
   );
 }
 
-export function Recruit({ onSoon }: { onSoon: (feature: string) => void }) {
-  return (
-    <section id="recruteurs" className="jj-wrap" style={{ paddingTop: 96 }}>
-      <motion.div className="jj-recruit" {...reveal()}>
-        <Tape style={{ left: 30, top: -12, rotate: "-8deg" }} />
-        <Tape style={{ right: 30, top: -12, rotate: "6deg" }} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 640 }}>
-          <div className="jj-kicker is-light">Pour les recruteurs · bientôt</div>
-          <h2 className="jj-recruit-h">Vous cherchez un·e alternant·e ?</h2>
-          <p style={{ fontSize: 18, lineHeight: 1.55, color: "#ece6da" }}>Publiez votre offre : on la montre aux étudiants dont le CV lui ressemble. Vous ne recevez que des candidatures relues.</p>
-        </div>
-        <button type="button" className="jj-bound is-dark" onClick={() => onSoon("espace recruteur")}>Découvrir l’espace recruteur</button>
-      </motion.div>
-    </section>
-  );
-}
+
 
 export function Final() {
   return (
