@@ -196,3 +196,20 @@ test("ROUTE — /api/offers/unlocked answers GET only, for the signed-in account
     assert.ok(code.indexOf("offerLocked(") > 0 && code.indexOf("offerLocked(") < (code.indexOf("consumeQuota(") > 0 ? code.indexOf("consumeQuota(") : Infinity), `${file}: guard before any spend`);
   }
 });
+
+test("ADMIN STATUS — says when the daily selection is installed but the job sites are still open to students", async () => {
+  const { buildAdminOverview } = await import("../lib/admin/overview");
+  const run = async (env: Record<string, string>, missing = false) => {
+    const { db } = fakeSupabase({ offer_unlocks: [], user_settings: [], source_runs: [], source_budget: [], usage_events: [], notifications: [], agent_runs: [] }, { missingTables: missing ? ["offer_unlocks"] : undefined, rpc: { admin_source_stats: () => [] } });
+    return buildAdminOverview({ supabase: db, userId: U, env });
+  };
+  const open = await run({});
+  assert.equal(open.dailyUnlock.status, "external_open");
+  assert.ok(open.actions.some((a) => a.level === "required" && /STUDENT_CATALOGUE_ONLY=1/.test(a.text)));
+  const closed = await run({ STUDENT_CATALOGUE_ONLY: "1" });
+  assert.equal(closed.dailyUnlock.status, "active");
+  assert.ok(!closed.actions.some((a) => /STUDENT_CATALOGUE_ONLY/.test(a.text)));
+  const none = await run({}, true);
+  assert.equal(none.dailyUnlock.status, "not_installed");
+  assert.ok(!none.actions.some((a) => /STUDENT_CATALOGUE_ONLY/.test(a.text)));
+});

@@ -3,6 +3,7 @@ import { aiConfigured, modelFor } from "@/lib/ai";
 import { loadIntegrationEnv } from "@/lib/integrations";
 import { loadUserSettings } from "@/lib/settings";
 import { budgetFor, type SourceId } from "@/lib/scan/health";
+import { studentCatalogueOnly } from "@/lib/scan/config";
 import { AI_ADVICE, EMBEDDINGS_PLAN, ENRICHMENT_SOURCES, NOT_CONNECTED, SOURCES, type CatalogSource, type EnrichmentSource } from "./catalog";
 
 type Env = Record<string, string | undefined>;
@@ -45,6 +46,11 @@ export type AdminOverview = {
   enrichment: AdminEnrichment[];
   notConnected: typeof NOT_CONNECTED;
   automation: { cronConfigured: boolean; sharedCache: boolean; lastServerRun: string | null };
+  /**
+   * Daily selection of 8 offers (migration 20261009090000). `external_open` = the table is installed but
+   * STUDENT_CATALOGUE_ONLY is not 1: students' updates still call the job sites (paid calls).
+   */
+  dailyUnlock: { status: "not_installed" | "active" | "external_open"; catalogueOnly: boolean; message: string };
   worker: { configured: boolean; online: boolean; browserReady: boolean | null };
   drive: boolean;
   alerts: { title: string; message: string; at: string; read: boolean }[];
@@ -188,11 +194,19 @@ export async function buildAdminOverview(ctx: {
     (acc, r) => ((acc[r.kind as keyof typeof acc] = (acc[r.kind as keyof typeof acc] ?? 0) + 1), acc),
     { scan: 0, analysis: 0, generation: 0 },
   );
+  const unlockProbe = await db.from("offer_unlocks").select("offer_id").limit(1);
+  const catalogueOnly = studentCatalogueOnly(env);
+  const dailyUnlock: AdminOverview["dailyUnlock"] = unlockProbe.error
+    ? { status: "not_installed", catalogueOnly, message: "Sélection quotidienne non installée : la migration 20261009090000 n’est pas appliquée, aucune offre n’est verrouillée." }
+    : catalogueOnly
+      ? { status: "active", catalogueOnly, message: "Sélection quotidienne active, recherche des sites d’emploi fermée pour les étudiants." }
+      : { status: "external_open", catalogueOnly, message: "Sélection quotidienne active mais recherche externe encore ouverte : ajoute STUDENT_CATALOGUE_ONLY=1 dans Vercel." };
   const cronConfigured = has("CRON_SECRET") && has("SUPABASE_SERVICE_ROLE_KEY");
   const lastServerRun = ((serverRunRes.data ?? []) as { created_at: string }[])[0]?.created_at ?? null;
 
   // What the admin has to do by hand, most important first.
   const actions: AdminAction[] = [];
+  if (dailyUnlock.status === "external_open") actions.push({ level: "required", text: dailyUnlock.message });
   const api = sources.filter((s) => s.kind === "api");
   if (!aiConfigured(env)) actions.push({ level: "required", text: "Configure le fournisseur IA dans Vercel pour lire les offres et rédiger les CV et lettres. La comparaison des compétences reste disponible sans appel IA." });
   if (!api.some((s) => s.keyOrigin !== "none") && !sources.some((s) => s.kind === "careers" && s.companies))
@@ -251,6 +265,7 @@ export async function buildAdminOverview(ctx: {
     enrichment,
     notConnected: NOT_CONNECTED,
     automation: { cronConfigured, sharedCache: has("SUPABASE_SERVICE_ROLE_KEY"), lastServerRun },
+    dailyUnlock,
     worker: {
       configured: has("WORKER_BASE_URL") && has("WORKER_SHARED_SECRET"),
       online: ctx.worker?.online ?? false,
