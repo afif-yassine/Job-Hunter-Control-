@@ -87,7 +87,7 @@ const MOVED: Record<Stage, string> = {
   interview: "Entretien noté. Bonne préparation !",
   offer: "Bravo ! Offre acceptée.",
   rejected: "C’est noté. La suivante sera la bonne.",
-  dismissed: "Offre écartée : elle ne reviendra plus.",
+  dismissed: "Offre écartée. Tu la retrouves en haut de « Mon suivi », sous « Voir l’offre écartée ».",
 };
 
 /** Server error → one readable sentence; only the administrator reads platform details. */
@@ -404,8 +404,10 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
       undoStage: async (job) => {
         const saved = history.current.get(job.id);
         const kit = data.documents.some((d) => d.job_id === job.id);
-        const patch = saved ?? undoPatch(job, kit);
-        if (!patch) return;
+        const base = saved ?? undoPatch(job, kit);
+        if (!base) return;
+        // Going back before the interview step forgets its date, whatever the saved history says.
+        const patch = ["new", "seen", "ready", "applied"].includes(String(base.stage)) ? { ...base, interview_at: null } : base;
         history.current.delete(job.id);
         patchJob(job.id, patch as Partial<Job>);
         if (!supabase) return;

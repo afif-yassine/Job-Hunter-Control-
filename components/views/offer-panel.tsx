@@ -517,7 +517,7 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
               {stage === "applied" && followUpDue(job) && <p className="hint">Une semaine sans réponse : c’est le bon moment pour relancer poliment.</p>}
             </JourneyStep>
             <JourneyStep
-              done={stage === "interview" || stage === "offer"}
+              done={stage === "interview" || stage === "offer" || (stage === "rejected" && Boolean(job.interview_at))}
               current={stage === "applied"}
               title="Entretien"
               when={job.interview_at ? dayTime(job.interview_at) : null}
@@ -538,6 +538,9 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                         <input type="datetime-local" value={interviewAt} onChange={(e) => setInterviewAt(e.target.value)} required />
                       </label>
                       <button className="btn small">Enregistrer</button>
+                      <button type="button" className="btn ghost small" onClick={() => setPickDate(false)}>
+                        Annuler
+                      </button>
                     </form>
                   ) : stage === "applied" ? (
                     <button className="btn secondary" disabled={disabled} onClick={() => setPickDate(true)}>
@@ -622,7 +625,7 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
         )}
         {stage === "dismissed" ? (
           <button className="btn ghost small" disabled={disabled} onClick={() => move("seen")}>
-            Remettre dans mes offres
+            Remettre dans mon suivi
           </button>
         ) : (
           !isSent(stage) && (

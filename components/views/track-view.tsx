@@ -32,6 +32,26 @@ export function TrackView({ ctx }: { ctx: Ctx }) {
   return (
     <>
       <PageHead title="Mon suivi" subtitle="Chaque offre que tu as ouverte, de la préparation jusqu’à la réponse. Clique une carte pour avancer." />
+      {/* At the top, where an offer put aside can be found again. */}
+      {dismissed.length > 0 && (
+        <div className="track-dismissed">
+          <button className="linkbtn small-text" onClick={() => setShowDismissed((v) => !v)}>
+            {showDismissed ? "Masquer" : "Voir"} {dismissed.length > 1 ? `les ${dismissed.length} offres écartées` : "l’offre écartée"}
+          </button>
+          {showDismissed && (
+            <div className="card list">
+              {dismissed.map((job) => (
+                <button key={job.id} className="row" onClick={() => openOffer(job)}>
+                  <span className="row-main">
+                    <strong>{job.title}</strong>
+                    <span className="muted">{job.company}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {total === 0 ? (
         <Empty
           title="Rien à suivre pour l’instant"
@@ -100,25 +120,6 @@ export function TrackView({ ctx }: { ctx: Ctx }) {
             ))}
           </div>
         </>
-      )}
-      {dismissed.length > 0 && (
-        <div className="track-dismissed">
-          <button className="linkbtn small-text" onClick={() => setShowDismissed((v) => !v)}>
-            {showDismissed ? "Masquer" : "Voir"} les {dismissed.length} offre{dismissed.length > 1 ? "s" : ""} écartée{dismissed.length > 1 ? "s" : ""}
-          </button>
-          {showDismissed && (
-            <div className="card list">
-              {dismissed.map((job) => (
-                <button key={job.id} className="row" onClick={() => openOffer(job)}>
-                  <span className="row-main">
-                    <strong>{job.title}</strong>
-                    <span className="muted">{job.company}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       )}
     </>
   );
