@@ -7,19 +7,19 @@ import { PicksView } from "./picks-view";
 import type { Ctx } from "./types";
 
 /**
- * The "Offres" page. When the student has a selection (batches), it opens on it and the whole catalogue
- * is one button away; in every other case (administrator, demo, nothing known, any doubt) it is the
- * catalogue with its tabs and filters, exactly as before.
+ * The "Offres" page. A student who has a selection (batches) sees only that selection: there is no way to the
+ * rest of the catalogue from here. In every other case (administrator, demo, nothing known, any doubt, no batch
+ * could be made) nothing is hidden: it is the catalogue with its tabs and filters, as before.
  */
 export function JobsEntry({ ctx }: { ctx: Ctx }) {
-  const { unlock, jobsMode } = ctx;
+  const { unlock } = ctx;
   if (unlock.kind === "loading")
     return (
       <div className="empty" role="status">
         <LoaderCircle className="spin" aria-hidden /> Chargement de tes offres…
       </div>
     );
-  if (unlock.kind === "locking" && jobsMode === "picks") return <PicksView ctx={ctx} />;
+  if (unlock.kind === "locking") return <PicksView ctx={ctx} />;
   return (
     <>
       {unlock.kind === "action" && (
@@ -33,16 +33,9 @@ export function JobsEntry({ ctx }: { ctx: Ctx }) {
               </button>
             }
           >
-            {actionMessage(unlock.need)} En attendant, tout le catalogue est ouvert.
+            {actionMessage(unlock.need)}
           </Callout>
         </div>
-      )}
-      {unlock.kind === "locking" && (
-        <p style={{ marginBottom: 12 }}>
-          <button className="linkbtn" onClick={() => ctx.setJobsMode("picks")}>
-            ← Revenir à ma sélection
-          </button>
-        </p>
       )}
       <JobsView ctx={ctx} />
     </>

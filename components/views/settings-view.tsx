@@ -366,12 +366,8 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
       await refreshStatus();
       const imported = Number(body.imported) || 0;
       if (imported) await reload();
-      notify(
-        imported
-          ? `Recherche enregistrée : ${imported} offre(s) déjà connue(s) ajoutée(s) tout de suite, sans attendre la prochaine recherche.`
-          : "Recherche enregistrée. Elle sera utilisée au prochain lancement.",
-        "good",
-      );
+      // No promise about when offers arrive: a student gets his selection of the day, not a list filled at once.
+      notify("Recherche enregistrée : elle sert à choisir tes prochaines offres.", "good");
     } catch (error) {
       notify(error instanceof Error ? error.message : "Erreur", "bad");
     } finally {
@@ -439,8 +435,8 @@ function SearchSection({ ctx }: { ctx: Ctx }) {
             </Callout>
           )}
           <small className="muted">
-            Coche les métiers qui t’intéressent. Le nombre indique les offres déjà connues autour de toi
-            {counts ? ` (${counts.total} au total)` : ""}, ajoutées tout de suite à ta liste.
+            Coche les métiers qui t’intéressent : tes offres du jour sont choisies selon eux. Le nombre indique les offres connues autour de toi
+            {counts ? ` (${counts.total} au total)` : ""}.
           </small>
           <div className="categories">
             {CATEGORIES.map((c) => {
@@ -697,7 +693,7 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
       await ctx.refreshProfile();
       // 2. The suggested job categories, ticked in the search too. A failure here is not a failure to save the CV.
       if (!wanted.length) {
-        notify(profileSavedMessage({ picked: 0, imported: 0 }), "good");
+        notify(profileSavedMessage({ picked: 0 }), "good");
       } else {
         const current = await fetch("/api/settings").then((r) => r.json());
         const categories = [...new Set([...(current.prefs?.categories ?? []), ...wanted])];
@@ -710,7 +706,7 @@ function ProfileSection({ ctx, onCategories }: { ctx: Ctx; onCategories: () => v
         if (!put.ok) throw new Error(saved.error || "Métiers non enregistrés");
         onCategories();
         await reload();
-        notify(profileSavedMessage({ picked: wanted.length, imported: Number(saved.imported) || 0 }), "good");
+        notify(profileSavedMessage({ picked: wanted.length }), "good");
       }
     } catch {
       notify(categoriesFailedMessage(), "info");

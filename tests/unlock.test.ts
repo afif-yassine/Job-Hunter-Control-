@@ -9,6 +9,7 @@ import {
   parisDay,
   parseUnlocked,
   silhouetteCount,
+  studentSees,
   teaserText,
   todayBatchSize,
   unlockState,
@@ -150,12 +151,24 @@ test("the teaser counts the locked offers and never lists them", () => {
 
 test("the teaser says what the business judgment wrote, with the right number and agreement", () => {
   assert.equal(teaserText(8).title, "Tes offres du jour sont là");
-  assert.equal(teaserText(8).text, "Demain, de nouvelles offres choisies selon tes compétences. Celles que tu as déjà restent à toi. Tout le catalogue reste ouvert et gratuit.");
+  assert.equal(teaserText(8).text, "Demain, de nouvelles offres choisies selon tes compétences. Celles que tu as déjà restent à toi.");
   assert.equal(teaserText(3).title, "Aujourd’hui, 3 offres te correspondent");
   assert.equal(teaserText(1).title, "Aujourd’hui, 1 offre te correspond");
-  assert.equal(teaserText(3).text, "On préfère t’en montrer peu que t’en montrer de mauvaises. Tout le catalogue reste ouvert et gratuit.");
+  assert.equal(teaserText(3).text, "On préfère t’en montrer peu que t’en montrer de mauvaises.");
   assert.equal(teaserText(0).title, "Aujourd’hui, aucune offre ne correspond assez à ton profil");
-  assert.equal(teaserText(0).text, "Élargis tes métiers dans Réglages, ou explore tout le catalogue : il reste ouvert et gratuit.");
+  assert.equal(teaserText(0).text, "Élargis tes métiers dans Réglages.");
+});
+
+test("a student is told nothing about an open catalogue", () => {
+  const all = [0, 1, 3, 8].map((n) => `${teaserText(n).title} ${teaserText(n).text}`).join(" ");
+  assert.doesNotMatch(all, /catalogue|explor/i);
+});
+
+test("studentSees follows the selection when locking, and shows everything otherwise", () => {
+  const locking = unlockState({ demo: false, plan: "known", fetch: "done", answer: { unlocked: [{ jobId: "b", unlockedOn: "2026-10-09", origin: "daily" }], reason: null } });
+  assert.equal(studentSees(job("a"), locking, false), false);
+  assert.equal(studentSees(job("b"), locking, false), true);
+  assert.equal(studentSees(job("a"), { kind: "open", why: "failed" }, false), true);
 });
 
 test("no text of the teaser sells anything or promises what is forbidden", () => {

@@ -4,9 +4,10 @@ import { silhouetteCount, teaserText } from "@/components/unlock";
 /**
  * What comes next, said under the day's offers: a few DRAWN silhouettes (no real offer, no title, no company,
  * no score, no link: hidden from screen readers and not clickable) and the words of the business judgment.
- * The only button is "Explorer tout le catalogue". Nothing here sells anything: no price, no plan name.
+ * Nothing here sells anything: no price, no plan name, and no way to the rest of the catalogue. With no offer
+ * today, the one button leads to Réglages, where the jobs are chosen.
  */
-export function LockedTeaser({ batch, locked, onExplore }: { batch: number; locked: number; onExplore: () => void }) {
+export function LockedTeaser({ batch, locked, onSettings }: { batch: number; locked: number; onSettings: () => void }) {
   const { title, text } = teaserText(batch);
   const count = silhouetteCount(locked);
   return (
@@ -23,9 +24,11 @@ export function LockedTeaser({ batch, locked, onExplore }: { batch: number; lock
       <div className="teaser-text">
         <h2 id="teaser-title">{title}</h2>
         <p className="muted">{text}</p>
-        <button className="btn secondary" onClick={onExplore}>
-          Explorer tout le catalogue
-        </button>
+        {batch <= 0 && (
+          <button className="btn secondary" onClick={onSettings}>
+            Ouvrir Réglages
+          </button>
+        )}
       </div>
     </section>
   );

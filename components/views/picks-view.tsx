@@ -13,7 +13,7 @@ import type { Ctx } from "./types";
 /**
  * "Pour toi": the student's selection. The day's batch first (numbered by score), then what was unlocked on
  * earlier days, then what the account already had, folded. Locked offers are not listed here: a few drawn
- * silhouettes say there is more, and "Explorer tout le catalogue" opens the whole catalogue.
+ * silhouettes say there is more to come. A student has no other list of offers than this one.
  */
 export function PicksView({ ctx }: { ctx: Ctx }) {
   const { data, unlock, openOffer, act } = ctx;
@@ -58,7 +58,7 @@ export function PicksView({ ctx }: { ctx: Ctx }) {
         </section>
       )}
 
-      <LockedTeaser batch={batch} locked={locked} onExplore={() => ctx.setJobsMode("explore")} />
+      <LockedTeaser batch={batch} locked={locked} onSettings={() => ctx.go("settings")} />
 
       {!todayGroup && groups.length === 0 && <Empty title="Rien à montrer pour l’instant" text="Tes offres arrivent dès qu’elles sont choisies pour toi." />}
 

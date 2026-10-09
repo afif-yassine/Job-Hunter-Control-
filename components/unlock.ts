@@ -143,16 +143,26 @@ export function todayBatchSize(state: UnlockState, today: string): number {
   return n;
 }
 
-/** The words of the zone under the day's offers, exactly as the business judgment wrote them. */
+/**
+ * The words of the zone under the day's offers. A student sees only his selection, so none of them says that the
+ * catalogue is open: the owner's decision of 9 October. The 0 case points to Réglages (the only way to get offers).
+ */
 export function teaserText(batch: number): { title: string; text: string } {
-  const open = "Tout le catalogue reste ouvert et gratuit.";
-  if (batch >= DAILY_LIMIT) return { title: "Tes offres du jour sont là", text: `Demain, de nouvelles offres choisies selon tes compétences. Celles que tu as déjà restent à toi. ${open}` };
-  if (batch <= 0)
-    return { title: "Aujourd’hui, aucune offre ne correspond assez à ton profil", text: "Élargis tes métiers dans Réglages, ou explore tout le catalogue : il reste ouvert et gratuit." };
+  if (batch >= DAILY_LIMIT) return { title: "Tes offres du jour sont là", text: "Demain, de nouvelles offres choisies selon tes compétences. Celles que tu as déjà restent à toi." };
+  if (batch <= 0) return { title: "Aujourd’hui, aucune offre ne correspond assez à ton profil", text: "Élargis tes métiers dans Réglages." };
   return {
     title: `Aujourd’hui, ${batch} offre${batch > 1 ? "s" : ""} ${batch > 1 ? "te correspondent" : "te correspond"}`,
-    text: `On préfère t’en montrer peu que t’en montrer de mauvaises. ${open}`,
+    text: "On préfère t’en montrer peu que t’en montrer de mauvaises.",
   };
+}
+
+/**
+ * Does the student see this offer in his lists? THE one place of the rule: today a free and a paying account see
+ * exactly their selection (what is unlocked, added by hand, or already worked on); changing what a paying account
+ * sees is a one-line change here. Outside the "locking" state (administrator, demo, any doubt) everything is seen.
+ */
+export function studentSees(job: Pick<Job, "id" | "stage" | "status" | "source_platform">, state: UnlockState, hasKit: boolean): boolean {
+  return isUnlocked(job, state, hasKit);
 }
 
 /** The drawn silhouettes of the teaser: 4 to 6, never a picture of real offers. */

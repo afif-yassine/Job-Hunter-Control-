@@ -51,7 +51,7 @@ import { MoreView } from "@/components/views/more-view";
 import { AdminView } from "@/components/views/admin-view";
 import type { AdminOverview } from "@/lib/admin/overview";
 import { PageHead } from "@/components/ui";
-import type { Ctx, JobFilter, JobsMode, KitResult, Tone, View } from "@/components/views/types";
+import type { Ctx, JobFilter, KitResult, Tone, View } from "@/components/views/types";
 
 /** The student space: four places, the rest lives in "Plus" and in each offer's panel. */
 const NAV: { id: View; label: string; icon: LucideIcon }[] = [
@@ -156,7 +156,6 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
 
   const [view, setView] = useState<View>("home");
   const [jobFilter, setJobFilter] = useState<JobFilter>("new");
-  const [jobsMode, setJobsMode] = useState<JobsMode>("picks");
   const [openId, setOpenId] = useState<string | null>(null);
   const openJob = openId ? (data.jobs.find((j) => j.id === openId) ?? null) : null;
   // The last move of each offer, so "Revenir à l’étape d’avant" restores it.
@@ -211,10 +210,7 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
       return;
     }
     setView(next);
-    if (filter) setJobFilter(filter);
-    // "Offres" opens the student's selection; asking for a given tab (new, all…) opens the whole catalogue on it.
-    if (next === "jobs") setJobsMode(filter ? "explore" : "picks");
-    try {
+    if (filter) setJobFilter(filter);    try {
       window.history.replaceState(null, "", `#${next}`);
     } catch {
       // ignore
@@ -492,8 +488,6 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo }: { userEm
     catalogueRefreshedAt,
     jobFilter,
     setJobFilter,
-    jobsMode,
-    setJobsMode,
     openOffer,
     act,
     adminDemo: demo?.admin,

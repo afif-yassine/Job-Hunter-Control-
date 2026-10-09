@@ -18,7 +18,7 @@ import { CV_SAVED_NOTE, profileCardLines } from "@/components/profile-card";
 import { openQuestionCount } from "@/components/questions-panel";
 import { Callout, PageHead, Progress } from "@/components/ui";
 import { kitsByJob, stageOf, todayTasks, TRACK } from "@/lib/journey";
-import { parisDay } from "@/components/unlock";
+import { parisDay, studentSees } from "@/components/unlock";
 import { compareShown } from "./closest";
 import { OfferCard } from "./offer-card";
 import { summarize } from "@/lib/pipeline-client";
@@ -90,7 +90,8 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
   const tasks = todayTasks(jobs);
   const kits = kitsByJob(documents);
   const counts = Object.fromEntries(TRACK.map((c) => [c.id, jobs.filter((j) => c.stages.includes(stageOf(j))).length])) as Record<string, number>;
-  const fresh = jobs.filter((j) => stageOf(j) === "new" && !j.review_flag && !j.gone_reason);
+  // A student sees only his selection (components/unlock.ts studentSees); in every other state this is everything.
+  const fresh = jobs.filter((j) => stageOf(j) === "new" && !j.review_flag && !j.gone_reason && studentSees(j, ctx.unlock, kits.has(j.id)));
   // With a selection, "Nouvelles offres pour toi" is today's batch; without one, the newest offers as before.
   const batchDay = parisDay();
   const todays =

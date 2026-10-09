@@ -3,10 +3,10 @@ import type { ProfileSummary } from "@/lib/profile-store";
 /** Said wherever the saved CV is shown, so nobody uploads it again by habit. */
 export const CV_SAVED_NOTE = "Ton CV est enregistré : tu n’as pas besoin de le déposer à nouveau, sauf pour le remplacer.";
 
-/** The confirmation after a saved profile, with the suggested jobs ticked or without. */
-export function profileSavedMessage(input: { picked: number; imported: number }): string {
+/** The confirmation after a saved profile, with the suggested jobs ticked or without. It promises no offer. */
+export function profileSavedMessage(input: { picked: number }): string {
   if (!input.picked) return "Profil enregistré : tes prochains CV et lettres partiront de lui.";
-  return `Profil enregistré. ${input.picked} métier(s) coché(s)${input.imported ? `, ${input.imported} offre(s) ajoutée(s) tout de suite` : ""}.`;
+  return `Profil enregistré. ${input.picked} métier(s) coché(s).`;
 }
 
 /** The profile is saved but the suggested jobs could not be ticked: say so plainly, and where to do it by hand. */

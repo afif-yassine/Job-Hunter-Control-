@@ -25,8 +25,6 @@ export type View =
 
 export type SummarizeResult = "ok" | "gone" | "failed";
 
-export type JobsMode = "picks" | "explore";
-
 /** What came of "Créer mon CV et ma lettre". "locked": the server refused because the offer is not in the student's selection. */
 export type KitResult = "ok" | "locked" | "failed";
 
@@ -69,9 +67,6 @@ export type Ctx = {
   catalogueRefreshedAt: string | null;
   jobFilter: JobFilter;
   setJobFilter: (filter: JobFilter) => void;
-  /** "picks": the student's selection (day's batch). "explore": the whole catalogue with its tabs and filters. */
-  jobsMode: JobsMode;
-  setJobsMode: (mode: JobsMode) => void;
   /** Opens the offer panel (and marks the offer as seen). */
   openOffer: (job: Job) => void;
   act: {

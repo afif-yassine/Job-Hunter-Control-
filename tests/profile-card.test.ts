@@ -35,9 +35,10 @@ test("an unknown file or date is never invented", () => {
 });
 
 test("the confirmation after a saved profile says what happened to the suggested jobs", () => {
-  assert.equal(profileSavedMessage({ picked: 0, imported: 0 }), "Profil enregistré : tes prochains CV et lettres partiront de lui.");
-  assert.equal(profileSavedMessage({ picked: 3, imported: 0 }), "Profil enregistré. 3 métier(s) coché(s).");
-  assert.equal(profileSavedMessage({ picked: 3, imported: 12 }), "Profil enregistré. 3 métier(s) coché(s), 12 offre(s) ajoutée(s) tout de suite.");
+  assert.equal(profileSavedMessage({ picked: 0 }), "Profil enregistré : tes prochains CV et lettres partiront de lui.");
+  assert.equal(profileSavedMessage({ picked: 3 }), "Profil enregistré. 3 métier(s) coché(s).");
+  // No promise of offers added at once: a student gets his selection of the day.
+  assert.doesNotMatch(profileSavedMessage({ picked: 3 }), /offre|tout de suite/);
 });
 
 test("when the jobs could not be ticked, the profile is still said saved and the student is told where to choose them", () => {
