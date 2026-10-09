@@ -1,3 +1,4 @@
+import { compareShown } from "@/components/views/closest";
 import { stageOf, type Stage } from "@/lib/journey";
 import type { Job } from "@/lib/types";
 
@@ -144,7 +145,8 @@ export function groupByUnlockDay(jobs: Job[], state: UnlockState, hasKit: (job: 
     ...[...backfill.entries()].sort(newestFirst).map(([day, list]): UnlockGroup => ({ key: `backfill-${day}`, kind: "backfill", day, label: `Avant le ${longDate(day, today)}`, jobs: list })),
   ];
   if (followed.length) groups.push({ key: "followed", kind: "followed", day: null, label: "Déjà suivies", jobs: followed });
-  return groups;
+  // Inside every group: the displayed score, highest first; offers without a score at the end.
+  return groups.map((g) => ({ ...g, jobs: [...g.jobs].sort(compareShown) }));
 }
 
 /** How many offers of the day's batch (counted from the server's list, not from what the screen shows). */

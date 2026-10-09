@@ -5,7 +5,6 @@ import { Callout, Empty, PageHead } from "@/components/ui";
 import { COMPUTING_TEXT, DEGRADED_TEXT, groupByUnlockDay, lockedCount, parisDay, todayBatchSize } from "@/components/unlock";
 import { kitsByJob, stageOf } from "@/lib/journey";
 import type { Job } from "@/lib/types";
-import { compareShown } from "./closest";
 import { LockedTeaser } from "./locked-teaser";
 import { OfferCard } from "./offer-card";
 import type { Ctx } from "./types";
@@ -24,7 +23,7 @@ export function PicksView({ ctx }: { ctx: Ctx }) {
   const visible = useMemo(() => data.jobs.filter((j) => stageOf(j) !== "dismissed"), [data.jobs]);
   const hasKit = (job: Job) => kits.has(job.id);
   const groups = useMemo(
-    () => groupByUnlockDay(visible, unlock, (job) => kits.has(job.id), today).map((g) => ({ ...g, jobs: [...g.jobs].sort(compareShown) })),
+    () => groupByUnlockDay(visible, unlock, (job) => kits.has(job.id), today),
     [visible, unlock, kits, today],
   );
   const batch = todayBatchSize(unlock, today);

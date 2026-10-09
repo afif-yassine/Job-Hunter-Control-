@@ -189,6 +189,13 @@ test("the new contract fields: manual origin, newToday and the new reasons", () 
   assert.equal(DEGRADED_TEXT, "Ta sélection du jour n’a pas pu être préparée. Réessaie dans un moment.");
 });
 
+test("every group is ranked by displayed score, highest first, offers without a score last", () => {
+  const scored = (id: string, score: number | null) => job(id, { fit: score === null ? null : { score } });
+  const state = locking({ a: "2026-10-08", b: "2026-10-08", c: "2026-10-08", d: "2026-10-07", e: "2026-10-07" });
+  const groups = groupByUnlockDay([scored("a", null), scored("b", 40), scored("c", 90), scored("d", 10), scored("e", 70)], state, noKit, "2026-10-08");
+  assert.deepEqual(groups.map((g) => g.jobs.map((j) => j.id)), [["c", "b", "a"], ["e", "d"]]);
+});
+
 test("COMPUTING keeps the lock, even with an empty list, and says the selection is being prepared", () => {
   for (const unlocked of [[], [{ jobId: "a", unlockedOn: "2026-10-08", origin: "daily" as const }]]) {
     const state = unlockState({ demo: false, plan: "known", fetch: "done", answer: { unlocked, reason: "COMPUTING", newToday: null } });
