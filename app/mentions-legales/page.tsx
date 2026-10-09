@@ -17,7 +17,8 @@ export default function LegalNoticePage() {
       <h2>Éditeur du site</h2>
       <p>
         {BRAND.name} est publié par <strong>{BRAND.publisher}</strong>, {BRAND.publisherStatus.toLowerCase()}. Le service est
-        gratuit pendant sa phase de test.
+        gratuit aujourd’hui (2 dossiers par mois). Une formule payante, LeBonTaf Plus, est présentée sur la page{" "}
+        <Link href="/tarifs">Tarifs</Link> ; le paiement n’est pas encore ouvert.
       </p>
       <ul>
         <li>Adresse du site : <a href={BRAND.siteUrl}>{BRAND.siteUrl.replace("https://", "")}</a></li>

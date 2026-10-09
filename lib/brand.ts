@@ -7,11 +7,11 @@ export const BRAND = {
   name: "LeBonTaf",
   /** Publisher of the site (LCEN art. 6): an individual while the product is in its free test phase. */
   publisher: "Yassine Afif",
-  publisherStatus: "Particulier, projet en phase de test, sans activité commerciale",
+  publisherStatus: "Particulier, projet en phase de test",
   contactEmail: "support@lebontaf.com",
   siteUrl: "https://lebontaf.com",
   /** Date shown at the top of the legal pages; update it with every change of their content. */
-  legalUpdatedAt: "4 octobre 2026",
+  legalUpdatedAt: "9 octobre 2026",
 } as const;
 
 export const HOSTS = [
