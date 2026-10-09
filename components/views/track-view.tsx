@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { BellRing, CalendarDays } from "lucide-react";
-import { Empty, PageHead, Soon } from "@/components/ui";
+import { Empty, PageHead } from "@/components/ui";
 import { followUpDue, kitsByJob, stageOf, TRACK } from "@/lib/journey";
 import { Milestones, ScoreRing } from "./offer-card";
 import type { Ctx } from "./types";
@@ -101,7 +101,6 @@ export function TrackView({ ctx }: { ctx: Ctx }) {
           </div>
         </>
       )}
-      {total > 0 && <Soon id="gmail-replies" />}
       {dismissed.length > 0 && (
         <div className="track-dismissed">
           <button className="linkbtn small-text" onClick={() => setShowDismissed((v) => !v)}>

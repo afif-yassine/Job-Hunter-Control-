@@ -108,7 +108,8 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
 
   // Small things that still block a step, shown after the journey tasks.
   const extras: { icon: typeof CircleHelp; title: string; text: string; onClick: () => void }[] = [];
-  if (openQuestions)
+  // Form questions are read only for the administrator: a student never has any.
+  if (openQuestions && status?.isAdmin)
     extras.push({
       icon: CircleHelp,
       title: `${openQuestions} question${openQuestions > 1 ? "s" : ""} de formulaire`,

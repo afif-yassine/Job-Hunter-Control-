@@ -1,20 +1,19 @@
 "use client";
-import { Activity, ChevronRight, CircleHelp, FileText, Gauge, LogOut, Map as MapIcon, Settings, ShieldCheck, Sparkles } from "lucide-react";
+import { Activity, ChevronRight, CircleHelp, FileText, Gauge, LogOut, Settings, ShieldCheck, Sparkles } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { PageHead } from "@/components/ui";
 import type { Ctx, View } from "./types";
 
 const ITEMS: { id: View; label: string; text: string; icon: typeof Settings }[] = [
   { id: "documents", label: "Mes documents", text: "Tous tes CV et lettres, offre par offre", icon: FileText },
-  { id: "questions", label: "Mes réponses", text: "Tes réponses aux questions des formulaires, réutilisées partout", icon: CircleHelp },
   { id: "settings", label: "Réglages", text: "Ton CV, tes métiers, ton compte", icon: Settings },
-  { id: "roadmap", label: "Feuille de route", text: "Ce qui marche, ce qui est en cours, ce qui arrive", icon: MapIcon },
 ];
 
 export function MoreView({ ctx, badge }: { ctx: Ctx; badge: (id: View) => number }) {
   const items = ctx.status?.isAdmin
     ? [
         ...ITEMS,
+        { id: "questions" as View, label: "Mes réponses", text: "Réponses aux questions des formulaires (admin)", icon: CircleHelp },
         { id: "activity" as View, label: "Activité", text: "Journal technique des recherches (admin)", icon: Activity },
         { id: "admin" as View, label: "Espace admin", text: "Croissance, niveaux, coûts, sources d’offres", icon: Gauge },
       ]

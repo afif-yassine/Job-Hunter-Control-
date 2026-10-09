@@ -20,8 +20,7 @@ export type View =
   | "applications"
   | "activity"
   | "settings"
-  | "admin"
-  | "roadmap";
+  | "admin";
 
 export type SummarizeResult = "ok" | "gone" | "failed";
 

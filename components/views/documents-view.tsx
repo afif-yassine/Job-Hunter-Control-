@@ -1,6 +1,6 @@
 "use client";
 import { CloudUpload, Code2, ExternalLink, FileText, Pencil, Sparkles } from "lucide-react";
-import { Chip, Empty, PageHead, Soon } from "@/components/ui";
+import { Chip, Empty, PageHead } from "@/components/ui";
 import { DOCUMENT_KIND } from "@/lib/labels";
 import type { DocumentRecord } from "@/lib/types";
 import type { Ctx } from "./types";
@@ -87,7 +87,6 @@ export function DocumentsView({ ctx }: { ctx: Ctx }) {
             : "Relis tes CV et lettres, modifie-les si besoin, puis postule sur le site de l’offre."
         }
       />
-      <Soon id="versions" />
       <div className="cards">
         {groups.map((group) => {
           const current = group.docs.filter((d) => !replacedBy.has(d.id));

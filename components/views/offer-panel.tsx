@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { followUpDue, isSent, stageOf, type Stage } from "@/lib/journey";
-import { Soon } from "@/components/ui";
 import { DOCUMENT_KIND, platformsOf, REVIEW } from "@/lib/labels";
 import type { DocumentRecord, Job, OfferSummary } from "@/lib/types";
 import { aiScore, listScore } from "./closest";
@@ -551,7 +550,6 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                   )}
                 </div>
               )}
-              {stage === "interview" && <Soon id="interview" />}
             </JourneyStep>
             <JourneyStep
               done={stage === "offer" || stage === "rejected"}

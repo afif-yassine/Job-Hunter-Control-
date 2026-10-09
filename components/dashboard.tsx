@@ -14,7 +14,6 @@ import {
   Search,
   Settings,
   SquareKanban,
-  Map as MapIcon,
   ShieldCheck,
   Sparkles,
   Gauge,
@@ -42,7 +41,6 @@ import { OnboardingView } from "@/components/views/onboarding-view";
 import { useSessionGuard } from "@/components/use-session-guard";
 import { Callout, Progress } from "@/components/ui";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { RoadmapView } from "@/components/views/roadmap-view";
 import { HomeView } from "@/components/views/home-view";
 import { JobsEntry } from "@/components/views/jobs-entry";
 import { DocumentsView } from "@/components/views/documents-view";
@@ -64,20 +62,18 @@ const NAV: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "track", label: "Mon suivi", icon: SquareKanban },
   { id: "settings", label: "Réglages", icon: Settings },
 ];
-const SECONDARY_NAV: { id: View; label: string; icon: LucideIcon }[] = [
-  { id: "documents", label: "Mes documents", icon: FileText },
-  { id: "questions", label: "Mes réponses", icon: CircleHelp },
-];
+const SECONDARY_NAV: { id: View; label: string; icon: LucideIcon }[] = [{ id: "documents", label: "Mes documents", icon: FileText }];
 const TABS: { id: View; label: string; icon: LucideIcon }[] = [
   ...NAV.slice(0, 3),
   { id: "more", label: "Plus", icon: Ellipsis },
 ];
 const ADMIN_NAV = [
+  { id: "questions" as View, label: "Mes réponses", icon: CircleHelp },
   { id: "activity" as View, label: "Activité", icon: Activity },
   { id: "admin" as View, label: "Espace admin", icon: Gauge },
 ];
-const VIEWS = new Set<string>(["home", "jobs", "track", "documents", "questions", "more", "admin", "activity", "settings", "roadmap"]);
-const MORE_VIEWS = new Set<View>(["more", "documents", "questions", "activity", "settings", "admin", "roadmap"]);
+const VIEWS = new Set<string>(["home", "jobs", "track", "documents", "questions", "more", "admin", "activity", "settings"]);
+const MORE_VIEWS = new Set<View>(["more", "documents", "questions", "activity", "settings", "admin"]);
 
 /** A pasted announcement shorter than this is never summarised by the shared reader (lib/offer-reader.ts, migration 20261007111753). */
 const DESCRIPTION_MIN_CHARS = 120;
@@ -523,7 +519,7 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
     pricing,
   };
   const nav = NAV;
-  const subNav = [...SECONDARY_NAV, { id: "roadmap" as View, label: "Feuille de route", icon: MapIcon }, ...(status?.isAdmin ? ADMIN_NAV : [])];
+  const subNav = [...SECONDARY_NAV, ...(status?.isAdmin ? ADMIN_NAV : [])];
   const tasks = todayTasks(data.jobs).length;
 
   const unread = data.notifications.filter((n) => !n.read_at).length;
@@ -537,7 +533,7 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
           ? tasks
           : 0
         : id === "more"
-          ? openQuestions
+          ? status?.isAdmin ? openQuestions : 0
           : id === "activity"
             ? unread
             : id === "admin"
@@ -700,6 +696,10 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
             <JobsEntry ctx={ctx} />
           ) : view === "documents" ? (
             <DocumentsView ctx={ctx} />
+          ) : view === "questions" && !status?.isAdmin ? (
+            <HomeView ctx={ctx} />
+          ) : view === "questions" && !status?.isAdmin ? (
+            <HomeView ctx={ctx} />
           ) : view === "questions" ? (
             <>
               <PageHead
@@ -716,8 +716,6 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
             <SettingsView ctx={ctx} />
           ) : view === "admin" && status?.isAdmin ? (
             <AdminView ctx={ctx} />
-          ) : view === "roadmap" ? (
-            <RoadmapView />
           ) : (
             <MoreView ctx={ctx} badge={badge} />
           )}
