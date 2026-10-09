@@ -168,7 +168,7 @@ test("ROUTE — the scan route decides on the server and spends no quota only fo
   const route = readFileSync("app/api/scan/route.ts", "utf8");
   const admin = route.indexOf("await isAdmin(auth.supabase)");
   assert.ok(admin > 0 && admin < route.indexOf("consumeQuota(auth.supabase"), "the administrator is determined before the quota");
-  assert.match(route, /const catalogueOnly = !admin && studentCatalogueOnly\(\)/);
+  assert.match(route, /const catalogueOnly = !admin && \(studentCatalogueOnly\(\) \|\| gate\.active\)/);
   assert.match(route, /if \(!catalogueOnly\) \{\s*const quota = await consumeQuota/);
   assert.match(route, /student: !admin,\s*catalogueOnly,/);
   assert.doesNotMatch(route, /student: body|catalogueOnly: body/);

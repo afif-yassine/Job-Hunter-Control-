@@ -124,10 +124,16 @@ export async function runScan(ctx: {
   catalogueOnly?: boolean;
 }): Promise<ScanSummary> {
   const student = Boolean(ctx.student || ctx.catalogueOnly);
+  // Daily selection (migration 20261009090000): once it applies to this account, nothing a job site returns
+  // reaches the list, so no job site is called at all (their quota would be spent for nothing), whatever
+  // STUDENT_CATALOGUE_ONLY says. The administrator is never concerned.
+  const cacheDb = ctx.cacheDb !== undefined ? ctx.cacheDb : serviceClient();
+  const gate = student ? await unlockGate(ctx.supabase, ctx.userId, cacheDb) : ({ active: false } as const);
+  const catalogueOnly = Boolean(ctx.catalogueOnly) || gate.active;
   // Keys typed in the dashboard win over Vercel variables.
   const env = ctx.env ?? {
     ...process.env,
-    ...(ctx.catalogueOnly ? {} : await loadIntegrationEnv(ctx.supabase, ctx.userId)),
+    ...(catalogueOnly ? {} : await loadIntegrationEnv(ctx.supabase, ctx.userId)),
   };
   const has = (name: string) => Boolean(env[name]?.trim());
   // A platform key (Vercel) is shared by every account: its free budget and
@@ -140,7 +146,7 @@ export async function runScan(ctx: {
   const config = configFromPrefs(settings.prefs);
   // Companies the app found by itself on a recruitment platform (see discover.ts)
   // are read like the ones typed in Réglages. null = column not migrated yet.
-  const discovered = ctx.catalogueOnly ? null : await loadDiscovered(ctx.supabase, ctx.userId);
+  const discovered = catalogueOnly ? null : await loadDiscovered(ctx.supabase, ctx.userId);
   const manualKeys = new Set(config.targets.map(targetKey));
   if (discovered)
     for (const t of discoveredTargets(discovered)) if (!manualKeys.has(targetKey(t))) config.targets.push(t);
@@ -172,7 +178,6 @@ export async function runScan(ctx: {
   const collected: ScannedOffer[] = [];
   // Careers boards read in full this scan → every link they list.
   const listedBoards: Record<string, string[]> = {};
-  const cacheDb = ctx.cacheDb !== undefined ? ctx.cacheDb : serviceClient();
   // Budgets and source health are platform data: written with the service
   // client only (accounts cannot call these functions themselves).
   const platformDb = cacheDb ?? ctx.supabase;
@@ -390,11 +395,13 @@ export async function runScan(ctx: {
       reports.push({ source: name, status: "ok", found, message: errors.length ? errors.slice(0, 3).join(" ; ") : undefined });
   };
 
-  if (ctx.catalogueOnly)
+  if (catalogueOnly)
     reports.push({ source: "Sources d’emploi externes", status: "skipped", found: 0, message: "Réservées à la collecte automatique de la plateforme : ta liste vient du catalogue commun." });
   // Operator-level sources are for the administrator's account only.
   const allowed = sources.filter((s) => !(student && (s.id === "gmail" || s.id === "webhook")));
-  await Promise.all(ctx.catalogueOnly ? [runCareers()] : [...allowed.map(runSource), runCareers()]);
+  // Selection active: the pages carrière typed by the account are read by the platform's own harvest (it
+  // knows every account's boards), and what they return would not be copied here: nothing is read per account.
+  await Promise.all(gate.active ? [] : catalogueOnly ? [runCareers()] : [...allowed.map(runSource), runCareers()]);
 
   // Learn new companies from the links of what was just found.
   let discoveredCount = 0;
@@ -405,7 +412,7 @@ export async function runScan(ctx: {
   }
 
   // Company careers pages and the catalogue alone do not need any key.
-  const configured = ctx.catalogueOnly || sources.some((s) => s.enabled) || config.targets.length > 0 || fromCatalogue.offers.length > 0;
+  const configured = catalogueOnly || sources.some((s) => s.enabled) || config.targets.length > 0 || fromCatalogue.offers.length > 0;
   const relevant = collected.filter(isRelevant);
   // Shared catalogue: store / refresh what was seen, close what left its board,
   // expire what nobody has seen for 3 weeks. Never blocks the scan.
@@ -427,7 +434,6 @@ export async function runScan(ctx: {
   const entries = harvest.error ? new Map(fromCatalogue.entries) : new Map([...fromCatalogue.entries, ...harvest.entries]);
   // Daily selection (migration 20261009090000): a student's list only receives the offers unlocked
   // for the account, today's lot included. Offers outside the catalogue are not copied at all.
-  const gate = student ? await unlockGate(ctx.supabase, ctx.userId, cacheDb) : ({ active: false } as const);
   const ingest = gate.active
     ? await ensureDailyBatch(ctx.supabase, gate, ctx.userId).then((b) => ({ inserted: b.inserted, duplicates: 0, alreadyApplied: 0, toReview: 0, suspected: 0, needsDescription: 0, error: undefined as string | undefined }))
     : await ingestOffers(ctx.supabase, ctx.userId, [...relevant, ...imported], entries.size ? entries : undefined);

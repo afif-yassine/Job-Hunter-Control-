@@ -3,6 +3,7 @@ import { authenticatedClient } from "@/lib/api";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
 import { runScan, scanMessage, SETUP_HINT } from "@/lib/scan";
 import { studentCatalogueOnly } from "@/lib/scan/config";
+import { unlockGate } from "@/lib/unlock";
 
 // France Travail + Gmail take a few seconds; allow up to a minute.
 export const maxDuration = 60;
@@ -19,7 +20,10 @@ export async function POST(req: Request) {
   // The decision is the server's: the administrator's search is the only one that may use the
   // operator's mailbox and webhook, and (once the owner switches it on) call job sites.
   const admin = await isAdmin(auth.supabase);
-  const catalogueOnly = !admin && studentCatalogueOnly();
+  // With the daily selection active for this account, no job site is called either (runScan does the same),
+  // so the update costs nothing outside and does not spend the daily scan quota.
+  const gate = admin ? ({ active: false } as const) : await unlockGate(auth.supabase, auth.userId);
+  const catalogueOnly = !admin && (studentCatalogueOnly() || gate.active);
   // Scheduled server scans are free; scans started from the dashboard are counted.
   // A catalogue-only update costs nothing outside, so it does not spend the daily scan quota.
   if (!catalogueOnly) {
