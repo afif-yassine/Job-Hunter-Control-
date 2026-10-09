@@ -18,6 +18,12 @@ import { CV_SAVED_NOTE, profileCardLines } from "@/components/profile-card";
 import { openQuestionCount } from "@/components/questions-panel";
 import { Callout, PageHead, Progress } from "@/components/ui";
 import { kitsByJob, stageOf, todayTasks, TRACK } from "@/lib/journey";
+import { monthBanner } from "@/components/panel-notes";
+import { PlusOfferCard } from "@/components/plus-offer-card";
+import { afterBannerClosed, canShowBanner, kitsUsedUp, plusEligible } from "@/components/plus-offer";
+import { pricingHref } from "@/components/pricing";
+import { PLUS_BUTTON } from "@/components/teaser-cards";
+import { usePlusStore } from "@/components/use-plus-store";
 import { DAILY_LIMIT, parisDay, studentSees } from "@/components/unlock";
 import { compareShown } from "./closest";
 import { OfferCard } from "./offer-card";
@@ -105,6 +111,10 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
     .sort(compareShown)
     .slice(0, 4);
   const plan = status?.plan;
+  // Moment "bandeau" (shared with "Pour toi"): replaces the plan card while the month's kits are used up.
+  const plus = usePlusStore();
+  const eligible = plusEligible({ pricing: ctx.pricing, demo: ctx.demo, onboarding: false, isAdmin: status?.isAdmin === true, plan, unlock: ctx.unlock });
+  const showBanner = eligible && plus.ready && kitsUsedUp(plan) && canShowBanner(plus.store, parisDay());
 
   // Small things that still block a step, shown after the journey tasks.
   const extras: { icon: typeof CircleHelp; title: string; text: string; onClick: () => void }[] = [];
@@ -150,7 +160,18 @@ export function HomeView({ ctx }: { ctx: Ctx }) {
         ))}
       </section>
 
-      {plan && plan.limit !== null && (
+      {showBanner && plan && plan.limit !== null && (
+        <PlusOfferCard
+          title={monthBanner(plan.limit, plan.resetsOn).title}
+          action={PLUS_BUTTON}
+          href={pricingHref("bandeau")}
+          onClose={() => plus.update((s) => afterBannerClosed(s, parisDay()))}
+        >
+          {monthBanner(plan.limit, plan.resetsOn).text}
+        </PlusOfferCard>
+      )}
+
+      {!showBanner && plan && plan.limit !== null && (
         <div className={`plan-card card${plan.used >= plan.limit ? " is-full" : ""}`}>
           <div>
             <strong>Offre gratuite</strong>
