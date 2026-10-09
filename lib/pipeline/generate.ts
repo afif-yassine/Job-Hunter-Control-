@@ -4,7 +4,7 @@ import { recordAiUsage } from "@/lib/ai-usage";
 import { generated, parseJson, type Generated } from "@/lib/generated";
 import { selectWritingProofs, unsupportedWritingSkills, writingVersion, WRITING_RULES } from "@/lib/writing-context";
 import { queueQuestions, type QueueResult } from "@/lib/question-store";
-import { checkPlan } from "@/lib/plan";
+import { checkPlan, recordKit } from "@/lib/plan";
 import { PROFILE_REQUIRED, PROFILE_REQUIRED_MESSAGE } from "@/lib/profile-store";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
 import { OFFER_LOCKED, OFFER_LOCKED_MESSAGE, offerLocked } from "@/lib/unlock";
@@ -175,6 +175,8 @@ async function generateKit(ctx: Ctx): Promise<StepResult> {
       .insert(docs.map(({ model: _m, ...rest }) => (void _m, rest)))
       .select());
   if (error) return { status: 400, body: { error: error.message } };
+  // Server-held trace of the kit: deleting the documents later does not give the allowance back.
+  await recordKit(supabase, userId, id);
 
   let { data: application } = await supabase
     .from("applications")

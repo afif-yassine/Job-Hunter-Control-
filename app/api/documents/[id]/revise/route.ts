@@ -14,6 +14,7 @@ import {
 import { parseContent, versionedFilename } from "@/lib/documents";
 import { normaliseGenerated, parseJson, asRecord, asText } from "@/lib/generated";
 import { queueQuestions } from "@/lib/question-store";
+import { checkMonthlyCap } from "@/lib/plan";
 import { consumeRevisionQuota, quotaRefusal } from "@/lib/quota";
 
 const input = z.object({ instruction: z.string().trim().min(3).max(2000) });
@@ -90,6 +91,8 @@ PREUVES=${JSON.stringify(proofs)}
 OFFRE=${JSON.stringify({ title: job?.title, company: job?.company, description: job?.description })}`;
 
   // Free for the student but capped per day: each revision is a paid model call, taken before it and not given back.
+  const monthly = await checkMonthlyCap(supabase, userId, "revision");
+  if (!monthly.ok) return Response.json(monthly.body, { status: monthly.status });
   const quota = await consumeRevisionQuota(supabase, userId);
   if (!quota.ok) {
     const refusal = quotaRefusal(quota.kind, quota.limit, quota.unavailable);

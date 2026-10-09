@@ -8,6 +8,7 @@ import { fetchJobText } from "@/lib/scan/enrich";
 import { serviceClient } from "@/lib/supabase/admin";
 import { recordSourceRun } from "@/lib/scan/health";
 import { detectSuspicion } from "@/lib/scan/suspicion";
+import { checkMonthlyCap } from "@/lib/plan";
 import { OFFER_LOCKED, OFFER_LOCKED_MESSAGE, offerLocked } from "@/lib/unlock";
 import { closedInCatalogue, markGoneForStudent } from "./availability";
 
@@ -190,6 +191,10 @@ export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
   }
 
   if (!profile) return { status: 409, body: { error: "Le profil vérifié n’est pas encore synchronisé." } };
+
+  // A paid account has a monthly ceiling too (the free plan: the daily limit only).
+  const monthly = await checkMonthlyCap(ctx.supabase, ctx.userId, "analysis", env);
+  if (!monthly.ok) return { status: monthly.status, body: monthly.body };
 
   const quota = await consumeQuota(ctx.supabase, ctx.userId, "analysis", env);
   if (!quota.ok) return quotaRefusal("analysis", quota.limit, quota.unavailable);
