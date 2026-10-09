@@ -774,6 +774,11 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .grow-origin.is-assumption { border-style: dashed; }
 .grow-kpi .grow-origin { margin-left: 0; margin-right: 6px; }
 /* Balance of the AI key (admin space) */
+/* The card that proposes LeBonTaf Plus: the close button is always there */
+.plus-offer { position: relative; display: grid; gap: 8px; padding-right: 44px; }
+.plus-offer p { margin: 0; }
+.plus-offer .btn { justify-self: start; }
+.plus-offer-close { position: absolute; top: 8px; right: 8px; }
 /* A message must stay readable above the open offer panel (80) */
 .toast { z-index: 95; }
 /* The guided sign-up: full screen, one step at a time */
