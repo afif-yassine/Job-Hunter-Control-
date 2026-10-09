@@ -106,7 +106,7 @@ function departmentOf(location: string | null | undefined): string | null {
  * endpoints only look up RDV/candidature windows for an already-known
  * formation (by numeroSession/numeroAction/numeroFormation) — it has no
  * search-by-métier endpoint, so it can't power a "suggest a training"
- * feature. See lib/france-travail/formation.ts for the full note.
+ * feature.
  */
 async function enrichWithFranceTravail(
   ctx: Ctx,

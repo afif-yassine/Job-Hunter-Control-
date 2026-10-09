@@ -126,7 +126,7 @@ export const ENRICHMENT_SOURCES: EnrichmentSource[] = [
     urlVar: "FRANCE_TRAVAIL_FORMATION_URL",
     unused: true,
     cost: "Gratuit",
-    usedFor: "Pas de recherche par métier possible avec cette API : non utilisée dans Job Hunter Control pour l’instant (voir lib/france-travail/formation.ts).",
+    usedFor: "Pas de recherche par métier possible avec cette API : non utilisée dans Job Hunter Control pour l’instant.",
   },
   {
     id: "ft:marche",

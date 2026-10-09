@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { fetchAccessRate } from "../lib/france-travail/acces-emploi";
 import { franceTravailApiReady, getFranceTravailToken } from "../lib/france-travail/client";
-import { fetchTrainingSuggestions } from "../lib/france-travail/formation";
 import { fetchMarketInsight } from "../lib/france-travail/market";
 
 const realFetch = globalThis.fetch;
@@ -88,39 +86,4 @@ test("fetchMarketInsight: POSTs a JSON body (confirmed shape), tolerant to field
 test("fetchMarketInsight: a 204 (no data for this métier) is not an error", async () => {
   globalThis.fetch = fetchSequence(new Response(JSON.stringify({ access_token: "tok" })), new Response(null, { status: 204 }));
   assert.equal(await fetchMarketInsight({ romeCode: "M1805", department: "75" }, READY_ENV), null);
-});
-
-test("fetchTrainingSuggestions: kept unused (Open Formation has no search-by-métier endpoint), returns [] when not configured", async () => {
-  assert.deepEqual(await fetchTrainingSuggestions({ romeCode: "M1805" }, {}), []);
-});
-
-test("fetchAccessRate: not configured or no department → null; reads the rate once configured", async () => {
-  assert.equal(await fetchAccessRate({ romeCode: "M1805" }, {}), null);
-  assert.equal(await fetchAccessRate({ romeCode: "M1805" }, READY_ENV), null); // no department
-  globalThis.fetch = fetchSequence(
-    new Response(JSON.stringify({ access_token: "tok" })),
-    new Response(JSON.stringify({ resultats: [{ tauxAcces6Mois: 62.4 }] })),
-  );
-  const result = await fetchAccessRate({ romeCode: "M1805", department: "75" }, READY_ENV);
-  assert.equal(result?.rate6Months, 62.4);
-});
-
-test("fetchAccessRate: POSTs the confirmed ACC_1 body shape (own endpoint docs, Sept 2026)", async () => {
-  let body: unknown;
-  let call = 0;
-  globalThis.fetch = (async (_url, init) => {
-    call++;
-    if (call === 1) return new Response(JSON.stringify({ access_token: "tok" }));
-    body = init?.body;
-    return new Response(JSON.stringify({ resultats: [{ tauxAcces6Mois: 62.4 }] }));
-  }) as typeof fetch;
-  await fetchAccessRate({ romeCode: "A1203", department: "75" }, READY_ENV);
-  assert.deepEqual(JSON.parse(body as string), {
-    codeTypeTerritoire: "DEP",
-    codeTerritoire: "75",
-    codeTypeActivite: "ROME",
-    codeActivite: "A1203",
-    codeTypePeriode: "TRIMESTRE",
-    codeTypeNomenclature: "DUREEEMP",
-  });
 });
