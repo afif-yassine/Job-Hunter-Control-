@@ -80,7 +80,6 @@ export function ProfileImportFlow({
     const wanted = picked;
     setAnswer(null);
     setJustSaved(true);
-    onSaved?.();
     try {
       await ctx.refreshProfile();
       // 2. The suggested job categories, ticked in the search too. A failure here is not a failure to save the CV.
@@ -104,6 +103,8 @@ export function ProfileImportFlow({
       notify(categoriesFailedMessage(), "info");
     } finally {
       setBusy("");
+      // Called last, once the suggested jobs are ticked too, so the next screen reads them.
+      onSaved?.();
     }
   }
 

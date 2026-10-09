@@ -36,6 +36,9 @@ import { useCatalogueRefresh } from "@/components/use-catalogue-refresh";
 import { shownEmail, useAccount } from "@/components/use-account";
 import { isUnlocked, unlockState, type PlanKnowledge } from "@/components/unlock";
 import { useUnlocked } from "@/components/use-unlocked";
+import { onboardingGate } from "@/components/onboarding";
+import { useOnboardingFacts } from "@/components/use-onboarding";
+import { OnboardingView } from "@/components/views/onboarding-view";
 import { useSessionGuard } from "@/components/use-session-guard";
 import { Callout, Progress } from "@/components/ui";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -134,7 +137,8 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
   const userEmail = shownEmail(account, tokenEmail);
   // Which offers can be worked on: read once (and again on a new Paris day). Not used by a screen yet;
   // any doubt locks nothing, so the app behaves as before until the screens read it.
-  const { fetchState: unlockFetch, answer: unlockAnswer } = useUnlocked(Boolean(supabase) && !isDemo);
+  const { fetchState: unlockFetch, answer: unlockAnswer, refresh: refreshUnlock } = useUnlocked(Boolean(supabase) && !isDemo);
+  const refreshSelection = useCallback(() => void refreshUnlock(), [refreshUnlock]);
   // Only the administrator is never locked: a paying account gets the same offers as a free one.
   const planKnowledge: PlanKnowledge = status
     ? status.isAdmin === true || status.plan?.plan === "admin"
@@ -149,6 +153,30 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
     () => unlockState({ demo: isDemo, plan: planKnowledge, fetch: unlockFetch, answer: unlockAnswer }),
     [isDemo, planKnowledge, unlockFetch, unlockAnswer],
   );
+  // The guided sign-up (components/onboarding.ts): a full-screen journey before the dashboard for an account without
+  // a CV or without a chosen job. Never in the demo, never for the administrator, and any doubt lets the student in.
+  const onbFacts = useOnboardingFacts(Boolean(supabase) && !isDemo);
+  const gate = onboardingGate({
+    demo: isDemo || !supabase,
+    isAdmin: status ? status.isAdmin === true || status.plan?.plan === "admin" : undefined,
+    statusFailed,
+    server: onbFacts.server,
+    hasProfile,
+    profileFailed,
+    searchChosen: onbFacts.searchChosen,
+    searchFailed: onbFacts.searchFailed,
+  });
+  // Once started, the journey stays until its end, even if the profile becomes known meanwhile.
+  const [onbStart, setOnbStart] = useState<"cv" | "search" | null>(null);
+  const [onbDone, setOnbDone] = useState(false);
+  const [onbGiveUp, setOnbGiveUp] = useState(false);
+  if (gate.kind === "step" && onbStart === null) setOnbStart(gate.step);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setOnbGiveUp(true), 10000);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const onboardingStep = onbDone ? null : (onbStart ?? (gate.kind === "step" ? gate.step : null));
+  const onboardingWaiting = !onbDone && onbStart === null && gate.kind === "wait" && !onbGiveUp;
   // Once per session, after the first load and only with a saved CV: the list is opened from the shared catalogue.
   const { refreshedAt: catalogueRefreshedAt } = useCatalogueRefresh({
     enabled: hasProfile === true && !loading && !isDemo && Boolean(supabase),
@@ -522,6 +550,38 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
   const phases = status?.plan?.plan === "free" ? (["scan", "analyze"] as const) : (["scan", "analyze", "generate", "prepare"] as const);
   const phaseAt = p ? Math.min(Math.max(phases.findIndex((x) => x === p.phase), 0), phases.length - 1) : 0;
   const percent = p ? ((phaseAt + (p.total ? p.done / p.total : 0)) / phases.length) * 100 : 0;
+
+  if (onboardingWaiting)
+    return (
+      <div className="onb">
+        <div className="empty" role="status">
+          <LoaderCircle className="spin" aria-hidden /> Chargement…
+        </div>
+      </div>
+    );
+  if (onboardingStep)
+    return (
+      <MotionConfig reducedMotion="user">
+        <OnboardingView
+          ctx={ctx}
+          start={onboardingStep}
+          onFinish={() => {
+            setOnbDone(true);
+            setView("jobs");
+            void reload();
+          }}
+          onRefreshSelection={refreshSelection}
+        />
+        {toast && (
+          <div className={`toast ${toast.tone}`} role="status">
+            <span>{toast.text}</span>
+            <button className="iconbtn" aria-label="Fermer" onClick={() => notify("")}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
+      </MotionConfig>
+    );
 
   return (
     <MotionConfig reducedMotion="user">

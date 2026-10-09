@@ -774,6 +774,16 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .grow-origin.is-assumption { border-style: dashed; }
 .grow-kpi .grow-origin { margin-left: 0; margin-right: 6px; }
 /* Balance of the AI key (admin space) */
+/* The guided sign-up: full screen, one step at a time */
+.onb { min-height: 100dvh; background: var(--surface-2); display: flex; flex-direction: column; }
+.onb-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; }
+.onb-main { width: 100%; max-width: 760px; margin: 0 auto; padding: 8px 16px 48px; display: grid; gap: 14px; align-content: start; }
+.onb-main h1 { margin: 4px 0 0; font-size: clamp(26px, 6vw, 36px); line-height: 1.1; }
+.onb-main p { margin: 0; }
+.onb-step { font-weight: 700; font-size: 13px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.onb-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.onb-bar span { height: 5px; border-radius: 99px; background: var(--line); }
+.onb-bar span.is-on { background: var(--text); }
 /* A note written in the offer panel where the kit button would be (offer outside the selection, kits used) */
 .locked-note { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
 .locked-note p { margin: 0; }
