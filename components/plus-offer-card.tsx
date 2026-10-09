@@ -13,12 +13,15 @@ export function PlusOfferCard({
   action,
   href,
   onClose,
+  quiet = false,
 }: {
   title: string;
   children: ReactNode;
   action: string;
   href: string;
   onClose?: () => void;
+  /** A link instead of a full button (the quietest proposal). */
+  quiet?: boolean;
 }) {
   return (
     <aside className="plus-offer card" aria-label={title}>
@@ -29,7 +32,7 @@ export function PlusOfferCard({
       )}
       <strong>{title}</strong>
       <p className="muted">{children}</p>
-      <a className="btn secondary" href={href}>
+      <a className={quiet ? "linkbtn" : "btn secondary"} href={href}>
         {action}
       </a>
     </aside>

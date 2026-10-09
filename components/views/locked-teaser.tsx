@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { useState } from "react";
+import { PlusWindow } from "@/components/plus-window";
 import { pricingHref } from "@/components/pricing";
 import {
   ageText,
@@ -80,7 +80,17 @@ export function LockedTeaser({
         <a className="btn secondary" href={pricingHref(phase === "end" ? "fin" : "cartes")}>
           {PLUS_BUTTON}
         </a>
-        <CardDialog item={open} onClose={() => setOpen(null)} />
+        <PlusWindow
+          open={open !== null}
+          title={CARD_DIALOG.title}
+          primary={PLUS_BUTTON}
+          href={pricingHref("carte")}
+          secondary={CARD_DIALOG.stay}
+          closeLabel={CARD_DIALOG.close}
+          onClose={() => setOpen(null)}
+        >
+          {open ? dialogPhrase(open) : ""}
+        </PlusWindow>
       </section>
     );
   }
@@ -108,49 +118,5 @@ export function LockedTeaser({
         )}
       </div>
     </section>
-  );
-}
-
-/**
- * The small window a card opens (a sheet at the bottom on a phone): close with the cross, Échap or a click
- * beside it. The student opens it himself, so it does not count as the day's one window. Both buttons are the
- * same size; the way to stay free is written in plain words.
- */
-function CardDialog({ item, onClose }: { item: TeaserItem | null; onClose: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (item && !dialog.open) dialog.showModal();
-    if (!item && dialog.open) dialog.close();
-  }, [item]);
-  return (
-    <dialog
-      ref={ref}
-      className="plus-dialog"
-      aria-labelledby="plus-dialog-title"
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === ref.current) onClose();
-      }}
-    >
-      {item && (
-        <div className="plus-dialog-body">
-          <button type="button" className="iconbtn plus-dialog-close" aria-label={CARD_DIALOG.close} onClick={onClose}>
-            <X size={18} aria-hidden />
-          </button>
-          <h2 id="plus-dialog-title">{CARD_DIALOG.title}</h2>
-          <p className="muted">{dialogPhrase(item)}</p>
-          <div className="plus-dialog-actions">
-            <a className="btn" href={pricingHref("carte")}>
-              {PLUS_BUTTON}
-            </a>
-            <button type="button" className="btn secondary" onClick={onClose}>
-              {CARD_DIALOG.stay}
-            </button>
-          </div>
-        </div>
-      )}
-    </dialog>
   );
 }

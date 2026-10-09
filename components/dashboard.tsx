@@ -376,7 +376,8 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
               outcome = "locked";
               return notify("");
             }
-            outcome = "failed";
+            // The free kits of the month are used: the panel may open the day's one Plus window; the message stays.
+            outcome = r.body.code === "PLAN_LIMIT" ? "quota" : "failed";
             return notify(readable(r.body.error), "bad");
           }
           notify("Ton dossier est prêt : relis ton CV et ta lettre, puis postule.", "good");

@@ -24,8 +24,8 @@ export type View =
 
 export type SummarizeResult = "ok" | "gone" | "failed";
 
-/** What came of "Créer mon CV et ma lettre". "locked": the server refused because the offer is not in the student's selection. */
-export type KitResult = "ok" | "locked" | "failed";
+/** What came of "Créer mon CV et ma lettre". "locked": the server refused because the offer is not in the student's selection. "quota": the free kits of the month are used. */
+export type KitResult = "ok" | "locked" | "quota" | "failed";
 
 export type JobFilter ="new" | "all" | "best" | "review" | "gone";
 

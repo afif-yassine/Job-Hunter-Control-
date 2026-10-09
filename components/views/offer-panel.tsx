@@ -24,9 +24,13 @@ import type { DocumentRecord, Job, OfferSummary } from "@/lib/types";
 import { aiScore, listScore } from "./closest";
 import { offerAge, salaryOf, ScoreRing, StageChip } from "./offer-card";
 import { summaryState } from "./summary-state";
-import { LOCKED_NOTE, monthFullNote } from "@/components/panel-notes";
-import { PRICING, pricingHref, whyKitsLimited } from "@/components/pricing";
-import { isUnlocked } from "@/components/unlock";
+import { lastKitBlock, LOCKED_NOTE, monthFullNote, monthWindow } from "@/components/panel-notes";
+import { PlusOfferCard } from "@/components/plus-offer-card";
+import { PlusWindow } from "@/components/plus-window";
+import { afterLastKitShown, afterWindowShown, canShowLastKit, canShowWindow, lastKitLeft, plusEligible } from "@/components/plus-offer";
+import { usePlusStore } from "@/components/use-plus-store";
+import { PLUS_MONTHLY_KITS, PRICING, pricingHref, whyKitsLimited } from "@/components/pricing";
+import { isUnlocked, parisDay, PLUS_DAILY_LIMIT } from "@/components/unlock";
 import type { Ctx } from "./types";
 
 const FT_LICENCE = "https://francetravail.io/produits-partages/documentation/conditions-dutilisation-api/licence-offres-emploi";
@@ -122,9 +126,36 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
   // Outside the student's selection (or refused by the server just now): readable, but no kit can be written.
   const [serverLocked, setServerLocked] = useState(false);
   const locked = serverLocked || !isUnlocked(job, ctx.unlock, docs.length > 0);
+  // LeBonTaf Plus is proposed to a free account only; the frequencies are the browser's memory (components/plus-offer.ts).
+  const planNow = status?.plan;
+  const eligible = plusEligible({ pricing: ctx.pricing, demo: ctx.demo, onboarding: false, isAdmin: status?.isAdmin === true, plan: planNow, unlock: ctx.unlock });
+  const plusStore = usePlusStore();
+  const parisToday = parisDay();
+  const [windowOpen, setWindowOpen] = useState(false);
+  const [kitJustMade, setKitJustMade] = useState(false);
+  const [lastKitShown, setLastKitShown] = useState(false);
+  const [lastKitClosed, setLastKitClosed] = useState(false);
   const createKit = async () => {
-    if ((await act.prepareKit(job)) === "locked") setServerLocked(true);
+    const result = await act.prepareKit(job);
+    if (result === "locked") setServerLocked(true);
+    else if (result === "ok") setKitJustMade(true);
+    else if (result === "quota" && eligible && plusStore.ready && canShowWindow(plusStore.store, parisToday)) {
+      // The day's one window: it counts as soon as it is shown.
+      plusStore.update((s) => afterWindowShown(s, parisToday));
+      setWindowOpen(true);
+    }
   };
+  // Moment "dernier": the kit that was just written leaves exactly one. Decided once, and it counts for the month.
+  const { ready: storeReady, store: storeNow, update: updateStore } = plusStore;
+  const showLastKit = kitJustMade && !lastKitShown && eligible && storeReady && lastKitLeft(planNow) && canShowLastKit(storeNow, parisToday);
+  useEffect(() => {
+    if (!showLastKit) return;
+    const timer = window.setTimeout(() => {
+      updateStore((s) => afterLastKitShown(s, parisToday));
+      setLastKitShown(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [showLastKit, updateStore, parisToday]);
   const salary = salaryOf(job);
   const platforms = platformsOf(job);
   const gone = Boolean(job.gone_reason) && !isSent(stage);
@@ -453,7 +484,7 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
                     <div className="locked-note" role="note">
                       <strong>{monthFullNote(monthFull.limit, monthFull.resetsOn).title}</strong>
                       <p className="muted small-text">{monthFullNote(monthFull.limit, monthFull.resetsOn).text}</p>
-                      {ctx.pricing && (
+                      {eligible && (
                         <>
                           <p className="muted small-text">{whyKitsLimited(monthFull.limit)}</p>
                           <a className="btn secondary" href={pricingHref("fiche")}>
@@ -573,6 +604,23 @@ function PanelBody({ job, ctx, closeRef, onClose }: { job: Job; ctx: Ctx; closeR
               {stage === "offer" && <p className="hint is-good">Bravo ! Ton bon départ commence ici.</p>}
             </JourneyStep>
           </ol>
+          {lastKitShown && !lastKitClosed && (
+            <PlusOfferCard title={lastKitBlock(PLUS_MONTHLY_KITS).title} action={PRICING.panelLink} href={pricingHref("dernier")} onClose={() => setLastKitClosed(true)} quiet>
+              {lastKitBlock(PLUS_MONTHLY_KITS).text}
+            </PlusOfferCard>
+          )}
+          {monthFull && (
+            <PlusWindow
+              open={windowOpen}
+              title={monthWindow(monthFull.limit, monthFull.resetsOn, PLUS_MONTHLY_KITS, PLUS_DAILY_LIMIT).title}
+              primary={PRICING.panelLink}
+              href={pricingHref("clic")}
+              secondary={monthWindow(monthFull.limit, monthFull.resetsOn, PLUS_MONTHLY_KITS, PLUS_DAILY_LIMIT).stay}
+              onClose={() => setWindowOpen(false)}
+            >
+              {monthWindow(monthFull.limit, monthFull.resetsOn, PLUS_MONTHLY_KITS, PLUS_DAILY_LIMIT).text}
+            </PlusWindow>
+          )}
           <AnimatePresence>
             {askApplied && stage === "ready" && (
               <motion.div className="ask-applied" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>

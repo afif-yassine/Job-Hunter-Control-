@@ -10,6 +10,20 @@ export const LOCKED_NOTE = {
   action: "Voir l’annonce",
 } as const;
 
+/** Moment "clic": the day's one window, when the server refuses a kit because the month's are used. */
+export function monthWindow(limit: number, resetsOn: string, plusKits: number, plusDaily: number): { title: string; text: string; stay: string } {
+  return {
+    title: limit > 1 ? `Tes ${limit} dossiers du mois sont utilisés` : "Ton dossier du mois est utilisé",
+    text: `Les ${limit} prochains arrivent le ${resetsOn}. Avec LeBonTaf Plus : ${plusKits} dossiers par mois et jusqu’à ${plusDaily} offres par jour. Le paiement n’est pas encore ouvert, tu peux demander l’accès anticipé.`,
+    stay: `Attendre le ${resetsOn}`,
+  };
+}
+
+/** Moment "dernier": under the success message of the kit that leaves exactly one. */
+export function lastKitBlock(plusKits: number): { title: string; text: string } {
+  return { title: "Il te reste 1 dossier ce mois-ci", text: `Garde-le pour l’offre qui compte le plus. Avec LeBonTaf Plus : ${plusKits} dossiers par mois.` };
+}
+
 /** Moment "bandeau" (top of "Pour toi") when the kits of the month are used. */
 export function monthBanner(limit: number, resetsOn: string): { title: string; text: string } {
   return {
