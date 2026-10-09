@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RETRY_DELAY_MS, retryDecision } from "@/components/load-retry";
+import { cappedText, readPages } from "@/components/paging";
 import { fitScore } from "@/lib/fit";
 import { createClient } from "@/lib/supabase/client";
 import type {
@@ -29,6 +30,8 @@ export function useDashboardData(demo?: Data) {
   const [data, setData] = useState<Data>(demo ?? EMPTY);
   const [loading, setLoading] = useState(!demo);
   const [error, setError] = useState("");
+  /** The ceiling was reached: how many of the most recent rows are kept (null: nothing was cut). */
+  const [cut, setCut] = useState<{ jobs: number | null; apps: number | null }>({ jobs: null, apps: null });
 
   const load = useCallback(async () => {
     if (demo) return;
@@ -37,71 +40,85 @@ export function useDashboardData(demo?: Data) {
       setLoading(false);
       return;
     }
-    const fetchOnce = async () => {
-    const [j, a, q, d, r, n] = await Promise.all([
-      supabase.from("jobs").select("*,job_sources(platform,url),offers(summary,salary)").order("created_at", { ascending: false }),
-      supabase.from("applications").select("*,jobs(company,title)").order("created_at", { ascending: false }),
-      supabase
-        .from("application_questions")
-        .select("*,applications(jobs(company,title))")
-        .order("created_at", { ascending: false }),
-      supabase.from("documents").select("*,jobs(company,title)").order("created_at", { ascending: false }),
-      supabase.from("agent_runs").select("*").order("created_at", { ascending: false }).limit(200),
-      supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(100),
-    ]);
-    let jobs = j;
-    if (j.error) {
-      // Older databases: without the salary, without the catalogue, then without job_sources.
-      jobs = await supabase.from("jobs").select("*,job_sources(platform,url),offers(summary)").order("created_at", { ascending: false });
-      if (jobs.error) jobs = await supabase.from("jobs").select("*,job_sources(platform,url)").order("created_at", { ascending: false });
-      if (jobs.error) jobs = await supabase.from("jobs").select("*").order("created_at", { ascending: false });
-    }
-    let questions = q.data as Question[] | null;
-    if (q.error) {
+    type Err = { message?: string; code?: string } | null;
+    const byNewest = <B extends { order: (c: string, o: { ascending: boolean }) => B }>(q: B) => q.order("created_at", { ascending: false }).order("id", { ascending: false });
+    // One table, page by page, in a stable order (date, then id): the API cuts every answer at 1 000 rows.
+    const pagesOf = <T,>(table: string, select: string, onPartial?: (rows: T[]) => void) =>
+      readPages<T>(
+        async (from, to) => {
+          const r = await byNewest(supabase.from(table).select(select)).range(from, to);
+          return { data: r.data as unknown as T[] | null, error: r.error };
+        },
+        { onPartial },
+      );
+    // Older databases: without the salary, without the catalogue, then without job_sources. The first page decides.
+    const jobSelects = ["*,job_sources(platform,url),offers(summary,salary)", "*,job_sources(platform,url),offers(summary)", "*,job_sources(platform,url)", "*"];
+    const readJobs = async (onPartial: (rows: Job[]) => void) => {
+      let out = await pagesOf<Job>("jobs", jobSelects[0], onPartial);
+      for (let i = 1; out.error && out.rows.length === 0 && i < jobSelects.length; i += 1) out = await pagesOf<Job>("jobs", jobSelects[i], onPartial);
+      return out;
+    };
+    const readQuestions = async () => {
       // The join is only a nicety: fall back to the plain table if it fails.
-      const plain = await supabase
-        .from("application_questions")
-        .select("*")
-        .order("created_at", { ascending: false });
-      questions = plain.data as Question[] | null;
-    }
-    // The free score of every offer: closeness to the CV (vectors) and skills
-    // in common, compared in the database without any AI call.
+      const joined = await pagesOf<Question>("application_questions", "*,applications(jobs(company,title))");
+      return joined.error ? pagesOf<Question>("application_questions", "*") : joined;
+    };
     type FitRow = { job_id: string; similarity: number | null; matched?: string[] | null; missing?: string[] | null; model?: string };
-    let near = await supabase.rpc("my_job_fit_v2");
-    if (near.error || !near.data?.length) near = await supabase.rpc("my_job_fit");
-    if (near.error) near = await supabase.rpc("my_job_similarity");
-    const fits = new Map(((near.data ?? []) as FitRow[]).map((x) => [x.job_id, x]));
-    if (jobs.data)
-      for (const job of jobs.data as Job[]) {
+    const readFits = (name: string) =>
+      readPages<FitRow>(async (from, to) => {
+        const r = await supabase.rpc(name).range(from, to);
+        return { data: r.data as FitRow[] | null, error: r.error };
+      });
+    const fetchOnce = async (onPartial: (rows: Job[]) => void) => {
+      const [jobs, a, q, d, r, n] = await Promise.all([
+        readJobs(onPartial),
+        pagesOf<Application>("applications", "*,jobs(company,title)"),
+        readQuestions(),
+        pagesOf<DocumentRecord>("documents", "*,jobs(company,title)"),
+        supabase.from("agent_runs").select("*").order("created_at", { ascending: false }).limit(200),
+        supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(100),
+      ]);
+      // The free score of every offer: closeness to the CV (vectors) and skills
+      // in common, compared in the database without any AI call.
+      let near = await readFits("my_job_fit_v2");
+      if (near.error || !near.rows.length) near = await readFits("my_job_fit");
+      if (near.error) near = await readFits("my_job_similarity");
+      const fits = new Map(near.rows.map((x) => [x.job_id, x]));
+      for (const job of jobs.rows) {
         const f = fits.get(job.id);
         job.similarity = f?.similarity ?? null;
         job.fit = f ? fitScore(f.similarity, f.matched ?? [], f.missing ?? [], f.model) : null;
       }
-    // How many LeBonTaf students applied to the same offer (only from 3, anonymous).
-    const offerIds = [...new Set(((jobs.data ?? []) as Job[]).map((x) => x.offer_id).filter((x): x is string => Boolean(x)))];
-    if (offerIds.length) {
-      const crowd = await supabase.rpc("offer_applicants", { p_offer_ids: offerIds.slice(0, 2000) });
-      const applicants = new Map(((crowd.data ?? []) as { offer_id: string; applicants: number }[]).map((x) => [x.offer_id, x.applicants]));
-      for (const job of (jobs.data ?? []) as Job[]) job.applicants = job.offer_id ? (applicants.get(job.offer_id) ?? null) : null;
-    }
-    return { jobs, a, d, r, n, questions };
+      // How many LeBonTaf students applied to the same offer (only from 3, anonymous).
+      const offerIds = [...new Set(jobs.rows.map((x) => x.offer_id).filter((x): x is string => Boolean(x)))];
+      if (offerIds.length) {
+        const crowd = await supabase.rpc("offer_applicants", { p_offer_ids: offerIds.slice(0, 2000) });
+        const applicants = new Map(((crowd.data ?? []) as { offer_id: string; applicants: number }[]).map((x) => [x.offer_id, x.applicants]));
+        for (const job of jobs.rows) job.applicants = job.offer_id ? (applicants.get(job.offer_id) ?? null) : null;
+      }
+      return { jobs, a, q, d, r, n };
     };
-    const failureOf = (x: { jobs: { error: { message?: string; code?: string } | null }; a: { error: { message?: string; code?: string } | null }; d: { error: { message?: string; code?: string } | null }; r: { error: { message?: string; code?: string } | null }; n: { error: { message?: string; code?: string } | null } }) => [x.jobs, x.a, x.d, x.r, x.n].find((y) => y.error)?.error;
-    let got = await fetchOnce();
+    const failureOf = (x: Awaited<ReturnType<typeof fetchOnce>>): Err => [x.jobs, x.a, x.d, x.r, x.n].find((y) => y.error)?.error ?? null;
+    // The first page of offers is shown at once; the rest follows (the realtime reload brings the stored truth).
+    const showFirst = (rows: Job[]) => {
+      setData((cur) => ({ ...cur, jobs: rows }));
+      setLoading(false);
+    };
+    let got = await fetchOnce(showFirst);
     // A token dated slightly in the future: wait and ask again (twice at most) before showing anything.
     for (let attempt = 0; retryDecision(failureOf(got), attempt).retry; attempt += 1) {
       await new Promise((resolve) => window.setTimeout(resolve, RETRY_DELAY_MS));
-      got = await fetchOnce();
+      got = await fetchOnce(showFirst);
     }
-    const { jobs, a, d, r, n, questions } = got;
-    const failure = [jobs, a, d, r, n].find((x) => x.error)?.error;
-    setError(failure ? failure.message : "");
+    const { jobs, a, q, d, r, n } = got;
+    const failure = failureOf(got);
+    setError(failure ? (failure.message ?? "") : "");
+    setCut({ jobs: jobs.capped ? jobs.rows.length : null, apps: a.capped ? a.rows.length : null });
     setData({
-      jobs: (jobs.data || []) as Job[],
-      apps: (a.data || []) as Application[],
-      questions: questions || [],
-      documents: (d.data || []) as DocumentRecord[],
+      jobs: jobs.rows,
+      apps: a.rows,
+      questions: q.rows,
+      documents: d.rows,
       runs: (r.data || []) as AgentRun[],
       notifications: (n.data || []) as NotificationRecord[],
     });
@@ -141,5 +158,7 @@ export function useDashboardData(demo?: Data) {
   // A plain reload: never hands an event to `load` as its retry counter.
   const reload = useCallback(() => load(), [load]);
 
-  return { supabase, data, loading, error, reload, patchJob };
+  const cutNotice = cut.jobs !== null ? cappedText(cut.jobs, "offres", true) : cut.apps !== null ? cappedText(cut.apps, "candidatures", true) : null;
+
+  return { supabase, data, loading, error, reload, patchJob, cutNotice };
 }

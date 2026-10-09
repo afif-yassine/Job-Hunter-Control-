@@ -120,7 +120,7 @@ async function post(url: string, body: unknown = {}) {
 export type DemoState = { data: Data; status: SystemStatus; admin?: AdminOverview };
 
 export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = false }: { userEmail?: string; userId?: string; demo?: DemoState; pricing?: boolean }) {
-  const { supabase, data, loading, error: loadError, reload, patchJob } = useDashboardData(demo?.data);
+  const { supabase, data, loading, error: loadError, reload, patchJob, cutNotice } = useDashboardData(demo?.data);
   const router = useRouter();
   const isDemo = Boolean(demo);
   // The page acts as whoever the browser's session belongs to: if another account signs in from another window,
@@ -681,6 +681,7 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
               </Callout>
             </div>
           )}
+          {cutNotice && <p className="muted small-text">{cutNotice}</p>}
           {loadError && (
             <div className="callout bad" style={{ marginBottom: 16 }} role="alert">
               <div className="callout-body">
