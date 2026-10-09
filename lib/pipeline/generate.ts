@@ -7,6 +7,7 @@ import { queueQuestions, type QueueResult } from "@/lib/question-store";
 import { checkPlan } from "@/lib/plan";
 import { PROFILE_REQUIRED, PROFILE_REQUIRED_MESSAGE } from "@/lib/profile-store";
 import { consumeQuota, quotaRefusal } from "@/lib/quota";
+import { OFFER_LOCKED, OFFER_LOCKED_MESSAGE, offerLocked } from "@/lib/unlock";
 import type { StepResult } from "./analyze";
 import { closedInCatalogue, markGone, markGoneForStudent, type OnlineCheck, type OnlineJob } from "./availability";
 
@@ -87,6 +88,9 @@ async function generateKit(ctx: Ctx): Promise<StepResult> {
       };
     }
   }
+
+  // Daily selection: an offer the account has not unlocked yet gets no kit (nothing is spent).
+  if (await offerLocked(supabase, userId, job)) return { status: 403, body: { error: OFFER_LOCKED_MESSAGE, code: OFFER_LOCKED } };
 
   const offer = { company: job.company, title: job.title, contract_type: job.contract_type, location: job.location, description: job.description };
   const version = writingVersion(userId, profile.profile, profile.truth_ledger, offer, modelFor("writing", env));

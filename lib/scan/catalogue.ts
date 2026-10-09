@@ -183,6 +183,9 @@ export function matchesCategories(
   return !kinds.length || kinds.includes(kind);
 }
 
+/** What the daily selection needs to rank a catalogue offer for one account. */
+export type CatalogueMeta = { similarity: number | null; skills: string[]; kind: string; publishedAt: string | null };
+
 const IMPORT_SCAN = 3000;
 /** Offers added for being close to the profile (embeddings), on top of the words and categories. */
 const SIMILAR_MAX = 40;
@@ -198,8 +201,8 @@ export async function importFromCatalogue(
   db: SupabaseClient,
   config: ScanConfig,
   now = Date.now(),
-): Promise<{ offers: ScannedOffer[]; entries: Map<string, CatalogueEntry>; boards: string[]; error?: string }> {
-  const empty = { offers: [], entries: new Map<string, CatalogueEntry>(), boards: [] };
+): Promise<{ offers: ScannedOffer[]; entries: Map<string, CatalogueEntry>; boards: string[]; meta: Map<string, CatalogueMeta>; error?: string }> {
+  const empty = { offers: [], entries: new Map<string, CatalogueEntry>(), boards: [], meta: new Map<string, CatalogueMeta>() };
   // Nothing asked yet: only the profile can still bring offers (embeddings).
   const seenSince = new Date(now - (EXPIRE_DAYS + 1) * 86_400_000).toISOString();
   const { data, error } = await db
@@ -222,6 +225,7 @@ export async function importFromCatalogue(
   const similar: CatalogueRow[] = [];
   let response = await db.rpc("match_offers_for_me_v2", { p_limit: 200 });
   if (response.error || !response.data?.length) response = await db.rpc("match_offers_for_me", { p_limit: 200 });
+  const similarityOf = new Map(((response.data ?? []) as { offer_id: string; similarity: number }[]).map((r) => [r.offer_id, Number.isFinite(r.similarity) ? r.similarity : null]));
   const nearIds = ((response.data ?? []) as { offer_id: string; similarity: number; model?: string }[])
     // Perplexity uses ranking; the old Gemini threshold is not transferable.
     .filter((r) => r.model?.startsWith("perplexity/") ? Number.isFinite(r.similarity) : r.similarity >= SIMILAR_MIN)
@@ -244,13 +248,21 @@ export async function importFromCatalogue(
 
   // Full texts only for the offers kept (the catalogue can be large).
   const texts = new Map<string, string | null>();
+  const readSkills = new Map<string, string[]>();
   for (let i = 0; i < rows.length; i += 100) {
     const { data: part } = await db
       .from("offers")
-      .select("id,description")
+      .select("id,description,summary")
       .in("id", rows.slice(i, i + 100).map((r) => r.id));
-    for (const r of (part ?? []) as { id: string; description: string | null }[]) texts.set(r.id, r.description);
+    for (const r of (part ?? []) as { id: string; description: string | null; summary?: { skills?: unknown } | null }[]) {
+      texts.set(r.id, r.description);
+      const skills = r.summary?.skills;
+      if (Array.isArray(skills)) readSkills.set(r.id, skills.filter((s): s is string => typeof s === "string"));
+    }
   }
+  const meta = new Map<string, CatalogueMeta>(
+    rows.map((r) => [r.id, { similarity: similarityOf.get(r.id) ?? null, skills: readSkills.get(r.id) ?? [], kind: r.contract_kind || contractKind(r), publishedAt: r.published_at }]),
+  );
   const entries = new Map<string, CatalogueEntry>();
   const boards = new Set<string>();
   const offers = rows.map((r): ScannedOffer => {
@@ -273,7 +285,7 @@ export async function importFromCatalogue(
     entries.set(r.fingerprint, { id: r.id, status: "open" });
     return offer;
   });
-  return { offers, entries, boards: [...boards] };
+  return { offers, entries, boards: [...boards], meta };
 }
 
 /**

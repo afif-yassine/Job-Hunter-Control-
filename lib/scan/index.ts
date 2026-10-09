@@ -3,6 +3,7 @@ import { loadIntegrationEnv } from "@/lib/integrations";
 import { loadUserSettings, saveUserSettings } from "@/lib/settings";
 import { configFromPrefs, hasChosenSearch, isRelevant, NO_SEARCH_MESSAGE } from "./config";
 import { ingestOffers } from "./ingest";
+import { ensureDailyBatch, unlockGate } from "../unlock";
 import { scanAdzuna } from "./sources/adzuna";
 import { discoveredTargets, loadDiscovered, mergeDiscovered, saveDiscovered } from "./discover";
 import { parseAtsTarget, scanAts, targetKey } from "./sources/ats";
@@ -424,7 +425,12 @@ export async function runScan(ctx: {
       message: "Offres déjà trouvées par d’autres recherches : aucun appel aux sites d’emploi.",
     });
   const entries = harvest.error ? new Map(fromCatalogue.entries) : new Map([...fromCatalogue.entries, ...harvest.entries]);
-  const ingest = await ingestOffers(ctx.supabase, ctx.userId, [...relevant, ...imported], entries.size ? entries : undefined);
+  // Daily selection (migration 20261009090000): a student's list only receives the offers unlocked
+  // for the account, today's lot included. Offers outside the catalogue are not copied at all.
+  const gate = student ? await unlockGate(ctx.supabase, ctx.userId, cacheDb) : ({ active: false } as const);
+  const ingest = gate.active
+    ? await ensureDailyBatch(ctx.supabase, gate, ctx.userId).then((b) => ({ inserted: b.inserted, duplicates: 0, alreadyApplied: 0, toReview: 0, suspected: 0, needsDescription: 0, error: undefined as string | undefined }))
+    : await ingestOffers(ctx.supabase, ctx.userId, [...relevant, ...imported], entries.size ? entries : undefined);
   if (ingest.error)
     reports.push({
       source: "Base de données",
@@ -509,7 +515,7 @@ export function scanMessage(s: ScanSummary): string {
  * called): right after sign-up or a change of search. Returns how many
  * offers were added.
  */
-export async function seedFromCatalogue(supabase: SupabaseClient, userId: string, options: { refreshVector?: boolean } = {}): Promise<number> {
+export async function seedFromCatalogue(supabase: SupabaseClient, userId: string, options: { refreshVector?: boolean; /** Service client for the daily unlock (tests); defaults to the platform's. */ service?: SupabaseClient | null } = {}): Promise<number> {
   const settings = await loadUserSettings(supabase, userId);
   if (!hasChosenSearch(settings.prefs)) return 0;
   const config = configFromPrefs(settings.prefs);
@@ -518,6 +524,9 @@ export async function seedFromCatalogue(supabase: SupabaseClient, userId: string
     if (semanticEnabled()) await ensureSemanticProfile(supabase, userId, process.env);
     else await ensureProfileEmbedding(supabase, userId, geminiEmbedder());
   }
+  // Daily selection: only today's lot (and what was unlocked before) is copied for a student.
+  const gate = await unlockGate(supabase, userId, options.service);
+  if (gate.active) return (await ensureDailyBatch(supabase, gate, userId)).inserted;
   const found = await importFromCatalogue(supabase, config);
   const offers = found.offers.filter(isRelevant);
   if (!offers.length) return 0;

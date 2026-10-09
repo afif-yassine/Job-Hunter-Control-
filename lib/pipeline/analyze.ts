@@ -8,6 +8,7 @@ import { fetchJobText } from "@/lib/scan/enrich";
 import { serviceClient } from "@/lib/supabase/admin";
 import { recordSourceRun } from "@/lib/scan/health";
 import { detectSuspicion } from "@/lib/scan/suspicion";
+import { OFFER_LOCKED, OFFER_LOCKED_MESSAGE, offerLocked } from "@/lib/unlock";
 import { closedInCatalogue, markGoneForStudent } from "./availability";
 
 const output = z.object({
@@ -156,6 +157,8 @@ export async function analyzeJob(ctx: Ctx): Promise<StepResult> {
       status: 409,
       body: { error: "Cette offre est dans « À vérifier » : confirme-la d’abord.", code: "TO_REVIEW" },
     };
+  // Daily selection: no paid analysis of an offer the account has not unlocked.
+  if (await offerLocked(ctx.supabase, ctx.userId, job)) return { status: 403, body: { error: OFFER_LOCKED_MESSAGE, code: OFFER_LOCKED } };
 
   // Always score the full ad: read the page unless the source is known to give
   // the whole text already (best effort; never gets around a protection).
