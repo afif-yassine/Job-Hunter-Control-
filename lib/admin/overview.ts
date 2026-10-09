@@ -104,10 +104,10 @@ export async function buildAdminOverview(ctx: {
   const [own, settings, runsRes, budgetRes, statsRes, usageRes, alertsRes, serverRunRes, targetsRes] = await Promise.all([
     loadIntegrationEnv(db, ctx.userId).catch(() => ({}) as Record<string, string>),
     loadUserSettings(db, ctx.userId),
-    db.from("source_runs").select("source,status,found,cached,message,created_at").gte("created_at", weekAgo).order("created_at", { ascending: false }).limit(3000),
+    db.from("source_runs").select("source,status,found,cached,message,created_at").gte("created_at", weekAgo).order("created_at", { ascending: false }).limit(3000),  // real cap: 1 000 rows per request
     db.from("source_budget").select("source,period,used"),
     db.rpc("admin_source_stats", { p_days: 30 }),
-    db.from("usage_events").select("kind").gte("created_at", parisMidnightIso(now)).limit(20000),
+    db.from("usage_events").select("kind").gte("created_at", parisMidnightIso(now)).limit(20000),  // real cap: 1 000 rows per request
     db.from("notifications").select("title,message,created_at,read_at").eq("notification_type", "SOURCE_ALERT").order("created_at", { ascending: false }).limit(10),
     (all ?? db).from("agent_runs").select("created_at,counters").filter("counters->>trigger", "eq", "server").order("created_at", { ascending: false }).limit(1),
     all ? all.from("user_settings").select("scan_config") : Promise.resolve({ data: null }),

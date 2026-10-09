@@ -63,8 +63,8 @@ export type PlanUsage = { plan: Plan | "admin"; used: number; limit: number | nu
 async function kitsThisMonth(supabase: SupabaseClient, userId: string, exceptJobId?: string, now = new Date()): Promise<number | null> {
   const since = monthStartParis(now);
   const [docs, events] = await Promise.all([
-    supabase.from("documents").select("job_id").eq("user_id", userId).eq("kind", "TAILORED_CV").gte("created_at", since).limit(2000),
-    supabase.from("usage_events").select("job_id").eq("user_id", userId).eq("kind", "kit").gte("created_at", since).limit(2000),
+    supabase.from("documents").select("job_id").eq("user_id", userId).eq("kind", "TAILORED_CV").gte("created_at", since).limit(2000),  // real cap: 1 000 rows per request
+    supabase.from("usage_events").select("job_id").eq("user_id", userId).eq("kind", "kit").gte("created_at", since).limit(2000),  // real cap: 1 000 rows per request
   ]);
   if (docs.error) return null;
   const rows = [...((docs.data ?? []) as { job_id: string | null }[]), ...(events.error ? [] : ((events.data ?? []) as { job_id: string | null }[]))];

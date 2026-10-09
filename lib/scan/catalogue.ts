@@ -1,3 +1,4 @@
+import { readAll } from "../paged";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { searchWords } from "./words";
 import type { ScanConfig, SearchQuery } from "./config";
@@ -307,18 +308,24 @@ export async function categoryCounts(
   area: Pick<ScanConfig, "city" | "departments" | "maxAgeDays" | "contracts">,
   now = Date.now(),
 ): Promise<{ total: number; byCategory: Record<string, number>; error?: string }> {
-  const { data, error } = await db
-    .from("offers")
-    .select("title,location,contract_type,source,rome_code,published_at,categories,contract_kind")
-    .eq("status", "open")
-    .order("last_seen_at", { ascending: false })
-    .limit(IMPORT_SCAN * 3);
-  if (error) return { total: 0, byCategory: {}, error: error.message };
+  // Page by page (the data API stops at 1 000 rows per request): the counts cover the whole catalogue.
+  const read = await readAll<CatalogueRow>((from, to) =>
+    db
+      .from("offers")
+      .select("title,location,contract_type,source,rome_code,published_at,categories,contract_kind")
+      .eq("status", "open")
+      .order("last_seen_at", { ascending: false })
+      .order("id")
+      .range(from, to),
+    { max: IMPORT_SCAN * 3 },
+  );
+  if (read.error) return { total: 0, byCategory: {}, error: read.error };
+  const data = read.rows;
   const cutoff = now - area.maxAgeDays * 86_400_000;
   const kinds = area.contracts ?? [];
   const byCategory: Record<string, number> = {};
   let total = 0;
-  for (const o of (data ?? []) as CatalogueRow[]) {
+  for (const o of data) {
     if (o.published_at && Date.parse(o.published_at) < cutoff) continue;
     if (!inArea(o.location, area)) continue;
     const kind = o.contract_kind || contractKind(o);

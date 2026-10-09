@@ -64,7 +64,7 @@ export async function listAccounts(service: SupabaseClient, opts: { page: number
     empty ? [] : orNull(service.from("candidate_profiles").select("user_id").in("user_id", ids)),
     empty ? [] : orNull(service.from("app_admins").select("user_id").in("user_id", ids)),
     empty ? [] : orNull(service.from("user_settings").select("user_id,plan").in("user_id", ids)),
-    empty ? [] : orNull(service.from("documents").select("user_id,job_id").eq("kind", "TAILORED_CV").gte("created_at", monthStartParis(now)).in("user_id", ids).limit(5000)),
+    empty ? [] : orNull(service.from("documents").select("user_id,job_id").eq("kind", "TAILORED_CV").gte("created_at", monthStartParis(now)).in("user_id", ids).limit(5000)),  // real cap: 1 000 rows per request
     // Grouped by account and model inside Postgres; this page's accounts are kept here.
     empty ? [] : orNull(service.rpc("admin_ai_usage_by_model", { p_since: since30d })),
   ]);

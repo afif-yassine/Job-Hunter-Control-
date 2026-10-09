@@ -1,3 +1,4 @@
+import { readAll } from "../paged";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getFranceTravailToken } from "@/lib/france-travail/client";
 import { recordAiUsage } from "@/lib/ai-usage";
@@ -102,9 +103,12 @@ const adzunaReady = (env: Env) => Boolean(env.ADZUNA_APP_ID?.trim() && env.ADZUN
 /** Every careers board the platform knows: in the catalogue, typed or discovered by any account. */
 async function knownBoards(db: SupabaseClient): Promise<string[]> {
   const boards = new Set<string>();
-  const { data: offers } = await db.from("offers").select("board").not("board", "is", null).limit(5000);
-  for (const r of (offers ?? []) as { board: string | null }[]) if (r.board) boards.add(r.board);
-  const { data: settings } = await db.from("user_settings").select("scan_config,discovered_targets").limit(5000);
+  // Page by page: the data API stops at 1 000 rows per request, and most offers share a few boards.
+  const offers = await readAll<{ board: string | null }>((from, to) => db.from("offers").select("board").not("board", "is", null).order("id").range(from, to), { max: 50_000 });
+  for (const r of offers.rows) if (r.board) boards.add(r.board);
+  // user_settings: one row per account, read 1 000 at a time.
+  const settingsRead = await readAll<Record<string, unknown>>((from, to) => db.from("user_settings").select("scan_config,discovered_targets").order("user_id").range(from, to), { max: 20_000 });
+  const settings = settingsRead.rows;
   for (const s of (settings ?? []) as { scan_config?: { targets?: unknown }; discovered_targets?: { items?: { key?: unknown }[] } }[]) {
     const typed = Array.isArray(s.scan_config?.targets) ? (s.scan_config!.targets as unknown[]) : [];
     for (const t of typed) {
@@ -394,7 +398,7 @@ export async function runHarvestSlice(
 
   await embedSome();
 
-  const { data: rest } = await db.from("harvest_tasks").select("key,source,status,found,error").eq("run_id", run).limit(5000);
+  const { data: rest } = await db.from("harvest_tasks").select("key,source,status,found,error").eq("run_id", run).limit(5000);  // real cap: 1 000 rows per request
   const tasks = (rest ?? []) as HarvestTask[];
   report.pending = tasks.filter((t) => t.status === "pending").length;
   if (report.pending === 0) {
