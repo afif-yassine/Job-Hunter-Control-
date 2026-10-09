@@ -5,6 +5,12 @@ import { Callout, Empty, PageHead } from "@/components/ui";
 import { COMPUTING_TEXT, DEGRADED_TEXT, groupByUnlockDay, lockedCount, parisDay, todayBatchSize } from "@/components/unlock";
 import { kitsByJob, stageOf } from "@/lib/journey";
 import type { Job } from "@/lib/types";
+import { monthBanner } from "@/components/panel-notes";
+import { pricingHref } from "@/components/pricing";
+import { PlusOfferCard } from "@/components/plus-offer-card";
+import { afterBannerClosed, canShowBanner, kitsUsedUp, plusEligible, winningMoment, type PlusMoment } from "@/components/plus-offer";
+import { cardsToShow, PLUS_BUTTON } from "@/components/teaser-cards";
+import { usePlusStore } from "@/components/use-plus-store";
 import { LockedTeaser } from "./locked-teaser";
 import { OfferCard } from "./offer-card";
 import type { Ctx } from "./types";
@@ -32,6 +38,21 @@ export function PicksView({ ctx }: { ctx: Ctx }) {
   const earlier = groups.filter((g) => g.kind === "day" && g.day !== today);
   const folded = groups.filter((g) => g.kind !== "day");
 
+  // Plus is proposed to a free account only (see components/plus-offer.ts); any doubt shows nothing.
+  const eligible = plusEligible({ pricing: ctx.pricing, demo: ctx.demo, onboarding: false, isAdmin: ctx.status?.isAdmin === true, plan: ctx.status?.plan, unlock });
+  const cards = eligible && unlock.kind === "locking" ? cardsToShow(unlock.teaser) : [];
+  const more = unlock.kind === "locking" && unlock.teaser ? unlock.teaser.more : 0;
+  // Moment "fin": every offer of the day was opened, kept or put aside.
+  const dayDone = Boolean(todayGroup && todayGroup.jobs.length > 0 && todayGroup.jobs.every((j) => stageOf(j) !== "new"));
+  const plus = usePlusStore();
+  const plan = ctx.status?.plan;
+  const wantsBanner = eligible && plus.ready && kitsUsedUp(plan) && canShowBanner(plus.store, today);
+  // One Plus block per screen: the cards (or the end of the day) win over the banner.
+  const candidates: PlusMoment[] = [];
+  if (cards.length > 0) candidates.push(dayDone ? "fin" : "cartes");
+  if (wantsBanner) candidates.push("bandeau");
+  const shown = winningMoment(candidates);
+
   return (
     <>
       <PageHead
@@ -43,6 +64,17 @@ export function PicksView({ ctx }: { ctx: Ctx }) {
           </button>
         }
       />
+
+      {shown === "bandeau" && plan && plan.limit !== null && (
+        <PlusOfferCard
+          title={monthBanner(plan.limit, plan.resetsOn).title}
+          action={PLUS_BUTTON}
+          href={pricingHref("bandeau")}
+          onClose={() => plus.update((s) => afterBannerClosed(s, today))}
+        >
+          {monthBanner(plan.limit, plan.resetsOn).text}
+        </PlusOfferCard>
+      )}
 
       {todayGroup && (
         <section className="picks-section" aria-labelledby="picks-today">
@@ -82,7 +114,14 @@ export function PicksView({ ctx }: { ctx: Ctx }) {
           Les offres que tu as déjà reçues restent là.
         </Callout>
       ) : (
-        <LockedTeaser batch={batch} locked={locked} onSettings={() => ctx.go("settings")} />
+        <LockedTeaser
+          batch={batch}
+          locked={locked}
+          onSettings={() => ctx.go("settings")}
+          cards={shown === "cartes" || shown === "fin" ? cards : []}
+          more={more}
+          phase={shown === "fin" ? "end" : "more"}
+        />
       )}
 
       {!todayGroup && groups.length === 0 && <Empty title="Rien à montrer pour l’instant" text="Tes offres arrivent dès qu’elles sont choisies pour toi." />}

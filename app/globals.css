@@ -778,7 +778,7 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .plus-offer { position: relative; display: grid; gap: 8px; padding-right: 44px; }
 .plus-offer p { margin: 0; }
 .plus-offer .btn { justify-self: start; }
-.plus-offer-close { position: absolute; top: 8px; right: 8px; }
+.plus-offer-close { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; }
 /* A message must stay readable above the open offer panel (80) */
 .toast { z-index: 95; }
 /* The guided sign-up: full screen, one step at a time */
@@ -807,6 +807,28 @@ details.more .menu { position: absolute; z-index: 20; top: calc(100% + 6px); rig
 .teaser-card i:nth-child(1) { width: 78%; }
 .teaser-card i:nth-child(2) { width: 52%; }
 .teaser-card i:nth-child(3) { width: 34%; }
+.tcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.tcard { position: relative; display: grid; gap: 10px; text-align: left; padding: 14px; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); color: var(--text); cursor: pointer; font: inherit; }
+.tcard:hover { border-color: var(--text); }
+.tcard:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.tcard-label { justify-self: start; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--text); }
+.tcard-bars { display: grid; gap: 6px; filter: blur(1.5px); }
+.tcard-bars i { display: block; height: 11px; border-radius: 6px; background: var(--line); }
+.tcard-bars i.is-title { width: 82%; }
+.tcard-bars i.is-company { width: 48%; }
+.tcard-facts { display: grid; gap: 2px; font-size: 14px; }
+.tcard-facts span { color: var(--muted); }
+.plus-dialog { border: 1px solid var(--line); border-radius: 16px; padding: 0; max-width: min(440px, calc(100vw - 24px)); background: var(--surface); color: var(--text); }
+.plus-dialog::backdrop { background: rgba(31, 26, 23, .45); }
+.plus-dialog-body { position: relative; display: grid; gap: 12px; padding: 22px 20px 20px; }
+.plus-dialog-body h2 { margin: 0; padding-right: 40px; font: 800 20px/1.2 var(--font-display), sans-serif; }
+.plus-dialog-body p { margin: 0; }
+.plus-dialog-close { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; }
+.plus-dialog-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.plus-dialog-actions .btn { flex: 1 1 160px; justify-content: center; text-align: center; }
+@media (max-width: 640px) {
+  .plus-dialog { margin: auto auto 0; max-width: 100vw; width: 100%; border-radius: 16px 16px 0 0; }
+}
 .teaser-text h2 { margin: 0 0 6px; font: 800 20px/1.2 var(--font-display), sans-serif; letter-spacing: -.03em; }
 .teaser-text p { margin: 0 0 12px; }
 /* Accounts table (admin space): scrolls sideways inside its card on a phone */

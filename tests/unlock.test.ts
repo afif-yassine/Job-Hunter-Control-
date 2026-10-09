@@ -31,9 +31,9 @@ const locking = (entries: Record<string, string>): UnlockState => ({
 const noKit = () => false;
 
 test("an answer is read as the contract says, and anything else is not an answer", () => {
-  assert.deepEqual(parseUnlocked({ unlocked: [{ jobId: "a", unlockedOn: "2026-10-08" }] }), { unlocked: [{ jobId: "a", unlockedOn: "2026-10-08", origin: "daily" }], reason: null, newToday: null });
-  assert.deepEqual(parseUnlocked({ unlocked: [], reason: "NO_SEARCH", newToday: null }), { unlocked: [], reason: "NO_SEARCH", newToday: null });
-  assert.deepEqual(parseUnlocked({ unlocked: null, reason: "NOT_READY", newToday: null }), { unlocked: null, reason: "NOT_READY", newToday: null });
+  assert.deepEqual(parseUnlocked({ unlocked: [{ jobId: "a", unlockedOn: "2026-10-08" }] }), { unlocked: [{ jobId: "a", unlockedOn: "2026-10-08", origin: "daily" }], reason: null, newToday: null, teaser: null });
+  assert.deepEqual(parseUnlocked({ unlocked: [], reason: "NO_SEARCH", newToday: null }), { unlocked: [], reason: "NO_SEARCH", newToday: null, teaser: null });
+  assert.deepEqual(parseUnlocked({ unlocked: null, reason: "NOT_READY", newToday: null }), { unlocked: null, reason: "NOT_READY", newToday: null, teaser: null });
   // A timestamp keeps only its day.
   assert.equal(parseUnlocked({ unlocked: [{ jobId: "a", unlockedOn: "2026-10-08T07:00:00Z" }] })?.unlocked?.[0].unlockedOn, "2026-10-08");
   for (const bad of [null, undefined, "x", 3, {}, { unlocked: "all" }, { unlocked: [{ jobId: "a" }] }, { unlocked: [{ jobId: "", unlockedOn: "2026-10-08" }] }, { unlocked: [{ jobId: "a", unlockedOn: "hier" }] }, { unlocked: [null] }])

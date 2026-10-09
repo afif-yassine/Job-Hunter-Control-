@@ -1,3 +1,5 @@
+import { parseTeaser, type Teaser } from "@/components/teaser-cards";
+import { DAILY_LIMIT, PLUS_DAILY_LIMIT } from "@/components/unlock-limits";
 import { compareShown } from "@/components/views/closest";
 import { stageOf, type Stage } from "@/lib/journey";
 import type { Job } from "@/lib/types";
@@ -13,21 +15,14 @@ import type { Job } from "@/lib/types";
 export const COMPUTING_TEXT = "On prépare ta sélection du jour…";
 export const DEGRADED_TEXT = "Ta sélection du jour n’a pas pu être préparée. Réessaie dans un moment.";
 
-/** How many offers a day's batch holds at most. */
-export const DAILY_LIMIT = 8;
-
-/**
- * How many a day LeBonTaf Plus is promised (the server reads PRO_DAILY_UNLOCKS, default 20). THE one place of
- * the number in the screens; a Plus account's lot is not served by the server yet.
- */
-export const PLUS_DAILY_LIMIT = 20;
+export { DAILY_LIMIT, PLUS_DAILY_LIMIT };
 
 /** "daily": a day's batch. "backfill": the offers an existing account already had when the batches began. "manual": added by hand or outside the catalogue, always open. */
 export type UnlockOrigin = "daily" | "backfill" | "manual";
 export type UnlockEntry = { jobId: string; unlockedOn: string; origin: UnlockOrigin };
 
 /** GET /api/offers/unlocked, as the contract says. `unlocked` is a list, or null with a reason. */
-export type UnlockAnswer = { unlocked: UnlockEntry[] | null; reason: string | null; /** Size of the day's batch, when the server says it. */ newToday?: number | null };
+export type UnlockAnswer = { unlocked: UnlockEntry[] | null; reason: string | null; /** Size of the day's batch, when the server says it. */ newToday?: number | null; /** The blurred cards Plus would add today (absent: none). */ teaser?: Teaser | null };
 
 export type UnlockState =
   /** The list (or the plan) is not known yet. */
@@ -37,15 +32,16 @@ export type UnlockState =
   /** Nothing is locked, and the student is told what to do: no batch could be made. */
   | { kind: "action"; need: "profile-vector" | "search" }
   /** The batches: offer id → the day it was unlocked (Paris date, YYYY-MM-DD) and where it comes from. */
-  | { kind: "locking"; unlocked: Map<string, { day: string; origin: UnlockOrigin }>; newToday: number | null; /** The day's calculation failed: the lock stays, and the student is told. */ degraded: boolean; /** The day's batch is still being computed: "On prépare ta sélection du jour…". */ computing?: boolean };
+  | { kind: "locking"; unlocked: Map<string, { day: string; origin: UnlockOrigin }>; newToday: number | null; /** The day's calculation failed: the lock stays, and the student is told. */ degraded: boolean; /** The day's batch is still being computed: "On prépare ta sélection du jour…". */ computing?: boolean; teaser?: Teaser | null };
 
 /** A well-formed answer, or null (anything else is treated as a failure, never as "everything locked"). */
 export function parseUnlocked(body: unknown): UnlockAnswer | null {
   if (typeof body !== "object" || body === null || !("unlocked" in body)) return null;
-  const { unlocked, reason, newToday } = body as { unlocked: unknown; reason?: unknown; newToday?: unknown };
+  const { unlocked, reason, newToday, teaser } = body as { unlocked: unknown; reason?: unknown; newToday?: unknown; teaser?: unknown };
   const why = typeof reason === "string" && reason ? reason : null;
   const today = typeof newToday === "number" && Number.isFinite(newToday) && newToday >= 0 ? Math.floor(newToday) : null;
-  if (unlocked === null) return { unlocked: null, reason: why, newToday: today };
+  const cards = parseTeaser(teaser);
+  if (unlocked === null) return { unlocked: null, reason: why, newToday: today, teaser: cards };
   if (!Array.isArray(unlocked)) return null;
   const entries: UnlockEntry[] = [];
   for (const item of unlocked) {
@@ -54,7 +50,7 @@ export function parseUnlocked(body: unknown): UnlockAnswer | null {
     // An absent or unknown origin is a daily batch.
     entries.push({ jobId: e.jobId, unlockedOn: e.unlockedOn.slice(0, 10), origin: e.origin === "backfill" || e.origin === "manual" ? e.origin : "daily" });
   }
-  return { unlocked: entries, reason: why, newToday: today };
+  return { unlocked: entries, reason: why, newToday: today, teaser: cards };
 }
 
 export type PlanKnowledge = "loading" | "unknown" | "known" | "admin";
@@ -77,7 +73,7 @@ export function unlockState(input: { demo: boolean; plan: PlanKnowledge; fetch: 
   // COMPUTING: the day's batch is still being worked out. The lock stays, even with an empty list.
   const computing = reason === "COMPUTING";
   const map = new Map(unlocked.map((e) => [e.jobId, { day: e.unlockedOn, origin: e.origin }]));
-  if (unlocked.length > 0 || degraded || computing) return { kind: "locking", unlocked: map, newToday: input.answer.newToday ?? null, degraded, computing };
+  if (unlocked.length > 0 || degraded || computing) return { kind: "locking", unlocked: map, newToday: input.answer.newToday ?? null, degraded, computing, teaser: input.answer.teaser ?? null };
   // No offer matches enough: the student sees his (empty) selection, not the whole catalogue.
   if (reason === "NO_CANDIDATES" || reason === "NONE_ABOVE_THRESHOLD") return { kind: "locking", unlocked: map, newToday: 0, degraded: false };
   if (reason === "NO_PROFILE_VECTOR" || reason === "NO_PROFILE") return { kind: "action", need: "profile-vector" };
@@ -109,7 +105,7 @@ export function parisDay(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
 
-const shiftDay = (day: string, delta: number) => {
+export const shiftDay = (day: string, delta: number) => {
   const d = new Date(`${day}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + delta);
   return d.toISOString().slice(0, 10);

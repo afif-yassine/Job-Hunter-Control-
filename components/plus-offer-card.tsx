@@ -3,28 +3,30 @@ import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
 /**
- * The one card that proposes LeBonTaf Plus, wherever the incentive plan puts it. It carries no text of its own:
- * title, sentence and button come from the caller. The way to close it is always visible, and the button only
- * leads to the pricing page (nothing is sold here).
+ * The one card that proposes LeBonTaf Plus in the page (a block that covers nothing). It carries no words of its
+ * own: title, sentence and button come from the caller. The cross is always visible (44 px), and the button only
+ * leads to the pricing page: nothing is sold here.
  */
 export function PlusOfferCard({
   title,
   children,
   action,
-  href = "/tarifs",
+  href,
   onClose,
 }: {
   title: string;
   children: ReactNode;
   action: string;
-  href?: string;
-  onClose: () => void;
+  href: string;
+  onClose?: () => void;
 }) {
   return (
     <aside className="plus-offer card" aria-label={title}>
-      <button type="button" className="iconbtn plus-offer-close" aria-label="Fermer" onClick={onClose}>
-        <X size={16} aria-hidden />
-      </button>
+      {onClose && (
+        <button type="button" className="iconbtn plus-offer-close" aria-label="Fermer" onClick={onClose}>
+          <X size={18} aria-hidden />
+        </button>
+      )}
       <strong>{title}</strong>
       <p className="muted">{children}</p>
       <a className="btn secondary" href={href}>

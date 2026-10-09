@@ -10,6 +10,14 @@ export const LOCKED_NOTE = {
   action: "Voir l’annonce",
 } as const;
 
+/** Moment "bandeau" (top of "Pour toi") when the kits of the month are used. */
+export function monthBanner(limit: number, resetsOn: string): { title: string; text: string } {
+  return {
+    title: limit > 1 ? `Tes ${limit} dossiers du mois sont utilisés` : "Ton dossier du mois est utilisé",
+    text: `Prochains dossiers le ${resetsOn}. Tu peux toujours suivre tes offres et modifier tes dossiers.`,
+  };
+}
+
 /** The kits of the month are used. `resetsOn` is the French label of the next date ("1er novembre"). */
 export function monthFullNote(limit: number, resetsOn: string): { title: string; text: string } {
   return {
