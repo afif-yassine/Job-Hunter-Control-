@@ -1,5 +1,5 @@
 import {readFile,writeFile} from 'node:fs/promises';
-import {parseJson} from '../lib/generated.ts';
+import {parseJson} from '../../../lib/generated.ts';
 const root='test-results/ai-comparison';const path=`${root}/results.json`;
 const ledger=JSON.parse(await readFile(path,'utf8'));
 // Backfill costs returned in snake_case by the Cohere-compatible endpoint.

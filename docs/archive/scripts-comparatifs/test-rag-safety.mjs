@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {retrieveEvidence,evidenceCacheKey,validEvidenceReferences} from '../lib/rag-evidence.ts';
+import {retrieveEvidence,evidenceCacheKey,validEvidenceReferences} from './rag-evidence.ts';
 const space={model:'test-embedding',dimension:2,version:'v1'};
 const make=(id,userId,verified,vector=[1,0])=>({id,userId,verified,vector,text:'Rapprochement bancaire vérifié',sourceId:'CV-1',sourceVersion:'1',space});
 const chunks=[make('a','A',true,[.8,.2]),make('b','B',true),make('unknown','A',false)];

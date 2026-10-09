@@ -1,6 +1,6 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {z} from 'zod';
-import {parseJson} from '../lib/generated.ts';
+import {parseJson} from '../../../lib/generated.ts';
 const path='test-results/ai-comparison/results.json';const ledger=JSON.parse(await readFile(path,'utf8'));
 const objectMode=process.argv.includes('--object');
 const source=await readFile('lib/profile-import.ts','utf8');const prefix=source.match(/export const IMPORT_PROMPT = `([\s\S]*?)`;/)?.[1];if(!prefix)throw new Error('Import prompt missing');

@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { generated, parseJson } from '../lib/generated.ts';
+import { generated, parseJson } from '../../../lib/generated.ts';
 import { z } from 'zod';
 
 // All profiles and employers are fictional. Production prompt is read, never executed.

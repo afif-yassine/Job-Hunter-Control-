@@ -1,5 +1,5 @@
 import {readFile,writeFile} from 'node:fs/promises';
-import {generated,parseJson,normaliseGenerated} from '../lib/generated.ts';
+import {generated,parseJson,normaliseGenerated} from '../../../lib/generated.ts';
 const ledger=JSON.parse(await readFile('test-results/ai-comparison/results.json','utf8'));
 const rows=ledger.results.filter(r=>r.task==='writing-production');
 function medianSeconds(a){const sorted=a.filter(r=>r.elapsedMs).map(r=>r.elapsedMs/1000).sort((a,b)=>a-b);const middle=Math.floor(sorted.length/2);return sorted.length?sorted.length%2?sorted[middle]:(sorted[middle-1]+sorted[middle])/2:null;}
