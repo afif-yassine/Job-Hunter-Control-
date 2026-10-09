@@ -502,6 +502,7 @@ export function Dashboard({ userEmail: tokenEmail = "", userId, demo, pricing = 
     userEmail,
     account,
     unlock,
+    refreshSelection,
     go,
     notify,
     reload,

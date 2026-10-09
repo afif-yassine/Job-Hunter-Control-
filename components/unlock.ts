@@ -8,15 +8,18 @@ import type { Job } from "@/lib/types";
  * Only the administrator is exempt by plan: a paying account gets the same offers as a free one.
  */
 
+/** Said when the server could not prepare the day's selection (reason DEGRADED): the lock stays. */
+export const DEGRADED_TEXT = "Ta sélection du jour n’a pas pu être préparée. Réessaie dans un moment.";
+
 /** How many offers a day's batch holds at most. */
 export const DAILY_LIMIT = 8;
 
-/** "daily": a day's batch. "backfill": the offers an existing account already had when the batches began. */
-export type UnlockOrigin = "daily" | "backfill";
+/** "daily": a day's batch. "backfill": the offers an existing account already had when the batches began. "manual": added by hand or outside the catalogue, always open. */
+export type UnlockOrigin = "daily" | "backfill" | "manual";
 export type UnlockEntry = { jobId: string; unlockedOn: string; origin: UnlockOrigin };
 
 /** GET /api/offers/unlocked, as the contract says. `unlocked` is a list, or null with a reason. */
-export type UnlockAnswer = { unlocked: UnlockEntry[] | null; reason: string | null };
+export type UnlockAnswer = { unlocked: UnlockEntry[] | null; reason: string | null; /** Size of the day's batch, when the server says it. */ newToday?: number | null };
 
 export type UnlockState =
   /** The list (or the plan) is not known yet. */
@@ -26,23 +29,24 @@ export type UnlockState =
   /** Nothing is locked, and the student is told what to do: no batch could be made. */
   | { kind: "action"; need: "profile-vector" | "search" }
   /** The batches: offer id → the day it was unlocked (Paris date, YYYY-MM-DD) and where it comes from. */
-  | { kind: "locking"; unlocked: Map<string, { day: string; origin: UnlockOrigin }> };
+  | { kind: "locking"; unlocked: Map<string, { day: string; origin: UnlockOrigin }>; newToday: number | null; /** The day's calculation failed: the lock stays, and the student is told. */ degraded: boolean };
 
 /** A well-formed answer, or null (anything else is treated as a failure, never as "everything locked"). */
 export function parseUnlocked(body: unknown): UnlockAnswer | null {
   if (typeof body !== "object" || body === null || !("unlocked" in body)) return null;
-  const { unlocked, reason } = body as { unlocked: unknown; reason?: unknown };
+  const { unlocked, reason, newToday } = body as { unlocked: unknown; reason?: unknown; newToday?: unknown };
   const why = typeof reason === "string" && reason ? reason : null;
-  if (unlocked === null) return { unlocked: null, reason: why };
+  const today = typeof newToday === "number" && Number.isFinite(newToday) && newToday >= 0 ? Math.floor(newToday) : null;
+  if (unlocked === null) return { unlocked: null, reason: why, newToday: today };
   if (!Array.isArray(unlocked)) return null;
   const entries: UnlockEntry[] = [];
   for (const item of unlocked) {
     const e = item as { jobId?: unknown; unlockedOn?: unknown; origin?: unknown } | null;
     if (!e || typeof e.jobId !== "string" || !e.jobId || typeof e.unlockedOn !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(e.unlockedOn)) return null;
     // An absent or unknown origin is a daily batch.
-    entries.push({ jobId: e.jobId, unlockedOn: e.unlockedOn.slice(0, 10), origin: e.origin === "backfill" ? "backfill" : "daily" });
+    entries.push({ jobId: e.jobId, unlockedOn: e.unlockedOn.slice(0, 10), origin: e.origin === "backfill" || e.origin === "manual" ? e.origin : "daily" });
   }
-  return { unlocked: entries, reason: why };
+  return { unlocked: entries, reason: why, newToday: today };
 }
 
 export type PlanKnowledge = "loading" | "unknown" | "known" | "admin";
@@ -60,8 +64,13 @@ export function unlockState(input: { demo: boolean; plan: PlanKnowledge; fetch: 
   const { unlocked, reason } = input.answer;
   if (reason === "all") return { kind: "open", why: "all" };
   if (unlocked === null) return { kind: "open", why: "not-ready" };
-  if (unlocked.length > 0) return { kind: "locking", unlocked: new Map(unlocked.map((e) => [e.jobId, { day: e.unlockedOn, origin: e.origin }])) };
-  if (reason === "NO_PROFILE_VECTOR") return { kind: "action", need: "profile-vector" };
+  // DEGRADED: the day's calculation failed and the server gave back what was already unlocked. The lock stays.
+  const degraded = reason === "DEGRADED";
+  const map = new Map(unlocked.map((e) => [e.jobId, { day: e.unlockedOn, origin: e.origin }]));
+  if (unlocked.length > 0 || degraded) return { kind: "locking", unlocked: map, newToday: input.answer.newToday ?? null, degraded };
+  // No offer matches enough: the student sees his (empty) selection, not the whole catalogue.
+  if (reason === "NO_CANDIDATES" || reason === "NONE_ABOVE_THRESHOLD") return { kind: "locking", unlocked: map, newToday: 0, degraded: false };
+  if (reason === "NO_PROFILE_VECTOR" || reason === "NO_PROFILE") return { kind: "action", need: "profile-vector" };
   if (reason === "NO_SEARCH") return { kind: "action", need: "search" };
   return { kind: "open", why: "empty" };
 }
@@ -120,7 +129,7 @@ export function groupByUnlockDay(jobs: Job[], state: UnlockState, hasKit: (job: 
   for (const job of jobs) {
     if (!isUnlocked(job, state, hasKit(job))) continue;
     const entry = state.kind === "locking" ? state.unlocked.get(job.id) : undefined;
-    if (!entry) followed.push(job);
+    if (!entry || entry.origin === "manual") followed.push(job);
     else {
       const bucket = entry.origin === "backfill" ? backfill : daily;
       bucket.set(entry.day, [...(bucket.get(entry.day) ?? []), job]);
@@ -138,6 +147,8 @@ export function groupByUnlockDay(jobs: Job[], state: UnlockState, hasKit: (job: 
 /** How many offers of the day's batch (counted from the server's list, not from what the screen shows). */
 export function todayBatchSize(state: UnlockState, today: string): number {
   if (state.kind !== "locking") return 0;
+  // The server's own count when it gives one; otherwise the entries of today.
+  if (state.newToday !== null) return state.newToday;
   let n = 0;
   for (const entry of state.unlocked.values()) if (entry.origin === "daily" && entry.day === today) n += 1;
   return n;

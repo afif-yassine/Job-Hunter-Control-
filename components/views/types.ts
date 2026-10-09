@@ -48,6 +48,8 @@ export type Ctx = {
   account: AccountInfo | null;
   /** Which offers can be worked on. Nothing is locked unless the state is "locking" (see components/unlock.ts). */
   unlock: UnlockState;
+  /** Reads the day's selection again. */
+  refreshSelection: () => void;
   go: (view: View, filter?: JobFilter) => void;
   notify: (text: string, tone?: Tone) => void;
   reload: () => Promise<void>;

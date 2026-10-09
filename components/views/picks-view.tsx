@@ -1,8 +1,8 @@
 "use client";
 import { useMemo } from "react";
 import { Plus } from "lucide-react";
-import { Empty, PageHead } from "@/components/ui";
-import { groupByUnlockDay, lockedCount, parisDay, todayBatchSize } from "@/components/unlock";
+import { Callout, Empty, PageHead } from "@/components/ui";
+import { DEGRADED_TEXT, groupByUnlockDay, lockedCount, parisDay, todayBatchSize } from "@/components/unlock";
 import { kitsByJob, stageOf } from "@/lib/journey";
 import type { Job } from "@/lib/types";
 import { compareShown } from "./closest";
@@ -58,7 +58,21 @@ export function PicksView({ ctx }: { ctx: Ctx }) {
         </section>
       )}
 
-      <LockedTeaser batch={batch} locked={locked} onSettings={() => ctx.go("settings")} />
+      {unlock.kind === "locking" && unlock.degraded ? (
+        <Callout
+          tone="warn"
+          title={DEGRADED_TEXT}
+          action={
+            <button className="btn secondary small" onClick={ctx.refreshSelection}>
+              Réessayer
+            </button>
+          }
+        >
+          Les offres que tu as déjà reçues restent là.
+        </Callout>
+      ) : (
+        <LockedTeaser batch={batch} locked={locked} onSettings={() => ctx.go("settings")} />
+      )}
 
       {!todayGroup && groups.length === 0 && <Empty title="Rien à montrer pour l’instant" text="Tes offres arrivent dès qu’elles sont choisies pour toi." />}
 

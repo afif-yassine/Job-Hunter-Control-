@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  DEGRADED_TEXT,
   actionMessage,
   dayLabel,
   groupByUnlockDay,
@@ -22,14 +23,16 @@ const job = (id: string, extra: Record<string, unknown> = {}) => ({ id, stage: "
 /** id → "2026-10-08" (a daily batch) or "2026-10-08/backfill". */
 const locking = (entries: Record<string, string>): UnlockState => ({
   kind: "locking",
-  unlocked: new Map(Object.entries(entries).map(([id, v]) => [id, { day: v.slice(0, 10), origin: (v.endsWith("/backfill") ? "backfill" : "daily") as UnlockOrigin }])),
+  unlocked: new Map(Object.entries(entries).map(([id, v]) => [id, { day: v.slice(0, 10), origin: (v.endsWith("/backfill") ? "backfill" : v.endsWith("/manual") ? "manual" : "daily") as UnlockOrigin }])),
+  newToday: null,
+  degraded: false,
 });
 const noKit = () => false;
 
 test("an answer is read as the contract says, and anything else is not an answer", () => {
-  assert.deepEqual(parseUnlocked({ unlocked: [{ jobId: "a", unlockedOn: "2026-10-08" }] }), { unlocked: [{ jobId: "a", unlockedOn: "2026-10-08", origin: "daily" }], reason: null });
-  assert.deepEqual(parseUnlocked({ unlocked: [], reason: "NO_SEARCH" }), { unlocked: [], reason: "NO_SEARCH" });
-  assert.deepEqual(parseUnlocked({ unlocked: null, reason: "NOT_READY" }), { unlocked: null, reason: "NOT_READY" });
+  assert.deepEqual(parseUnlocked({ unlocked: [{ jobId: "a", unlockedOn: "2026-10-08" }] }), { unlocked: [{ jobId: "a", unlockedOn: "2026-10-08", origin: "daily" }], reason: null, newToday: null });
+  assert.deepEqual(parseUnlocked({ unlocked: [], reason: "NO_SEARCH", newToday: null }), { unlocked: [], reason: "NO_SEARCH", newToday: null });
+  assert.deepEqual(parseUnlocked({ unlocked: null, reason: "NOT_READY", newToday: null }), { unlocked: null, reason: "NOT_READY", newToday: null });
   // A timestamp keeps only its day.
   assert.equal(parseUnlocked({ unlocked: [{ jobId: "a", unlockedOn: "2026-10-08T07:00:00Z" }] })?.unlocked?.[0].unlockedOn, "2026-10-08");
   for (const bad of [null, undefined, "x", 3, {}, { unlocked: "all" }, { unlocked: [{ jobId: "a" }] }, { unlocked: [{ jobId: "", unlockedOn: "2026-10-08" }] }, { unlocked: [{ jobId: "a", unlockedOn: "hier" }] }, { unlocked: [null] }])
@@ -83,7 +86,7 @@ test("an empty batch with a known reason locks nothing and tells the student wha
 });
 
 test("a batch locks everything that is not in it", () => {
-  const state = unlockState({ demo: false, plan: "known", fetch: "done", answer: { unlocked: [{ jobId: "a", unlockedOn: "2026-10-08", origin: "daily" }], reason: null } });
+  const state = unlockState({ demo: false, plan: "known", fetch: "done", answer: { unlocked: [{ jobId: "a", unlockedOn: "2026-10-08", origin: "daily" }], reason: null, newToday: null } });
   assert.equal(state.kind, "locking");
   assert.equal(isUnlocked(job("a"), state, false), true);
   assert.equal(isUnlocked(job("b"), state, false), false);
@@ -164,8 +167,36 @@ test("a student is told nothing about an open catalogue", () => {
   assert.doesNotMatch(all, /catalogue|explor/i);
 });
 
+test("the new contract fields: manual origin, newToday and the new reasons", () => {
+  const manual = parseUnlocked({ unlocked: [{ jobId: "m", unlockedOn: "2026-10-09", origin: "manual" }], newToday: 3 });
+  assert.equal(manual?.unlocked?.[0].origin, "manual");
+  assert.equal(manual?.newToday, 3);
+  assert.equal(parseUnlocked({ unlocked: [], newToday: -1 })?.newToday, null);
+  const answer = (reason: string, unlocked: { jobId: string; unlockedOn: string; origin: "daily" }[] = []) => unlockState({ demo: false, plan: "known", fetch: "done", answer: { unlocked, reason, newToday: null } });
+  // Nothing matches enough: the student sees his empty selection, not the catalogue.
+  for (const reason of ["NO_CANDIDATES", "NONE_ABOVE_THRESHOLD"]) {
+    const state = answer(reason);
+    assert.equal(state.kind, "locking");
+    assert.equal(todayBatchSize(state, "2026-10-09"), 0);
+  }
+  assert.deepEqual(answer("NO_PROFILE"), { kind: "action", need: "profile-vector" });
+  // DEGRADED keeps the lock, with or without offers already unlocked.
+  const degraded = answer("DEGRADED");
+  assert.equal(degraded.kind === "locking" && degraded.degraded, true);
+  const withOffers = answer("DEGRADED", [{ jobId: "a", unlockedOn: "2026-10-08", origin: "daily" }]);
+  assert.equal(withOffers.kind === "locking" && withOffers.degraded, true);
+  assert.equal(DEGRADED_TEXT, "Ta sélection du jour n’a pas pu être préparée. Réessaie dans un moment.");
+});
+
+test("a manual entry is listed with the followed offers, and the server's day size wins", () => {
+  const state = unlockState({ demo: false, plan: "known", fetch: "done", answer: { unlocked: [{ jobId: "m", unlockedOn: "2026-10-09", origin: "manual" }, { jobId: "d", unlockedOn: "2026-10-09", origin: "daily" }], reason: null, newToday: 5 } });
+  const groups = groupByUnlockDay([job("m"), job("d")], state, noKit, "2026-10-09");
+  assert.deepEqual(groups.map((g) => [g.kind, g.jobs.map((j) => j.id)]), [["day", ["d"]], ["followed", ["m"]]]);
+  assert.equal(todayBatchSize(state, "2026-10-09"), 5);
+});
+
 test("studentSees follows the selection when locking, and shows everything otherwise", () => {
-  const locking = unlockState({ demo: false, plan: "known", fetch: "done", answer: { unlocked: [{ jobId: "b", unlockedOn: "2026-10-09", origin: "daily" }], reason: null } });
+  const locking = unlockState({ demo: false, plan: "known", fetch: "done", answer: { unlocked: [{ jobId: "b", unlockedOn: "2026-10-09", origin: "daily" }], reason: null, newToday: null } });
   assert.equal(studentSees(job("a"), locking, false), false);
   assert.equal(studentSees(job("b"), locking, false), true);
   assert.equal(studentSees(job("a"), { kind: "open", why: "failed" }, false), true);
